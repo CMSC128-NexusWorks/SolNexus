@@ -1,0 +1,23 @@
+name: solnexus
+version: "1.0.0"
+config-version: 2
+profile: solnexus
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: target
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  solnexus:
+    bronze:
+      +schema: bronze
+      +materialized: view
+    silver:
+      +schema: silver
+      +materialized: table
