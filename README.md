@@ -144,3 +144,4 @@ Use `docker compose down -v` to also remove the Postgres volume.
 - [Project Proposal](docs/project_proposal.md)
 - [Software Requirements](docs/software_requirements.md)
 - [System Architecture](docs/architecture.md)
+- [Wireframes](docs/wireframes)
