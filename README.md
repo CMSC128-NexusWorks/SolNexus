@@ -104,6 +104,41 @@ The dashboard provides two core views: **Leads to Follow Up Today** and **All Le
 - **Pipeline:** Apache Airflow
 - **Integrations:** Gmail API, Facebook Graph API, Viber API, and AWS Cost Explorer
 
+## Local development
+
+The Phase 1 scaffold runs as Docker Compose services: PostgreSQL, FastAPI, the React frontend, and Apache Airflow (webserver + scheduler).
+
+### Prerequisites
+
+- Docker and Docker Compose
+
+### Start
+
+```bash
+cp .env.example .env
+docker compose build
+docker compose up -d --build
+```
+
+### Endpoints
+
+| Service | URL |
+|---|---|
+| React dashboard | http://localhost:5173 |
+| FastAPI (`GET /health`) | http://localhost:8000/health |
+| Airflow UI | http://localhost:8080 |
+| PostgreSQL | localhost:5433 |
+
+Default Airflow login is `admin` / `admin` (override in `.env`).
+
+### Stop
+
+```bash
+docker compose down
+```
+
+Use `docker compose down -v` to also remove the Postgres volume.
+
 ## Documentation
 
 - [Project Proposal](docs/project_proposal.md)
