@@ -42,6 +42,7 @@ airflow/airflow.db
 # IDE / OS
 .idea/
 .vscode/
+.vibe-wise/
 *.swp
 .DS_Store
 Thumbs.db
