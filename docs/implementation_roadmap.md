@@ -2,7 +2,7 @@
 
 Planning revision: October 18, 2026 (Asia/Manila). Jira project: **SNX — CMSC 128/129**. Original backlog planning record: [SNX-15](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-15). [Machine-readable issue plan](jira_backlog_plan.json).
 
-SNX-15 now records this revision. It remains In Progress pending team capacity review and removal of the five obsolete native Blocks links noted below.
+SNX-15 now records this revision. It remains In Progress pending team capacity review. The five obsolete Phase 2 Blocks links to the Phase 1 gate have been removed.
 
 ## Delivery decision
 
@@ -96,6 +96,6 @@ Priority labels map to Jira native priorities: P0 Highest, P1 High, P2 Medium, P
 - **Viber coverage:** the documented bot API may not include existing personal chats. Phase 2 scope is conditional on a workflow test, not an assumption that all historical conversations are available.
 - **Lead reconciliation:** imported and manually created clinics must survive dbt rebuilds and avoid false cross-channel merges. SNX-20 defines identity and data ownership before implementation.
 - **Capacity:** hours and velocity are unmeasured. Phase 2 has no fixed sprint or due-date commitment until Phase 1 is accepted and the team reforecasts.
-- **Legacy Jira links:** the connector can add but cannot remove issue links. The earlier Blocks links from SNX-37, SNX-38, SNX-39, SNX-41 and SNX-42 to SNX-43 still appear in Jira. They are obsolete under this Phase 1 acceptance plan; SNX-43 documents that they do not define its acceptance criteria. Remove those five links in Jira when link deletion is available.
+- **Jira dependencies:** the five obsolete Phase 2 Blocks links to SNX-43 have been removed. Its remaining direct blockers are SNX-35, SNX-36, SNX-48 and SNX-53.
 
 This revision updates the plan and issue text. Actual provider access, production data permissions, native sprint assignment and software behavior still require implementation and evidence.
