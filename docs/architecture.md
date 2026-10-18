@@ -153,7 +153,7 @@ flowchart TB
 | Lead Spreadsheet Import | Staff-driven import of clinic/lead records from the existing SolTech workbook | FR-02 |
 | Facebook Graph API Connector | Automated Facebook Page ingestion in Phase 1 | FR-11 |
 | Viber Bot API Connector | Phase 2 ingestion of supported bot conversations after access review | FR-12 |
-| Lead Spreadsheet and Add Clinic UI | Download current lead records and create outbound clinic leads | FR-19, FR-20 |
+| Lead Spreadsheet and Add Clinic UI | Download current lead records, create outbound clinic leads, and correct status/next-action date | FR-19, FR-20 |
 | Apache Airflow | Scheduling, retries, and (Phase 2) failure alerting | FR-05, FR-18, NFR-02, NFR-08 |
 | PostgreSQL Bronze Layer | Immutable raw storage tagged by source/timestamp | FR-03, NFR-09 |
 | Amazon S3 | Scalable raw data lake for unstructured conversation data | FR-14 |
@@ -199,6 +199,10 @@ flowchart LR
     subgraph BRONZE_L["Bronze Layer (PostgreSQL)"]
         RAW["raw_messages\n(source, timestamp, payload)"]
     end
+    subgraph APP_L["Operational app data (PostgreSQL)"]
+        CLINICS["clinics\n(staff/import values, stable clinic ID)"]
+        LINKS["staff-confirmed source identity\nand message resolution"]
+    end
 
     subgraph SILVER_L["Silver Layer (PostgreSQL, via dbt)"]
         LEADS["leads\n(clinic, contact, status,\nnext_action_date)"]
@@ -207,12 +211,16 @@ flowchart LR
 
     E1 --> DAG1 --> RAW
     E3 --> DAG1
-    E2 -. "lead records; mapping in SNX-20" .-> LEADS
-    E4 -. "lead intake; identity contract in SNX-20" .-> LEADS
+    E2 -. "lead records; two sheet adapters in SNX-20" .-> CLINICS
+    E4 -. "lead intake and basic status/date correction" .-> CLINICS
     RAW --> DAG2
+    CLINICS --> DAG2
+    LINKS --> DAG2
     DAG2 -- "dbt run" --> LEADS
     DAG2 -- "dbt run" --> INTER
-    LEADS -.->|deduplicated by lead identity| INTER
+    RAW --> LINKS
+    CLINICS --> LINKS
+    INTER -.->|linked by confirmed clinic ID| LEADS
 ```
 
 ### 2.3 Diagram — Phase 2 Data Flow

@@ -17,7 +17,7 @@ SolTech EMR is a healthcare technology startup that manages sales outreach to cl
 
 This proposal outlines a two-semester Data Engineering project that will design and build a Unified Lead & Client Communication Intelligence Pipeline: an automated system that ingests conversation data from SolTech's communication channels, transforms it into a clean and structured data model, and surfaces it through a purpose-built web dashboard. The dashboard directly implements the two-table view requested by the client — a "Leads to Follow Up Today" view and a "Complete Lead History" view — backed by a governed data pipeline rather than manual data entry.
 
-The current delivery target makes Phase 1 the minimum finished product for this semester: Gmail and Facebook Page ingestion, import of SolTech's existing clinic/lead spreadsheet, export of the current lead list, manual clinic creation, the orchestrated data pipeline, and the authenticated two-table dashboard. Spreadsheet rows are lead records rather than Viber/Facebook conversation exports. Phase 2 follows Phase 1 acceptance if time and provider access allow; it adds Viber bot integration, AI/LLM extraction, S3 retention, analytics, and failure alerts. Financial tracking and the daily digest remain stretch goals. The original two-semester outline below is historical planning context; the phase acceptance boundary in the requirements list and implementation roadmap governs current work.
+The current delivery target makes Phase 1 the minimum finished product for this semester: Gmail and Facebook Page ingestion, import of both sheets of SolTech's existing clinic/lead workbook, export of the current lead list, manual clinic creation and basic status/date correction, the orchestrated data pipeline, and the authenticated two-table dashboard. Spreadsheet rows are lead records rather than Viber/Facebook conversation exports. Phase 2 follows Phase 1 acceptance if time and provider access allow; it adds Viber bot integration, AI/LLM extraction, S3 retention, analytics, and failure alerts. Financial tracking and the daily digest remain stretch goals. The original two-semester outline below is historical planning context; the phase acceptance boundary in the requirements list and implementation roadmap governs current work.
 
 ## 2. Client Background
 
@@ -54,8 +54,8 @@ The Phase 1 minimum is a working, demonstrable product that automates Gmail and 
 **Planned deliverables:**
 
 - Automated Gmail API and Facebook Page Graph API ingestion with real synthetic test conversations.
-- Import of clinic/lead records from the existing `leads-data/Leads Spreadsheet.xlsx` format and download of the current lead list, with validation, row-level errors, provenance, and duplicate handling under the agreed identity rules. The sheet does not contain platform conversation exports.
-- Manual clinic creation for outbound leads before any digital message arrives, with contact details, status, next action, and discovery source as shown in wireframe 06.
+- Import of clinic/lead records from both equally authoritative sheets of the existing `leads-data/Leads Spreadsheet.xlsx` format, using separate adapters for their inconsistent layouts, and download of the current lead list, with validation, row-level errors, provenance, conflict review, and duplicate handling under the agreed identity rules. The workbook does not contain platform conversation exports.
+- Manual clinic creation for outbound leads before any digital message arrives, with contact details, status, next action, and discovery source as shown in wireframe 06; basic in-app status and next-action-date correction for an existing clinic, with an audit trail. Call logging remains a separate decision.
 - A raw ("bronze") data layer in PostgreSQL that stores ingested messages in their original form, tagged by source and timestamp.
 - Apache Airflow DAGs to orchestrate scheduled ingestion and transformation runs, including retries and basic monitoring.
 - dbt models to transform bronze data into a clean, structured ("silver") layer: normalized lead and interaction tables.
@@ -65,7 +65,7 @@ The Phase 1 minimum is a working, demonstrable product that automates Gmail and 
   - **"All Leads"** — the complete lead history with filtering by status (e.g., proposal sent, awaiting demo, follow-up needed).
 - Basic authentication for the two SolTech team members who track leads.
 
-The Phase 1 acceptance target is a working system where Gmail and Facebook Page activity is automatically captured and staff can import, create and export lead records without relying on a separate spreadsheet as the source of truth. Automated Viber conversation ingestion remains Phase 2.
+The Phase 1 acceptance target is a working system where Gmail and Facebook Page activity is automatically captured and staff can import from both workbook sheets, create and correct clinic leads, and export current lead records without relying on a separate spreadsheet as the source of truth. Automated Viber conversation ingestion remains Phase 2.
 
 ### 5.2 Semester 2 (SWE 2) — Full Automation, Intelligence, and Analytics
 
@@ -167,7 +167,7 @@ These map directly onto the two dashboard views defined by the client:
 
 ## 12. Expected Outcomes & Success Metrics
 
-- A live dashboard with clinic creation and spreadsheet lead-data upload/download for day-to-day follow-up by Phase 1 acceptance.
+- A live dashboard with clinic creation, basic status/date correction, and two-sheet spreadsheet lead-data upload/current-list download for day-to-day follow-up by Phase 1 acceptance.
 - Gmail and Facebook Page ingestion demonstrated end-to-end with real APIs and synthetic conversations by Phase 1 acceptance.
 - Automated Viber bot ingestion pursued in Phase 2 only where access and conversation coverage are proven.
 - Reduced manual data entry effort for the SolTech team, measured qualitatively through client feedback.
