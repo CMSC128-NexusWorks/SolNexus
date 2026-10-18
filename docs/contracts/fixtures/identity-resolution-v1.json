@@ -1,0 +1,253 @@
+{
+  "contract_version": "phase1-identity-v1",
+  "synthetic_data_only": true,
+  "clinics": [
+    {
+      "clinic_id": "clinic-001",
+      "name": "Harbor Family Clinic",
+      "location": "North District"
+    },
+    {
+      "clinic_id": "clinic-002",
+      "name": "Harbor Family Clinic",
+      "location": "South District"
+    },
+    {
+      "clinic_id": "clinic-003",
+      "name": "Cedar Health Center",
+      "location": null
+    }
+  ],
+  "staff_confirmed_mappings": [
+    {
+      "source_channel": "gmail",
+      "source_account_id": "soltech-test-mailbox",
+      "clinic_id": "clinic-001",
+      "confirmed_by": "staff-test-01",
+      "confirmed_at": "2026-10-16T09:00:00+08:00",
+      "active": true,
+      "external_participant_id": "mira@harbor.example"
+    },
+    {
+      "source_channel": "facebook",
+      "source_account_id": "soltech-test-page",
+      "clinic_id": "clinic-003",
+      "confirmed_by": "staff-test-02",
+      "confirmed_at": "2026-10-16T10:00:00+08:00",
+      "active": true,
+      "external_participant_id": "page-scoped-user-42"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "first_contact_full_name_match",
+      "message": {
+        "source_channel": "gmail",
+        "source_account_id": "soltech-test-mailbox",
+        "source_sender_id": "alex@harbor.example",
+        "source_message_id": "gmail-001",
+        "source_thread_id": "thread-001",
+        "source_event_at": "2026-10-17T08:00:00+08:00",
+        "ingested_at": "2026-10-17T08:05:00+08:00",
+        "raw_payload": {
+          "from": "Alex <alex@harbor.example>",
+          "subject": "Harbor Family Clinic, North District",
+          "body": "I am Alex from Harbor Family Clinic in North District."
+        },
+        "external_participant_id": "alex@harbor.example",
+        "direction": "inbound",
+        "source_recipient_ids": [
+          "soltech-test-mailbox"
+        ]
+      },
+      "expected": {
+        "resolution_status": "needs_review",
+        "clinic_id": null,
+        "review_reason": "unconfirmed_source_identity"
+      }
+    },
+    {
+      "case_id": "confirmed_sender_location_absent",
+      "message": {
+        "source_channel": "gmail",
+        "source_account_id": "soltech-test-mailbox",
+        "source_sender_id": "mira@harbor.example",
+        "source_message_id": "gmail-002",
+        "source_thread_id": "thread-002",
+        "source_event_at": "2026-10-17T09:00:00+08:00",
+        "ingested_at": "2026-10-17T09:03:00+08:00",
+        "raw_payload": {
+          "from": "Mira <mira@harbor.example>",
+          "body": "Following up for Harbor Family Clinic."
+        },
+        "external_participant_id": "mira@harbor.example",
+        "direction": "inbound",
+        "source_recipient_ids": [
+          "soltech-test-mailbox"
+        ]
+      },
+      "expected": {
+        "resolution_status": "linked",
+        "clinic_id": "clinic-001",
+        "review_reason": null
+      }
+    },
+    {
+      "case_id": "same_name_multiple_clinics",
+      "message": {
+        "source_channel": "gmail",
+        "source_account_id": "soltech-test-mailbox",
+        "source_sender_id": "sam@harbor.example",
+        "source_message_id": "gmail-003",
+        "source_thread_id": "thread-003",
+        "source_event_at": "2026-10-17T10:00:00+08:00",
+        "ingested_at": "2026-10-17T10:02:00+08:00",
+        "raw_payload": {
+          "from": "Sam <sam@harbor.example>",
+          "body": "Writing from Harbor Family Clinic."
+        },
+        "external_participant_id": "sam@harbor.example",
+        "direction": "inbound",
+        "source_recipient_ids": [
+          "soltech-test-mailbox"
+        ]
+      },
+      "expected": {
+        "resolution_status": "needs_review",
+        "clinic_id": null,
+        "review_reason": "multiple_candidates"
+      }
+    },
+    {
+      "case_id": "confirmed_sender_conflicting_location",
+      "message": {
+        "source_channel": "gmail",
+        "source_account_id": "soltech-test-mailbox",
+        "source_sender_id": "mira@harbor.example",
+        "source_message_id": "gmail-004",
+        "source_thread_id": "thread-004",
+        "source_event_at": "2026-10-17T11:00:00+08:00",
+        "ingested_at": "2026-10-17T11:01:00+08:00",
+        "raw_payload": {
+          "from": "Mira <mira@harbor.example>",
+          "body": "Please update the South District Harbor Family Clinic."
+        },
+        "external_participant_id": "mira@harbor.example",
+        "direction": "inbound",
+        "source_recipient_ids": [
+          "soltech-test-mailbox"
+        ]
+      },
+      "expected": {
+        "resolution_status": "needs_review",
+        "clinic_id": null,
+        "review_reason": "conflicting_evidence"
+      }
+    },
+    {
+      "case_id": "no_clinic_match",
+      "message": {
+        "source_channel": "facebook",
+        "source_account_id": "soltech-test-page",
+        "source_sender_id": "page-scoped-user-77",
+        "source_message_id": "facebook-001",
+        "source_thread_id": "conversation-001",
+        "source_event_at": "2026-10-17T12:00:00+08:00",
+        "ingested_at": "2026-10-17T12:02:00+08:00",
+        "raw_payload": {
+          "sender_name": "Taylor",
+          "text": "Hello, I have a question."
+        },
+        "external_participant_id": "page-scoped-user-77",
+        "direction": "inbound",
+        "source_recipient_ids": [
+          "soltech-test-page"
+        ]
+      },
+      "expected": {
+        "resolution_status": "needs_review",
+        "clinic_id": null,
+        "review_reason": "no_match"
+      }
+    },
+    {
+      "case_id": "same_name_new_channel_identity",
+      "message": {
+        "source_channel": "facebook",
+        "source_account_id": "soltech-test-page",
+        "source_sender_id": "page-scoped-user-99",
+        "source_message_id": "facebook-002",
+        "source_thread_id": "conversation-002",
+        "source_event_at": "2026-10-17T13:00:00+08:00",
+        "ingested_at": "2026-10-17T13:02:00+08:00",
+        "raw_payload": {
+          "sender_name": "Mira",
+          "text": "Harbor Family Clinic, North District here."
+        },
+        "external_participant_id": "page-scoped-user-99",
+        "direction": "inbound",
+        "source_recipient_ids": [
+          "soltech-test-page"
+        ]
+      },
+      "expected": {
+        "resolution_status": "needs_review",
+        "clinic_id": null,
+        "review_reason": "unconfirmed_source_identity"
+      }
+    },
+    {
+      "case_id": "confirmed_facebook_sender",
+      "message": {
+        "source_channel": "facebook",
+        "source_account_id": "soltech-test-page",
+        "source_sender_id": "page-scoped-user-42",
+        "source_message_id": "facebook-003",
+        "source_thread_id": "conversation-003",
+        "source_event_at": "2026-10-17T14:00:00+08:00",
+        "ingested_at": "2026-10-17T14:02:00+08:00",
+        "raw_payload": {
+          "sender_name": "Casey",
+          "text": "Checking in from Cedar Health Center."
+        },
+        "external_participant_id": "page-scoped-user-42",
+        "direction": "inbound",
+        "source_recipient_ids": [
+          "soltech-test-page"
+        ]
+      },
+      "expected": {
+        "resolution_status": "linked",
+        "clinic_id": "clinic-003",
+        "review_reason": null
+      }
+    },
+    {
+      "case_id": "outbound_to_confirmed_contact",
+      "message": {
+        "source_channel": "gmail",
+        "source_account_id": "soltech-test-mailbox",
+        "source_sender_id": "inbox@soltech.example",
+        "source_message_id": "gmail-005",
+        "source_thread_id": "thread-002",
+        "source_event_at": "2026-10-17T15:00:00+08:00",
+        "ingested_at": "2026-10-17T15:02:00+08:00",
+        "raw_payload": {
+          "from": "SolTech <inbox@soltech.example>",
+          "to": "Mira <mira@harbor.example>",
+          "body": "Thank you for following up."
+        },
+        "external_participant_id": "mira@harbor.example",
+        "direction": "outbound",
+        "source_recipient_ids": [
+          "mira@harbor.example"
+        ]
+      },
+      "expected": {
+        "resolution_status": "linked",
+        "clinic_id": "clinic-001",
+        "review_reason": null
+      }
+    }
+  ]
+}

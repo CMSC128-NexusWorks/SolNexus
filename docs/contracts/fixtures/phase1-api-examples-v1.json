@@ -1,0 +1,77 @@
+{
+  "contract_version": "phase1-data-api-v1-proposed",
+  "synthetic_only": true,
+  "business_timezone": "Asia/Manila",
+  "business_date": "2026-10-19",
+  "auth": {
+    "login_request": {"email": "staff@example.test", "password": "example-only"},
+    "login_response": {"user_id": "00000000-0000-4000-8000-000000000001", "email": "staff@example.test"},
+    "unauthorized": {"error": {"code": "unauthorized", "message": "Sign in required", "details": []}}
+  },
+  "create_clinic": {
+    "request": {"clinic_name": "Harborview Clinic", "contact_person": "Sam Example", "contact_number": "0917 000 0101", "email": "harborview@example.test", "status_code": "contacted", "next_action_date": "2026-10-20", "discovery_source": "outbound_call"},
+    "response": {"clinic_id": "10000000-0000-4000-8000-000000000001", "clinic_name": "Harborview Clinic", "status_code": "contacted", "next_action_date": "2026-10-20", "origin": "manual", "version": 1, "pending_projection": true},
+    "invalid_request": {"clinic_name": "  "},
+    "invalid_response": {"error": {"code": "validation_error", "message": "Clinic name is required", "details": [{"field": "clinic_name", "reason": "blank"}]}}
+  },
+  "correct_clinic": {
+    "request": {"version": 1, "status_code": "follow_up_needed", "next_action_date": "2026-10-19"},
+    "response": {"clinic_id": "10000000-0000-4000-8000-000000000001", "status_code": "follow_up_needed", "next_action_date": "2026-10-19", "version": 2, "pending_projection": true},
+    "stale_version_response": {"error": {"code": "version_conflict", "message": "Clinic changed since it was opened", "details": []}}
+  },
+  "import": {
+    "request": "multipart field file: synthetic-lead-import-v1.xlsx",
+    "synthetic_source_rows": {
+      "synthetic_ljs_row_1_positions": {"A": "Region Sample", "B": "Province Sample", "C": "Harborview Clinic", "D": "0917 000 0101", "E": "harborview@example.test", "F": "Sample Street", "G": "Sample City", "H": null, "I": null},
+      "synthetic_jacks_header_positions": {"A": "Facility", "B": "Name", "C": "Email", "D": "Status", "H": "Status", "I": "Next Step", "J": "Contact", "K": "Point Person"},
+      "synthetic_jacks_row_2_positions": {"A": "Harborview Clinic", "B": "Sam Example", "C": "harborview@example.test", "D": "0917 000 0199", "H": "Contacted", "I": "Call next week", "J": "unmapped contact example", "K": "Staff Example"},
+      "synthetic_jacks_corrected_meaning": {"D": "contact_number_despite_status_header", "H": "status_source", "J": "unconfirmed"}
+    },
+    "accepted_response": {"batch_id": "20000000-0000-4000-8000-000000000001", "state": "processing"},
+    "result_response": {
+      "batch_id": "20000000-0000-4000-8000-000000000001",
+      "precondition": "staff_confirmed_harborview_cross_sheet_identity",
+      "state": "needs_review",
+      "counts": {"created_clinics": 3, "accepted_rows": 4, "needs_review_rows": 0, "rejected_rows": 2, "skipped_rows": 0},
+      "rows": [
+        {"sheet": "Ljs Calling Sheet", "row": 1, "result": "accepted", "clinic_id": "10000000-0000-4000-8000-000000000002", "field_review_required": true},
+        {"sheet": "Jacks Calling Sheet", "row": 2, "result": "accepted", "match_basis": "staff_confirmed", "clinic_id": "10000000-0000-4000-8000-000000000002", "field_review_required": true, "warnings": ["field_conflict_unresolved"]},
+        {"sheet": "Jacks Calling Sheet", "row": 3, "result": "rejected", "reason": "missing_facility"},
+        {"sheet": "Jacks Calling Sheet", "row": 4, "result": "accepted", "clinic_id": "10000000-0000-4000-8000-000000000003"},
+        {"sheet": "Ljs Calling Sheet", "row": 2, "result": "rejected", "reason": "missing_facility"},
+        {"sheet": "Ljs Calling Sheet", "row": 3, "result": "accepted", "clinic_id": "10000000-0000-4000-8000-000000000004"}
+      ],
+      "field_review": {"review_id": "60000000-0000-4000-8000-000000000001", "field_name": "contact_number", "candidate_rows": [{"sheet": "Ljs Calling Sheet", "row": 1}, {"sheet": "Jacks Calling Sheet", "row": 2}], "state": "unresolved", "selected_value": null}
+    },
+    "changed_header_response": {"error": {"code": "unsupported_workbook_format", "message": "Workbook layout needs review", "details": []}}
+  },
+  "leads": {
+    "request": "/api/v1/leads?status=contacted&q=harbor&limit=20",
+    "response": {"as_of": "2026-10-19T03:00:00Z", "published_at": "2026-10-19T02:55:00Z", "items": [{"clinic_id": "10000000-0000-4000-8000-000000000001", "clinic_name": "Harborview Clinic", "status_code": "contacted", "next_action_date": "2026-10-20", "last_contact_at": null, "pending_projection": true}], "next_cursor": null}
+  },
+  "due_cases": [
+    {"case": "overdue", "status_code": "contacted", "next_action_date": "2026-10-18", "included": true},
+    {"case": "today", "status_code": "follow_up_needed", "next_action_date": "2026-10-19", "included": true},
+    {"case": "future", "status_code": "contacted", "next_action_date": "2026-10-20", "included": false},
+    {"case": "no_date", "status_code": "contacted", "next_action_date": null, "included": false},
+    {"case": "closed", "status_code": "closed", "next_action_date": "2026-10-18", "included": false}
+  ],
+  "history": {
+    "response": {"clinic_id": "10000000-0000-4000-8000-000000000002", "items": [{"raw_message_id": "30000000-0000-4000-8000-000000000001", "channel": "gmail", "direction": "inbound", "event_at": "2026-10-18T09:00:00Z", "topic": null, "derived_status_code": null}], "next_cursor": null},
+    "unconfirmed_message": {"raw_message_id": "30000000-0000-4000-8000-000000000002", "resolution_status": "needs_review", "review_reason": "unconfirmed_source_identity", "clinic_id": null}
+  },
+  "source_identity_confirmation": {
+    "request": {"source_channel": "gmail", "source_account_id": "test-mailbox", "external_participant_id": "contact@example.test", "clinic_id": "10000000-0000-4000-8000-000000000002", "expected_active_mapping_id": null, "reason": "confirmed_by_staff"},
+    "response": {"mapping_id": "40000000-0000-4000-8000-000000000001", "confirmed_by": "00000000-0000-4000-8000-000000000001", "recheck_job_id": "50000000-0000-4000-8000-000000000001"},
+    "conflicting_evidence_result": {"raw_message_id": "30000000-0000-4000-8000-000000000003", "resolution_status": "needs_review", "review_reason": "conflicting_evidence", "clinic_id": null}
+  },
+  "replay_cases": [
+    {"case": "same_message_twice", "source_key": ["gmail", "test-mailbox", "message-1"], "expected_bronze_rows": 1, "expected_silver_rows": 1},
+    {"case": "same_name_different_clinics", "expected_action": "needs_review"},
+    {"case": "confirmed_cross_sheet_conflict", "expected_action": "retain_both_source_values_and_require_staff_field_review"},
+    {"case": "reverse_workbook_sheet_order", "expected_action": "same_clinic_and_field_review_outcome"},
+    {"case": "same_file_reupload", "expected_action": "return_completed_batch_without_clinic_changes"},
+    {"case": "changed_file_after_staff_edit", "expected_action": "do_not_overwrite_staff_value"}
+  ],
+  "export": {"format_marker": "solnexus-leads-v1", "columns": ["clinic_id", "clinic_name", "contact_person", "contact_number", "email", "region", "province", "municipality", "address", "status_code", "next_action_date", "next_step", "point_person", "discovery_source", "last_contact_at", "origin"], "includes_manual_and_imported": true, "includes_raw_messages": false}
+}
