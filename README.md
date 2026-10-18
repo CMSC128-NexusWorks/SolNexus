@@ -12,17 +12,19 @@ SolNexus is a unified lead and client communication pipeline for SolTech EMR. It
 
 ## Planned Phases
 
-### Phase 1: MVP
+### Phase 1: minimum finished product for this semester
 
-- Gmail API ingestion, with manual imports for Facebook and Viber exports.
+- Automated Gmail and Facebook Page ingestion.
+- Upload of the existing SolTech lead spreadsheet and download of the current lead list; spreadsheet rows are clinic/lead records, not conversation exports.
+- Manual clinic creation before any message arrives.
 - PostgreSQL bronze storage and dbt silver models for leads and interactions.
 - Airflow orchestration with retries.
 - FastAPI backend and React dashboard.
 - Authentication for SolTech staff.
 
-### Phase 2: Expansion
+### Phase 2: expansion after Phase 1 acceptance, as capacity allows
 
-- Automated Facebook Messenger and Viber integrations.
+- Automated Viber bot ingestion, subject to access and conversation coverage.
 - LLM-based extraction of lead status, next actions, and urgency.
 - Amazon S3 raw data lake and dbt gold analytics models.
 - Conversion funnel and response-time reporting.

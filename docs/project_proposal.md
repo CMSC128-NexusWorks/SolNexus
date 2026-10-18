@@ -17,7 +17,7 @@ SolTech EMR is a healthcare technology startup that manages sales outreach to cl
 
 This proposal outlines a two-semester Data Engineering project that will design and build a Unified Lead & Client Communication Intelligence Pipeline: an automated system that ingests conversation data from SolTech's communication channels, transforms it into a clean and structured data model, and surfaces it through a purpose-built web dashboard. The dashboard directly implements the two-table view requested by the client — a "Leads to Follow Up Today" view and a "Complete Lead History" view — backed by a governed data pipeline rather than manual data entry.
 
-In Semester 1 (SWE 1), the team will deliver a working end-to-end prototype: ingestion from email, an orchestrated pipeline built with Apache Airflow, transformation modeling with dbt, a normalized PostgreSQL data warehouse, and a functioning two-table web dashboard. In Semester 2 (SWE 2), the system will be extended with additional source integrations (Facebook Messenger and Viber), an AI/LLM-based extraction and classification layer, a lightweight financial tracking module, and analytics on lead conversion performance.
+The current delivery target makes Phase 1 the minimum finished product for this semester: Gmail and Facebook Page ingestion, import of SolTech's existing clinic/lead spreadsheet, export of the current lead list, manual clinic creation, the orchestrated data pipeline, and the authenticated two-table dashboard. Spreadsheet rows are lead records rather than Viber/Facebook conversation exports. Phase 2 follows Phase 1 acceptance if time and provider access allow; it adds Viber bot integration, AI/LLM extraction, S3 retention, analytics, and failure alerts. Financial tracking and the daily digest remain stretch goals. The original two-semester outline below is historical planning context; the phase acceptance boundary in the requirements list and implementation roadmap governs current work.
 
 ## 2. Client Background
 
@@ -49,11 +49,13 @@ The project aims to:
 
 ### 5.1 Semester 1 (SWE 1) — Foundational Pipeline and MVP Dashboard
 
-The goal of Semester 1 is a working, demonstrable prototype that automates ingestion from at least one live communication channel, establishes the full orchestration and transformation stack, and delivers the two-table dashboard the client described in the interview.
+The Phase 1 minimum is a working, demonstrable product that automates Gmail and accessible Facebook Page conversations, establishes the orchestration and transformation stack, and delivers the two-table dashboard the client described in the interview.
 
 **Planned deliverables:**
 
-- Automated email ingestion via the Gmail API (SolTech uses Google Workspace), plus a manual/CSV import screen for Viber and Facebook conversation exports, to be used while API access for those channels is confirmed.
+- Automated Gmail API and Facebook Page Graph API ingestion with real synthetic test conversations.
+- Import of clinic/lead records from the existing `leads-data/Leads Spreadsheet.xlsx` format and download of the current lead list, with validation, row-level errors, provenance, and duplicate handling under the agreed identity rules. The sheet does not contain platform conversation exports.
+- Manual clinic creation for outbound leads before any digital message arrives, with contact details, status, next action, and discovery source as shown in wireframe 06.
 - A raw ("bronze") data layer in PostgreSQL that stores ingested messages in their original form, tagged by source and timestamp.
 - Apache Airflow DAGs to orchestrate scheduled ingestion and transformation runs, including retries and basic monitoring.
 - dbt models to transform bronze data into a clean, structured ("silver") layer: normalized lead and interaction tables.
@@ -63,15 +65,15 @@ The goal of Semester 1 is a working, demonstrable prototype that automates inges
   - **"All Leads"** — the complete lead history with filtering by status (e.g., proposal sent, awaiting demo, follow-up needed).
 - Basic authentication for the two SolTech team members who track leads.
 
-By the end of Semester 1, SolTech will have a working system where email-based lead activity is automatically captured and reflected in the dashboard, replacing part of the manual spreadsheet workflow.
+The Phase 1 acceptance target is a working system where Gmail and Facebook Page activity is automatically captured and staff can import, create and export lead records without relying on a separate spreadsheet as the source of truth. Automated Viber conversation ingestion remains Phase 2.
 
 ### 5.2 Semester 2 (SWE 2) — Full Automation, Intelligence, and Analytics
 
-Semester 2 extends the Semester 1 foundation into a fully automated, multi-source pipeline with an added intelligence layer, closing the gaps intentionally deferred in Semester 1.
+Phase 2 extends the accepted Phase 1 foundation with Viber automation and an intelligence layer. It is an aspirational extension for this semester, not part of the minimum finished-product gate.
 
 **Planned deliverables:**
 
-- Automated ingestion from Facebook Messenger (Graph API) and Viber (Bot/REST API), removing the need for manual import.
+- Automated ingestion of supported Viber bot conversations (Bot/REST API) where access and conversation coverage are proven; the lead spreadsheet does not provide a substitute for inaccessible conversation history.
 - An LLM-based extraction and classification layer that reads unstructured message text and automatically determines lead status, next action, and urgency/sentiment — reducing manual encoding effort.
 - Expansion of the bronze layer into a proper data lake (e.g., Amazon S3) for raw conversation storage prior to transformation.
 - Additional dbt models forming a "gold" analytics layer: lead conversion funnel (contacted → proposal sent → demo → closed) and response-time metrics.
@@ -99,7 +101,7 @@ This bronze/silver/gold structure is a widely used data engineering pattern (the
 
 | Layer | Semester 1 | Semester 2 (Extension) |
 |---|---|---|
-| Ingestion | Gmail API; manual/CSV import for Viber & Facebook | Facebook Graph API; Viber REST/Bot API; AWS Cost Explorer API |
+| Ingestion | Gmail API; Facebook Graph API; existing lead spreadsheet import and current lead-list export | Viber REST/Bot API when feasible; AWS Cost Explorer API only as a stretch goal |
 | Orchestration | Apache Airflow | Apache Airflow (added monitoring & alerting) |
 | Transformation | dbt (bronze → silver models) | dbt (added gold/analytics models) |
 | Storage | PostgreSQL | PostgreSQL + Amazon S3 (raw data lake) |
@@ -114,8 +116,9 @@ This bronze/silver/gold structure is a widely used data engineering pattern (the
 | Source | Data Type | Access Method | Semester |
 |---|---|---|---|
 | Email (Gmail / Google Workspace) | Semi-structured text (threads, timestamps, sender) | Gmail API (OAuth) | 1 |
-| Facebook Messenger (Page) | Unstructured chat text | Manual export (Sem 1) → Graph API (Sem 2) | 1 → 2 |
-| Viber | Unstructured chat text | Manual export (Sem 1) → Bot/REST API (Sem 2) | 1 → 2 |
+| Facebook Messenger (Page) | Unstructured chat text | Graph API | 1 |
+| Viber | Unstructured chat text | Bot/REST API after access and coverage decision | 2 |
+| Existing SolTech lead spreadsheet | Clinic, contact, status and next-step records; no platform conversation payloads | Staff upload, followed by current lead-list download in SolNexus | 1 |
 | AWS Billing | Structured cost data (CSV / API) | Cost Explorer API / CSV export | 2 (stretch) |
 
 ## 9. Data Model & Dashboard Design
@@ -137,7 +140,7 @@ These map directly onto the two dashboard views defined by the client:
 | Phase | Weeks | Key Milestones |
 |---|---|---|
 | Requirements & Design | 1–3 | Finalize data model, architecture diagram, Airflow/dbt project setup |
-| Ingestion & Storage | 4–6 | Gmail API integration; bronze layer in PostgreSQL; manual import tool |
+| Ingestion & Storage | 4–6 | Gmail and Facebook API integration; bronze layer in PostgreSQL; existing lead spreadsheet import |
 | Transformation | 7–9 | dbt silver models for leads and interactions; Airflow DAGs scheduled |
 | Application Layer | 10–12 | FastAPI backend; React dashboard (two-table view); authentication |
 | Testing & Demo | 13–14 | End-to-end testing; client walkthrough; MVP demo |
@@ -146,7 +149,7 @@ These map directly onto the two dashboard views defined by the client:
 
 | Phase | Weeks | Key Milestones |
 |---|---|---|
-| API Integrations | 1–4 | Facebook Graph API and Viber API automated ingestion |
+| API Integrations | 1–4 | Viber API access decision and supported bot ingestion |
 | Intelligence Layer | 5–7 | LLM-based extraction & classification pipeline |
 | Data Lake & Analytics | 8–10 | S3 raw storage; dbt gold models; conversion funnel analytics |
 | Finance Module (stretch) | 11–12 | AWS cost ingestion and reporting view |
@@ -156,16 +159,17 @@ These map directly onto the two dashboard views defined by the client:
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Facebook/Viber API access not granted in time | Delays automated multi-channel ingestion | Use manual/CSV import in Sem 1; pursue API access in parallel for Sem 2 |
+| Facebook Page API access not granted in time | Blocks the Phase 1 automated Facebook requirement | Seek access early, test with synthetic Page conversations, keep the lead spreadsheet workflow usable, and report Phase 1 as incomplete until live API evidence exists |
+| Viber bot cannot cover existing conversations | Limits Phase 2 automated ingestion | Record the bot access and conversation-coverage decision before Phase 2 implementation; the lead sheet does not contain the missing conversations |
 | Unstructured chat text is noisy/inconsistent | Reduces accuracy of automated status extraction | Start with rule-based parsing in Sem 1; introduce LLM extraction with validation in Sem 2 |
 | Limited team familiarity with dbt | Slower initial development pace | Team has prior Airflow experience and will onboard dbt early in Sem 1 with a small pilot model |
 | Client's low prioritization of finance tracking | Feature may be deprioritized | Scoped explicitly as a Semester 2 stretch goal, not a core deliverable |
 
 ## 12. Expected Outcomes & Success Metrics
 
-- A live dashboard replacing the manual spreadsheet for day-to-day lead follow-up by end of Semester 1.
-- At least one communication channel (email) fully automated end-to-end by end of Semester 1.
-- All three communication channels (email, Facebook, Viber) automated by end of Semester 2.
+- A live dashboard with clinic creation and spreadsheet lead-data upload/download for day-to-day follow-up by Phase 1 acceptance.
+- Gmail and Facebook Page ingestion demonstrated end-to-end with real APIs and synthetic conversations by Phase 1 acceptance.
+- Automated Viber bot ingestion pursued in Phase 2 only where access and conversation coverage are proven.
 - Reduced manual data entry effort for the SolTech team, measured qualitatively through client feedback.
 - A documented, orchestrated (Airflow + dbt) pipeline suitable for demonstration in academic and professional portfolios.
 

@@ -8,7 +8,7 @@ This document describes the architecture of the system in two parts:
 1. **Overall System Architecture** — the end-to-end view, from source systems through to the dashboard used by SolTech staff.
 2. **Data Pipeline Architecture** — a focused view of the ingestion → storage → transformation flow that powers the dashboard, including the bronze/silver/gold layering and orchestration.
 
-Architecture is presented for both **Phase 1 (Semester 1 / SWE 1)** and **Phase 2 (Semester 2 / SWE 2)**, consistent with the phased scope in the project proposal and requirements list.
+Architecture is presented for **Phase 1**, this semester's minimum finished product, and **Phase 2**, pursued after Phase 1 acceptance as capacity and access allow. The requirements list defines the current phase boundary.
 
 ---
 
@@ -19,7 +19,7 @@ Architecture is presented for both **Phase 1 (Semester 1 / SWE 1)** and **Phase 
 The system is organized into five layers:
 
 - **Source Systems** — the external platforms where lead conversations originate (Gmail, Facebook Messenger, Viber), plus AWS billing data for the stretch-goal finance module.
-- **Ingestion Layer** — Python connectors that pull data from source systems, scheduled and orchestrated by Apache Airflow. In Phase 1, Facebook and Viber data enters via manual staff upload rather than a live API connection (FR-02).
+- **Ingestion Layer** — Gmail and Facebook Page conversation connectors, plus staff import of existing clinic/lead spreadsheet records in Phase 1. Phase 2 adds supported Viber bot conversations after access and coverage are proven. Spreadsheet rows are not conversation messages.
 - **Storage & Transformation Layer** — the bronze/silver/gold medallion architecture: raw storage, normalized structured tables, and (in Phase 2) aggregated analytics tables.
 - **Serving Layer** — a FastAPI REST backend that exposes leads, interactions, and analytics data.
 - **Application Layer** — the React dashboard used by SolTech's two authenticated team members, plus optional Phase 2 notification output (daily digest email).
@@ -32,12 +32,14 @@ Authentication (FR-10) gates access to the dashboard and, transitively, to the A
 flowchart TB
     subgraph SRC["Source Systems"]
         GMAIL["Gmail\n(Google Workspace)"]
-        STAFF["SolTech Staff\n(manual export)"]
+        FB["Facebook Page\n(Graph API)"]
+        STAFF["SolTech Staff\n(existing lead spreadsheet)"]
     end
 
     subgraph ING["Ingestion Layer"]
         GMAILCONN["Gmail API Connector"]
-        UPLOAD["Manual CSV/Export\nUpload Screen"]
+        FBCONN["Facebook Graph API Connector"]
+        UPLOAD["Lead spreadsheet\nimport/export"]
         AF["Apache Airflow\n(scheduling, retries, monitoring)"]
     end
 
@@ -54,10 +56,12 @@ flowchart TB
         AUTH["Login / Authentication\n(2 SolTech users)"]
         DASH1["'Leads to Follow Up Today' View"]
         DASH2["'All Leads' View\n(filter by status)"]
+        LEADTOOLS["Lead spreadsheet upload/download\nand Add clinic"]
     end
 
     GMAIL --> GMAILCONN --> AF
-    STAFF --> UPLOAD --> BRONZE
+    FB --> FBCONN --> AF
+    STAFF --> UPLOAD --> LEADTOOLS
     AF --> BRONZE
     AF -. "orchestrates dbt run" .-> SILVER
     BRONZE --> SILVER
@@ -65,11 +69,13 @@ flowchart TB
     API --> AUTH
     AUTH --> DASH1
     AUTH --> DASH2
+    AUTH --> LEADTOOLS
+    LEADTOOLS --> API
 ```
 
 ### 1.3 Diagram — Phase 2 (Semester 2 / SWE 2)
 
-Phase 2 replaces manual import with live API ingestion for Facebook and Viber, introduces an LLM extraction step, adds S3 as a raw data lake, adds a gold analytics layer, and adds alerting and an optional digest notification.
+Phase 2 adds supported Viber bot ingestion to Phase 1's Gmail and Facebook connectors, introduces LLM extraction, adds S3 raw retention and gold analytics, and adds failure alerting. The existing lead spreadsheet cannot supply missing Viber conversation history. The daily digest is optional.
 
 ```mermaid
 flowchart TB
@@ -144,8 +150,10 @@ flowchart TB
 | Component | Responsibility | Requirement(s) |
 |---|---|---|
 | Gmail API Connector | Automated ingestion of lead email threads | FR-01 |
-| Manual Upload Screen | Staff-driven import of Viber/Facebook exports (Phase 1 only) | FR-02 |
-| Facebook Graph API / Viber Bot API Connectors | Automated ingestion, replacing manual import | FR-11, FR-12 |
+| Lead Spreadsheet Import | Staff-driven import of clinic/lead records from the existing SolTech workbook | FR-02 |
+| Facebook Graph API Connector | Automated Facebook Page ingestion in Phase 1 | FR-11 |
+| Viber Bot API Connector | Phase 2 ingestion of supported bot conversations after access review | FR-12 |
+| Lead Spreadsheet and Add Clinic UI | Download current lead records and create outbound clinic leads | FR-19, FR-20 |
 | Apache Airflow | Scheduling, retries, and (Phase 2) failure alerting | FR-05, FR-18, NFR-02, NFR-08 |
 | PostgreSQL Bronze Layer | Immutable raw storage tagged by source/timestamp | FR-03, NFR-09 |
 | Amazon S3 | Scalable raw data lake for unstructured conversation data | FR-14 |
@@ -178,7 +186,9 @@ The pipeline is orchestrated end-to-end by Apache Airflow, which triggers extrac
 flowchart LR
     subgraph EXTRACT["Extraction"]
         E1["Gmail API\nExtraction Script"]
-        E2["Manual Import\n(Viber/FB export)"]
+        E3["Facebook Graph API\nConnector"]
+        E2["Existing lead spreadsheet\nimport"]
+        E4["Add clinic"]
     end
 
     subgraph ORCH["Orchestration"]
@@ -196,7 +206,9 @@ flowchart LR
     end
 
     E1 --> DAG1 --> RAW
-    E2 --> RAW
+    E3 --> DAG1
+    E2 -. "lead records; mapping in SNX-20" .-> LEADS
+    E4 -. "lead intake; identity contract in SNX-20" .-> LEADS
     RAW --> DAG2
     DAG2 -- "dbt run" --> LEADS
     DAG2 -- "dbt run" --> INTER
@@ -271,7 +283,7 @@ flowchart LR
 
 | Layer | Phase 1 | Phase 2 |
 |---|---|---|
-| Extraction | Gmail API + manual export upload | Gmail, Facebook Graph, Viber, (AWS Cost Explorer) APIs — fully automated |
+| Extraction | Gmail and Facebook Graph APIs + existing lead spreadsheet import | Adds supported Viber bot messages; AWS Cost Explorer is stretch only |
 | Orchestration | Airflow DAGs with retries | Airflow DAGs with retries + failure alerting |
 | Bronze / Raw | PostgreSQL, source + timestamp tagged | PostgreSQL + Amazon S3 (data lake) |
 | Intelligence | Rule-based status parsing (baseline) | LLM-based extraction & classification |
