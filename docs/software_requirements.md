@@ -8,14 +8,14 @@ Prepared for SolTech EMR | CMSC 128 / CMSC 129 (SWE 1 & SWE 2) | September 10, 2
 
 ## 1. Functional Requirements
 
-Requirements are grouped by delivery phase, consistent with the two-semester scope defined in the project proposal.
+Requirements are grouped by delivery phase. Phase 1 is the minimum finished product for this semester; Phase 2 is pursued after Phase 1 is accepted, as capacity and external access allow. Existing requirement IDs remain stable, so new Phase 1 requirements use FR-19 and FR-20.
 
 ### 1.1 Phase 1 — Foundational Pipeline and MVP Dashboard
 
 | ID | Requirement |
 |---|---|
 | FR-01 | **Automated Email Ingestion** — The system shall automatically ingest lead-related email conversations from SolTech's Google Workspace account via the Gmail API. |
-| FR-02 | SolTech staff should be able to manually upload exported Viber/Facebook conversations into the system, instead of the system automatically connecting to those platforms. |
+| FR-02 | **Existing Lead Spreadsheet Import** — Authorized staff shall be able to upload SolTech's existing lead spreadsheet (the format represented by `leads-data/Leads Spreadsheet.xlsx`) into SolNexus as clinic/lead records. The import shall map the sheet's facility, name, email, status, next step, contact and point-person fields under an agreed mapping, validate rows, report rejected rows and avoid duplicate leads. Spreadsheet rows are lead data, not Facebook or Viber conversation messages. |
 | FR-03 | **Raw Message Storage (Bronze Layer)** — The system shall store all ingested messages in their original, unmodified form in a PostgreSQL bronze layer, tagged with source channel and timestamp. |
 | FR-04 | **Data Transformation (Silver Layer)** — The system shall transform bronze-layer data into normalized, structured "leads" and "interactions" tables using dbt models. |
 | FR-05 | **Pipeline Orchestration** — The system shall use Apache Airflow to schedule and orchestrate ingestion and transformation runs, including automatic retries on failure. |
@@ -24,13 +24,15 @@ Requirements are grouped by delivery phase, consistent with the two-semester sco
 | FR-08 | **"All Leads" / Complete Lead History View** — The dashboard shall display the complete list of leads and their interaction history, including clinic name, contact person, contact number, engagement topic, current status, follow-up date, and prior interactions. |
 | FR-09 | **Status Filtering** — The system shall allow users to filter the lead list by current status or required next action (e.g., proposal sent, awaiting demo, follow-up needed). |
 | FR-10 | **User Authentication** — The system shall require login authentication and shall support the two designated SolTech team members who manage lead tracking. |
+| FR-11 | **Automated Facebook Messenger Ingestion** — The system shall automatically ingest accessible Facebook Page conversations through the Facebook Graph API into the shared pipeline. Phase 1 acceptance requires a real API test with synthetic conversations; a mock alone does not satisfy this requirement. |
+| FR-19 | **Lead Spreadsheet Download** — Authorized staff shall be able to download the current lead list as a spreadsheet in SolNexus, using documented columns that correspond to the existing lead sheet where applicable. The export shall reflect current authorized lead data, including manually created and imported clinics; it shall not represent conversation history as spreadsheet rows. |
+| FR-20 | **Manual Clinic Creation** — Authorized staff shall be able to create a clinic lead before any digital conversation arrives, as shown in wireframe 06. The form shall capture clinic name and allow contact person, contact number, email address, status, next-action date, and how the clinic was found. The lead shall appear in the dashboard; later Gmail, Facebook, or Viber interactions shall attach when the approved contact-matching rules identify that clinic. |
 
 ### 1.2 Phase 2 — Multi-Source Automation, Intelligence & Analytics
 
 | ID | Requirement |
 |---|---|
-| FR-11 | **Automated Facebook Messenger Ingestion** — The system shall automatically ingest Facebook Messenger conversations via the Facebook Graph API, replacing the manual import process. |
-| FR-12 | **Automated Viber Ingestion** — The system shall automatically ingest Viber conversations via the Viber Bot/REST API, replacing the manual import process. |
+| FR-12 | **Automated Viber Ingestion** — Subject to an evidenced access and conversation-coverage decision, the system shall automatically ingest supported Viber bot conversations through the Viber Bot/REST API. The Phase 1 lead spreadsheet does not satisfy this conversation-ingestion requirement. |
 | FR-13 | Use an LLM to read each conversation and convert what the client said into structured fields that the rest of our data pipeline can use. |
 | FR-14 | **Data Lake Storage** — The system shall extend raw conversation storage to Amazon S3 as the bronze/raw layer for scalable retention of unstructured source data. |
 | FR-15 | **Conversion & Performance Analytics (Gold Layer)** — The system shall generate dbt-modeled analytics tables reporting the lead conversion funnel (contacted → proposal sent → demo → closed) and response-time metrics. |
@@ -48,7 +50,7 @@ Requirements are grouped by delivery phase, consistent with the two-semester sco
 | NFR-04 | **Usability — Immediate Actionability** — Upon login, a user shall be able to identify, without additional navigation or filtering, which clinics require contact that day, directly replacing the manual spreadsheet lookup process. |
 | NFR-05 | **Searchability** — Users shall be able to locate a specific lead's history and status without manually scanning a spreadsheet, via the "All Leads" filterable view. |
 | NFR-06 | **Maintainability** — The pipeline shall follow a layered (bronze/silver/gold) data architecture with modular dbt transformation models, so that individual layers and models can be modified or extended independently. |
-| NFR-07 | **Scalability of Data Source Integration** — The architecture shall be designed to accommodate additional communication channels and increasing data volume (e.g., extending from one automated source in Semester 1 to three in Semester 2) without a redesign of the core data model. |
+| NFR-07 | **Scalability of Data Source Integration** — The architecture shall accommodate additional communication channels and increasing data volume, beginning with automated Gmail and Facebook in Phase 1 and adding Viber automation in Phase 2 without redesigning the core data model. |
 | NFR-08 | **Observability** — The orchestration layer shall provide basic monitoring of pipeline runs in Phase 1, extended to alerting on failures in Phase 2, so pipeline health is visible to the team. |
 | NFR-09 | **Data Traceability** — Every ingested record shall retain its originating source channel and timestamp through the bronze layer, so that any lead or interaction can be traced back to its origin. |
 
@@ -56,8 +58,8 @@ Requirements are grouped by delivery phase, consistent with the two-semester sco
 
 | Category | Count |
 |---|---|
-| Functional Requirements — Phase 1 | 10 (FR-01 – FR-10) |
-| Functional Requirements — Phase 2 | 8 (FR-11 – FR-18) |
-| **Total Functional Requirements** | **18** |
+| Functional Requirements — Phase 1 | 13 (FR-01 – FR-11, FR-19 – FR-20) |
+| Functional Requirements — Phase 2 | 7 (FR-12 – FR-18; FR-16 and FR-17 are stretch goals) |
+| **Total Functional Requirements** | **20** |
 | **Total Non-Functional Requirements** | **9** |
-| **Overall Total** | **27** |
+| **Overall Total** | **29** |
