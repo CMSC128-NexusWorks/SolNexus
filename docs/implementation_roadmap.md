@@ -2,6 +2,8 @@
 
 Planning revision: October 18, 2026 (Asia/Manila). Jira project: **SNX — CMSC 128/129**. Original backlog planning record: [SNX-15](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-15). [Machine-readable issue plan](jira_backlog_plan.json).
 
+SNX-15 now records this revision. It remains In Progress pending team capacity review and removal of the five obsolete native Blocks links noted below.
+
 ## Delivery decision
 
 **Phase 1 is this semester’s minimum finished product.** Complete and verify it before starting Phase 2 implementation. Phase 2 is an aspiration for remaining time and provider access; incomplete Phase 2 work is reported separately. FR-16 finance and FR-17 digest remain stretch goals. Sprint labels are planning labels; the connected Jira tool does not expose native board sprint assignment.
