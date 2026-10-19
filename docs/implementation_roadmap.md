@@ -1,6 +1,6 @@
 # SolNexus delivery roadmap and Jira backlog
 
-Planning revision: October 18, 2026 (Asia/Manila). Jira project: **SNX — CMSC 128/129**. Original backlog planning record: [SNX-15](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-15). [Machine-readable issue plan](jira_backlog_plan.json).
+Planning revision: October 19, 2026 (Asia/Manila). Jira project: **SNX — CMSC 128/129**. Original backlog planning record: [SNX-15](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-15). [Machine-readable issue plan](jira_backlog_plan.json).
 
 SNX-15 now records this revision. It remains In Progress pending team capacity review. The five obsolete Phase 2 Blocks links to the Phase 1 gate have been removed.
 
@@ -8,7 +8,7 @@ SNX-15 now records this revision. It remains In Progress pending team capacity r
 
 **Phase 1 is this semester’s minimum finished product.** Complete and verify it before starting Phase 2 implementation. Phase 2 is an aspiration for remaining time and provider access; incomplete Phase 2 work is reported separately. FR-16 finance and FR-17 digest remain stretch goals. Sprint labels are planning labels; the connected Jira tool does not expose native board sprint assignment.
 
-Phase 1 includes Gmail API and Facebook Page Graph API conversation ingestion; import of clinic/lead rows from both equally authoritative sheets of the private `leads-data/Leads Spreadsheet.xlsx` format; download of the current lead list; manual Add clinic (wireframe 06) and basic status/next-action-date correction; raw-message bronze storage, dbt silver processing, Airflow retries, authenticated FastAPI and the due-today/history dashboard. The lead workbook contains operational lead data, **not** Facebook or Viber conversation exports. Do not place its real rows in fixtures, Jira descriptions, or logs.
+Phase 1 includes Gmail API and Facebook Page Graph API conversation ingestion; import of clinic/lead rows from both equally authoritative sheets of the private `leads-data/Leads Spreadsheet.xlsx` format; download of the current lead list; manual Add clinic (wireframe 06); and FR-21 spreadsheet-like editing of operational rows in the Due today, Needs clinic name and All leads dashboard views (wireframe 02). Authorized staff can edit contact details, status, next-action date, notes, person spoken to and confirmed clinic fields with save/cancel, validation, audit and stale-edit protection. New inquiries display **Clinic name unknown** and an **Email to ask** action until staff review the lead's reply and confirm the clinic name. Raw-message bronze storage, dbt silver processing, Airflow retries and authenticated FastAPI support these workflows. The lead workbook contains operational lead data, **not** Facebook or Viber conversation exports. Do not place its real rows in fixtures, Jira descriptions, or logs.
 
 Phase 2 adds supported Viber bot conversations after an access and workflow-coverage decision, LLM enrichment, private S3 raw retention, gold conversion/response analytics and pipeline failure alerts. The [Viber REST API](https://developers.viber.com/docs/api/rest-bot-api/) documents commercial bot access and webhook callbacks; it does not establish access to the client’s existing personal conversation history. A GO decision requires evidence for the intended conversation workflow.
 
@@ -39,8 +39,8 @@ Priority labels map to Jira native priorities: P0 Highest, P1 High, P2 Medium, P
 | [SNX-27](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-27) | Implement two-user login and protect application APIs | BACKEND | P0 | Sprint 2 |
 | [SNX-28](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-28) | Import existing SolTech lead spreadsheet records | DATA | P0 | Sprint 2 |
 | [SNX-29](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-29) | Build dbt silver leads and interactions with baseline status parsing | DATA | P0 | Sprint 2 |
-| [SNX-30](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-30) | Expose authenticated lead, due-today and history queries | BACKEND | P0 | Sprint 2 |
-| [SNX-31](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-31) | Deliver the due-today dashboard and searchable lead history | FRONTEND | P0 | Sprint 2 |
+| [SNX-30](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-30) | Expose authenticated lead/history queries and version-checked operational row updates | BACKEND | P0 | Sprint 2 |
+| [SNX-31](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-31) | Deliver Due today, Needs clinic name and All leads views with FR-21 editable rows and clinic-name confirmation | FRONTEND | P0 | Sprint 2 |
 | [SNX-32](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-32) | Implement incremental Gmail ingestion with replay protection | INTEGRATION | P0 | Sprint 2 |
 | [SNX-33](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-33) | Orchestrate Gmail and bronze-to-silver runs in Airflow | DATA | P0 | Sprint 2 |
 | [SNX-34](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-34) | Add reproducible checks and a shared test deployment | DEVOPS | P0 | Sprint 2 |
