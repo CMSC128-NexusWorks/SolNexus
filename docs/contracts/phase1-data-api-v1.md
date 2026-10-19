@@ -62,11 +62,15 @@ An identical file hash is a replay hint. Its prior completed batch may be return
 
 Candidate discovery must surface exact normalized-name collisions, shared nonblank contact identifiers, and plausible differently written names for staff review across both sheets and existing app clinics. These are **review candidates**, never automatic identity decisions. SNX-28 must document and test its candidate lookup, and staff must reconcile remaining rows before a production migration is accepted. The exact lookup algorithm and thresholds need validation on synthetic cases and a permitted client review; no threshold is approved by SNX-20 yet.
 
+Until staff resolves the uncertain Jacks columns, preserve `B`, `J`, and `K` only as restricted import evidence; do not copy them into operational contact or owner fields. For Jacks `H`, trim and case-fold the value and accept only an exact match to an approved status label/code; leave all other values null with a review reason. Do not infer a follow-up date from `I` Next Step or any free text. Staff can enter a date through the versioned row editor, which is the safe Phase 1 path when no workbook date field is confirmed. These rules make the confirmed columns usable without silently inventing mappings.
+
 Proposed operational limits: authenticated upload, `.xlsx` only, 10 MiB file and 10,000 populated rows, single active batch per upload, with a documented operator retry path. These limits are capacity assumptions to validate in SNX-28, not facts about the client workbook. Retain only the minimum normalized values and validation metadata needed for reconciliation, with restricted access and a retention period approved before production import.
 
 ## Clinic field precedence and status
 
 Clinic name/contact/status/next action are operational fields. Explicit staff corrections take precedence over imported values. Accepted import values initialize fields once; re-imports do not overwrite them. Rule-based parsing of messages may populate **suggestions** in silver interactions but may not silently mutate `app.clinics`. Null means unknown; an explicit staff clear must remain clear and must not be refilled from an old import or parser output. Store field-level edit provenance or an equivalent audit event with actor, time, old/new value, and reason. Concurrency control uses `version` or `updated_at` preconditions and returns a conflict if another staff member edited the clinic first.
+
+Persist append-only status events whenever staff creates a clinic with a status, confirms an inquiry into a clinic with a status, or changes/clears a clinic status through the row editor. Write the operational value, field audit, and status event in one transaction. Record the clinic, old/new status, actor, recorded time, and origin. An imported status is a **baseline observation**, not proof of when the clinic entered that stage; record it separately with its import row reference. Inquiry-only status edits remain in their field audit until confirmation. Parser suggestions do not create status events. Phase 2 funnel calculations may use staff-confirmed transitions as evidence but must exclude imported baselines from transition timing unless a later staff decision supplies a supported effective date. This retains the event grain needed by metrics without inventing historical conversion dates.
 
 ### First-contact inquiry and clinic-name confirmation
 
@@ -114,6 +118,8 @@ All endpoints require the authenticated SolTech staff session except login. Use 
 | `GET /api/v1/leads/export` | No body | `200` spreadsheet with format/version marker and snapshot time |
 
 Pagination uses an opaque cursor with stable tie-break keys and an upper bound (proposed 100 per page); invalid cursors return `422`. `published_at` denotes the last successful silver publication, not the latest connector poll. `as_of` is the response time. A newly created clinic may be read through from `app.clinics` before publication, with `pending_projection: true` so freshness is honest. The exact API examples are in [phase1-api-examples-v1.json](fixtures/phase1-api-examples-v1.json); payloads use synthetic data.
+
+Proposed refresh default for review: poll each available Phase 1 connector hourly and run silver after each successful durable ingestion batch; retry failed runs without advancing source checkpoints. Compute the due list from the current Manila business date at read time, and show staff edits from application state immediately with `pending_projection` until silver catches up. Display `published_at` so staff can judge data age. The hourly interval and an acceptable freshness threshold require team approval and provider quota validation; a failed run must not claim a fresh publication.
 
 ## Phase 2 boundaries
 

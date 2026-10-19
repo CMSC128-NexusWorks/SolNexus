@@ -14,6 +14,7 @@ erDiagram
     STAFF_USERS ||--o{ IMPORT_BATCHES : uploads
     STAFF_USERS ||--o{ CLINIC_SOURCE_IDENTITIES : confirms
     STAFF_USERS ||--o{ CLINIC_FIELD_EVENTS : corrects
+    STAFF_USERS ||--o{ CLINIC_STATUS_EVENTS : records
     STAFF_USERS ||--o{ LEAD_INQUIRIES : confirms
     IMPORT_BATCHES ||--o{ IMPORT_ROWS : contains
     IMPORT_ROWS }o--o{ IMPORT_FIELD_REVIEWS : considered_in
@@ -21,6 +22,8 @@ erDiagram
     CLINICS o|--o{ IMPORT_FIELD_REVIEWS : reviewed_for
     CLINICS ||--o{ CLINIC_SOURCE_IDENTITIES : has
     CLINICS ||--o{ CLINIC_FIELD_EVENTS : has
+    CLINICS ||--o{ CLINIC_STATUS_EVENTS : has
+    IMPORT_ROWS o|--o{ CLINIC_STATUS_EVENTS : baseline_for
     CLINICS o|--o{ MESSAGE_RESOLUTIONS : linked_to
     BRONZE_RAW_MESSAGES ||--|| MESSAGE_RESOLUTIONS : has
     MESSAGE_RESOLUTIONS ||--o{ MESSAGE_RESOLUTION_EVENTS : changes
@@ -65,6 +68,16 @@ erDiagram
         uuid changed_by FK
         text field_name
         timestamptz changed_at
+    }
+    CLINIC_STATUS_EVENTS {
+        uuid event_id PK
+        uuid clinic_id FK
+        text old_status_code
+        text new_status_code
+        text origin
+        timestamptz recorded_at
+        uuid changed_by FK
+        uuid import_row_id FK
     }
     IMPORT_BATCHES {
         uuid batch_id PK
@@ -145,7 +158,7 @@ erDiagram
     }
 ```
 
-`clinics`, clinic field events, import records, source mappings, and resolution decisions are **operational state** written through the API or ingestion service. `bronze.raw_messages` is append-only source evidence. `silver.leads` and `silver.interactions` are dbt-built read models. The dashboard reads silver plus any operational fields needed to show newly created or corrected clinics before the next dbt run; the API must provide a consistent merged view.
+`clinics`, clinic field and status events, import records, source mappings, and resolution decisions are **operational state** written through the API or ingestion service. `bronze.raw_messages` is append-only source evidence. `silver.leads` and `silver.interactions` are dbt-built read models. The dashboard reads silver plus any operational fields needed to show newly created or corrected clinics before the next dbt run; the API must provide a consistent merged view.
 
 ## Schema ownership and data flow
 
@@ -163,6 +176,7 @@ flowchart LR
         MAPPINGS["clinic_source_identities<br/>staff-confirmed source links"]
         RESOLUTION["message_resolutions<br/>linked or needs_review"]
         RESOLUTIONEVENTS["message_resolution_events<br/>audited changes"]
+        STATUSEVENTS["clinic_status_events<br/>confirmed changes and import baselines"]
     end
     subgraph BRONZE["bronze schema · source evidence"]
         RAW["raw_messages<br/>one row per source message"]
@@ -178,6 +192,8 @@ flowchart LR
     STAFF --> INQUIRIES --> CLINICS
     INQUIRIES --> LEADS
     STAFF --> FIELDEVENTS["clinic_field_events<br/>audited corrections"] --> CLINICS
+    STAFF --> STATUSEVENTS
+    IMPORT --> STATUSEVENTS
     STAFF --> IMPORT --> CLINICS
     IMPORT --> IMPORTREVIEW
     IMPORTREVIEW --> CLINICS
@@ -208,6 +224,7 @@ Types and keys below are the intended migration contract once SNX-20 decisions a
 | `app.clinics` | `clinic_id uuid PK`, `clinic_name text NOT NULL`, `contact_person text NULL`, `person_spoken_to text NULL`, `calling_notes text NULL`, `contact_number text NULL`, `email text NULL`, `region text NULL`, `province text NULL`, `municipality text NULL`, `address text NULL`, `status_code text NULL`, `next_action_date date NULL`, `next_step text NULL`, `point_person text NULL`, `discovery_source text NULL`, `origin text NOT NULL`, `version int NOT NULL`, `created_by uuid NULL FK staff_users`, `created_at`, `updated_at` | Stable confirmed clinic row for manual creation, staff-confirmed inquiry, or accepted import. LJ's H and I map to `calling_notes` and `person_spoken_to`; I may fill a blank `contact_person`. `version` supports safe row editing. Do **not** put a unique constraint on clinic name, phone, or email: those are candidate evidence, not identity. |
 | `app.lead_inquiries` | `inquiry_id uuid PK`, `source_channel text`, `source_account_id text`, `external_participant_id text NULL`, `clinic_name_state text NOT NULL DEFAULT 'unknown'`, `contact_person text NULL`, `contact_number text NULL`, `email text NULL`, `status_code text NULL`, `next_action_date date NULL`, `next_step text NULL`, `calling_notes text NULL`, `version int NOT NULL`, `state text NOT NULL`, `created_at`, `updated_at`, `closed_at timestamptz NULL`, `confirmed_clinic_id uuid NULL FK clinics` | Unresolved inbound lead before clinic identification. `clinic_name` is absent/null and state is explicitly unknown. Unique open complete source key; incomplete keys remain separate review records. Staff confirms from the question/reply before creating or choosing a clinic. Retain the inquiry and supporting message IDs after closure for audit. |
 | `app.clinic_field_events` | `event_id uuid PK`, `clinic_id uuid NULL FK clinics`, `inquiry_id uuid NULL FK lead_inquiries`, `field_name text`, `old_value jsonb`, `new_value jsonb`, `changed_by uuid FK staff_users`, `changed_at timestamptz`, `reason text NULL`, `evidence_message_ids uuid[] NULL` | Append-only audit for row edits and clinic-name confirmation. Exactly one of clinic or inquiry ID is present. Explicit null clears remain distinct from missing values. Protect from dbt rebuilds and ordinary lead-list responses. |
+| `app.clinic_status_events` | `event_id uuid PK`, `clinic_id uuid FK clinics`, `old_status_code text NULL`, `new_status_code text NULL`, `origin text`, `recorded_at timestamptz`, `changed_by uuid NULL FK staff_users`, `import_row_id uuid NULL FK import_rows`, `reason text NULL` | Append-only status evidence. Staff create/edit/clear events identify an actor; imported initial status is a baseline observation linked to a row, not a dated conversion. Parser suggestions never write here. Metric models use confirmed transitions and do not treat imported baseline time as stage-entry time. |
 | `app.import_batches` | `batch_id uuid PK`, `uploaded_by uuid FK staff_users`, `file_sha256 text`, `original_filename text`, `uploaded_at timestamptz`, `state text`, `created_clinic_count int`, `accepted_row_count int`, `needs_review_row_count int`, `rejected_row_count int`, `skipped_row_count int` | Audit of workbook uploads with clinic and row counts kept separate. Store file hash, not the private workbook blob. An identical hash may flag a replay but is not alone a clinic identity. |
 | `app.import_rows` | `import_row_id uuid PK`, `batch_id uuid FK import_batches`, `sheet_name text`, `row_number int`, `row_fingerprint text`, `normalized_fields jsonb`, `validation_errors jsonb`, `result text`, `clinic_id uuid NULL FK clinics` | One result per attempted row. Unique `(batch_id, sheet_name, row_number)`. `result` is `accepted`, `needs_review`, `rejected`, or `skipped`; accepted rows link to a clinic, while other results have null `clinic_id` until review completes. Two accepted rows may link to the same newly created clinic. Fingerprint supports replay checks, not automatic cross-row merges. Raw client row values need an approved retention policy before storing them here. |
 | `app.import_field_reviews` | `review_id uuid PK`, `clinic_id uuid NULL FK clinics`, `field_name text`, `candidate_import_row_ids uuid[]`, `state text`, `resolved_value jsonb NULL`, `resolved_by uuid NULL FK staff_users`, `resolved_at timestamptz NULL`, `resolution_reason text NULL` | Durable review of conflicting values from two or more import rows, including required clinic-name conflicts before a clinic exists. `state` distinguishes an unresolved null from a staff-selected null. Candidate row IDs refer to restricted import evidence; SNX-26 may use a junction table to enforce FKs. Identical-file replay reuses the recorded decision; a changed workbook with uncertain matches needs fresh review. |
@@ -234,7 +251,7 @@ For `source_channel`, the Phase 1 allowed values are `gmail` and `facebook`; `vi
 |---|---|
 | Workbook mapping and scope | Both sheets are equally authoritative migration inputs. Headerless Ljs has confirmed A–I positions: H is notes and I is person spoken to. Jacks D is a contact number despite its `Status` header and H is the real status source. On a staff-confirmed cross-sheet match, equal or complementary values can initialize fields; conflicting values remain unresolved for staff review, with no sheet priority. Decide Jacks H value normalization and B/J/K meanings, and blank/date parsing. Do not copy private row data into fixtures or docs. |
 | Clinic candidate discovery | Staff confirmation is the identity rule, and later imports never overwrite app edits. Define and validate how the importer surfaces repeated or differently written rows as candidates, including a reconciliation review before production migration; a candidate is never an automatic merge. |
-| Status and next-action ownership | Approve the proposed enum and due/closed behavior. Editable staff row values and unknown-name inquiries were requested for Phase 1 on October 19; record the backlog and capacity change. Parser output remains a suggestion. |
+| Status and next-action ownership | Approve the proposed enum and due/closed behavior. Staff status changes have append-only events; imported status is a baseline, and parser output remains a suggestion. With no confirmed workbook date source, staff enters next-action dates through FR-21. Editable rows and unknown-name inquiries were requested for Phase 1 on October 19; record the backlog and capacity change. |
 | Message resolution lifecycle | The identity contract now requires bounded re-evaluation after confirmation, correction or revocation for the exact source key. SNX-26/29/30 implement retry checkpoints, conflict review, resolution audit and current-link filtering; batch size is an implementation tuning choice. |
 | Dashboard and import/export contracts | Set timezone, due/overdue and sorting rules, import limits/errors, export columns, API payloads and refresh timing. |
 
