@@ -22,7 +22,7 @@ The system is organized into five layers:
 - **Ingestion Layer** — Gmail and Facebook Page conversation connectors, plus staff import of existing clinic/lead spreadsheet records in Phase 1. Phase 2 adds supported Viber bot conversations after access and coverage are proven. Spreadsheet rows are not conversation messages.
 - **Storage & Transformation Layer** — the bronze/silver/gold medallion architecture: raw storage, normalized structured tables, and (in Phase 2) aggregated analytics tables.
 - **Serving Layer** — a FastAPI REST backend that exposes leads, interactions, and analytics data.
-- **Application Layer** — the React dashboard used by SolTech's two authenticated team members, plus optional Phase 2 notification output (daily digest email).
+- **Application Layer** — the React dashboard used by SolTech's two authenticated team members. Phase 1 includes versioned operational row editing and a visible inquiry state for leads whose clinic name is still unknown. Phase 2 may add a daily digest email.
 
 Authentication (FR-10) gates access to the dashboard and, transitively, to the API layer, satisfying the access-control requirement (NFR-03) given the sensitivity of clinic client data.
 
@@ -153,7 +153,8 @@ flowchart TB
 | Lead Spreadsheet Import | Staff-driven import of clinic/lead records from the existing SolTech workbook | FR-02 |
 | Facebook Graph API Connector | Automated Facebook Page ingestion in Phase 1 | FR-11 |
 | Viber Bot API Connector | Phase 2 ingestion of supported bot conversations after access review | FR-12 |
-| Lead Spreadsheet and Add Clinic UI | Download current lead records, create outbound clinic leads, and correct status/next-action date | FR-19, FR-20 |
+| Lead Spreadsheet and Add Clinic UI | Download current lead records and create named outbound clinic leads | FR-19, FR-20 |
+| Editable dashboard rows | Correct operational fields with audit and version checks; show first-contact inquiries as Clinic name unknown until staff confirms a reply | FR-21 |
 | Apache Airflow | Scheduling, retries, and (Phase 2) failure alerting | FR-05, FR-18, NFR-02, NFR-08 |
 | PostgreSQL Bronze Layer | Immutable raw storage tagged by source/timestamp | FR-03, NFR-09 |
 | Amazon S3 | Scalable raw data lake for unstructured conversation data | FR-14 |
@@ -201,18 +202,22 @@ flowchart LR
     end
     subgraph APP_L["Operational app data (PostgreSQL)"]
         CLINICS["clinics\n(staff/import values, stable clinic ID)"]
+        INQUIRIES["lead_inquiries\n(clinic name unknown pending staff confirmation)"]
         LINKS["staff-confirmed source identity\nand message resolution"]
     end
 
     subgraph SILVER_L["Silver Layer (PostgreSQL, via dbt)"]
-        LEADS["leads\n(clinic, contact, status,\nnext_action_date)"]
+        LEADS["leads\n(clinics and open inquiries,\ncontact, status, next_action_date)"]
         INTER["interactions\n(lead_ref, channel,\ntopic, timestamp)"]
     end
 
     E1 --> DAG1 --> RAW
     E3 --> DAG1
     E2 -. "lead records; two sheet adapters in SNX-20" .-> CLINICS
-    E4 -. "lead intake and basic status/date correction" .-> CLINICS
+    E4 -. "named clinic creation" .-> CLINICS
+    RAW --> INQUIRIES
+    INQUIRIES --> DAG2
+    INQUIRIES -. "staff confirms reply and source mapping" .-> CLINICS
     RAW --> DAG2
     CLINICS --> DAG2
     LINKS --> DAG2

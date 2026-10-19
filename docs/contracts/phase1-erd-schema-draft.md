@@ -1,6 +1,6 @@
 # Phase 1 ERD and database schema — review draft
 
-Status: **draft for SNX-20 review**, not an approved migration. Read with [the proposed data/API contract](phase1-data-api-v1.md). Scope: Phase 1 (FR-01–FR-11, FR-19–FR-20, plus the requested editable dashboard rows and unknown-name inquiry pending backlog amendment). Phase 2 adds Viber to the same message envelope and later adds enrichment and gold models; finance is outside this schema.
+Status: **draft for SNX-20 review**, not an approved migration. Read with [the proposed data/API contract](phase1-data-api-v1.md). Scope: Phase 1 (FR-01–FR-11, FR-19–FR-21, including editable dashboard rows and unknown-name inquiries; capacity review remains open). Phase 2 adds Viber to the same message envelope and later adds enrichment and gold models; finance is outside this schema.
 
 This design follows [the agreed identity contract](phase1-identity-v1.md). In particular, importing or manually creating a clinic gives it an internal ID, while a message remains unlinked until staff confirms its exact source identity. The app owns staff-entered clinic data and mappings; dbt owns rebuildable projections. No dbt run may replace the operational tables.
 

@@ -1,6 +1,6 @@
 # Phase 1 data and API contract — proposed v1
 
-Status: **implementation proposal for SNX-20**. The staff-confirmed message identity rule in [phase1-identity-v1.md](phase1-identity-v1.md) is already agreed. Product choices listed under **Approval gates** still need team/client confirmation before dependent tickets claim acceptance. This document defines behavior for SNX-26–SNX-33, SNX-48, SNX-53, and the editable dashboard row workflow requested on October 19. It does not claim those features are implemented.
+Status: **implementation proposal for SNX-20**. The staff-confirmed message identity rule in [phase1-identity-v1.md](phase1-identity-v1.md) is already agreed. Product choices listed under **Approval gates** still need team/client confirmation before dependent tickets claim acceptance. This document defines behavior for SNX-26–SNX-33, SNX-48, SNX-53, and FR-21's editable dashboard row workflow. It does not claim those features are implemented.
 
 ## Data ownership and grain
 
@@ -13,7 +13,7 @@ Status: **implementation proposal for SNX-20**. The staff-confirmed message iden
 | `app.clinic_source_identities` | One staff confirmation or revocation of a channel participant to a clinic | `mapping_id`; one active mapping per complete source key | Staff workflow | No |
 | `app.message_resolutions` | Current clinic association for one raw message | `raw_message_id` | Resolution workflow | No; audit changes |
 | `silver.interactions` | One normalized raw message | `raw_message_id` | dbt | Yes |
-| `silver.leads` | One clinic, including one with zero messages | `clinic_id` | dbt | Yes |
+| `silver.leads` | One confirmed clinic or open inquiry, including records with zero linked messages | `(record_type, lead_id)` | dbt | Yes |
 
 The application tables hold operational decisions. dbt reads them and the bronze messages; it never writes back to them. The authenticated API may read `app.clinics` for a just-created or corrected row before silver refresh, using the same field precedence as silver. A failed dbt run keeps the previous published silver snapshot and exposes its last successful publication time; it must not present an empty dashboard as fresh data.
 
@@ -80,7 +80,7 @@ Proposed Phase 1 status codes are `contacted`, `proposal_sent`, `awaiting_demo`,
 
 No workbook column has yet been confirmed as a next-action date. Imported clinics with null `next_action_date` remain visible in All leads and are excluded from Due today. Before Phase 1 acceptance, confirm a date mapping from the remaining workbook fields or demonstrate staff entering dates through the row editor; otherwise the imported due-list workflow is incomplete.
 
-The requested Phase 1 row editor updates operational fields for an existing clinic or inquiry, with staff actor and audit trail. It does not create a call or conversation record. Manual call logging, snooze, and collapse preferences remain separate scope decisions. SNX-20 should amend the dashboard and API delivery tickets and Phase 1 gate after the team approves capacity; the contract alone does not deliver UI/API behavior.
+FR-21's Phase 1 row editor updates operational fields for an existing clinic or inquiry, with staff actor and audit trail. It does not create a call or conversation record. Manual call logging, snooze, and collapse preferences remain separate scope decisions. The dashboard and API delivery tickets and Phase 1 gate must include FR-21 while team capacity is reviewed; this contract alone does not deliver UI/API behavior.
 
 ## Dashboard and export semantics
 
@@ -125,7 +125,7 @@ Proposed response-time grain is one eligible inbound message. Pair it to the fir
 
 1. Both workbook sheets are equally authoritative migration inputs; Ljs `A`–`I` mapping is confirmed, with H as notes and I as person spoken to. Cross-sheet conflicts require staff review, with no sheet taking priority. Jacks `D` is confirmed phone despite its header, and `H` is confirmed status. SolTech/team still needs to define the values-to-enum mapping for Jacks `H`, Jacks `B`/`J`/`K`, and any actual date field. SNX-28 also needs a reviewed candidate lookup for differently written rows. Until then, the importer can map confirmed columns and show a preview, but cannot claim complete status/date or deduplication coverage.
 2. SolTech/team approves the proposed status vocabulary, due/overdue and closed rules, Manila business date, filter behavior, refresh expectation, upload limits, export columns, and retention period.
-3. Team records Phase 1 capacity and updates the backlog/acceptance gate for editable dashboard rows and the unknown-name inquiry workflow. Call logging remains separately decided.
+3. Team records Phase 1 capacity and reviews the updated FR-21 backlog/acceptance gate for editable dashboard rows and the unknown-name inquiry workflow. Call logging remains separately decided.
 4. SNX-26 implements durable schema/migrations; SNX-28 implements the adapter; SNX-29 owns silver models; SNX-30 owns read APIs; SNX-48/53 own create/export. Each ticket validates against synthetic examples and records any contract revision.
 
 These are explicit gates, not evidence of client approval or implementation completion.

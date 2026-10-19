@@ -17,7 +17,7 @@ SolTech EMR is a healthcare technology startup that manages sales outreach to cl
 
 This proposal outlines a two-semester Data Engineering project that will design and build a Unified Lead & Client Communication Intelligence Pipeline: an automated system that ingests conversation data from SolTech's communication channels, transforms it into a clean and structured data model, and surfaces it through a purpose-built web dashboard. The dashboard directly implements the two-table view requested by the client — a "Leads to Follow Up Today" view and a "Complete Lead History" view — backed by a governed data pipeline rather than manual data entry.
 
-The current delivery target makes Phase 1 the minimum finished product for this semester: Gmail and Facebook Page ingestion, import of both sheets of SolTech's existing clinic/lead workbook, export of the current lead list, manual clinic creation and basic status/date correction, the orchestrated data pipeline, and the authenticated two-table dashboard. Spreadsheet rows are lead records rather than Viber/Facebook conversation exports. Phase 2 follows Phase 1 acceptance if time and provider access allow; it adds Viber bot integration, AI/LLM extraction, S3 retention, analytics, and failure alerts. Financial tracking and the daily digest remain stretch goals. The original two-semester outline below is historical planning context; the phase acceptance boundary in the requirements list and implementation roadmap governs current work.
+The current delivery target makes Phase 1 the minimum finished product for this semester: Gmail and Facebook Page ingestion, import of both sheets of SolTech's existing clinic/lead workbook, export of the current lead list, manual clinic creation, editable dashboard rows with an explicit unknown-clinic inquiry flow, the orchestrated data pipeline, and the authenticated dashboard. Spreadsheet rows are lead records rather than Viber/Facebook conversation exports. Phase 2 follows Phase 1 acceptance if time and provider access allow; it adds Viber bot integration, AI/LLM extraction, S3 retention, analytics, and failure alerts. Financial tracking and the daily digest remain stretch goals. The original two-semester outline below is historical planning context; the phase acceptance boundary in the requirements list and implementation roadmap governs current work.
 
 ## 2. Client Background
 
@@ -125,7 +125,7 @@ This bronze/silver/gold structure is a widely used data engineering pattern (the
 
 The core data model is designed directly around the two-table view the client requested during the interview. At the silver layer, two primary entities are modeled:
 
-- **leads** — one row per clinic/lead, containing: clinic name, primary contact person, contact number, current status (e.g., contacted, proposal sent, awaiting demo, closed), next action date, and source(s) of origin.
+- **leads** — one row per confirmed clinic or open inquiry, containing an explicit clinic-name state, primary contact person, contact number, current status (e.g., contacted, proposal sent, awaiting demo, closed), next action date, and source(s) of origin. An inquiry may have no clinic name until staff confirms the lead's reply.
 - **interactions** — one row per logged conversation event, containing: lead reference, channel (email/Viber/Facebook), message excerpt/topic, timestamp, and the team member involved.
 
 These map directly onto the two dashboard views defined by the client:
@@ -167,7 +167,7 @@ These map directly onto the two dashboard views defined by the client:
 
 ## 12. Expected Outcomes & Success Metrics
 
-- A live dashboard with clinic creation, basic status/date correction, and two-sheet spreadsheet lead-data upload/current-list download for day-to-day follow-up by Phase 1 acceptance.
+- A live dashboard with clinic creation, editable operational rows, a visible unknown-clinic inquiry action, and two-sheet spreadsheet lead-data upload/current-list download for day-to-day follow-up by Phase 1 acceptance.
 - Gmail and Facebook Page ingestion demonstrated end-to-end with real APIs and synthetic conversations by Phase 1 acceptance.
 - Automated Viber bot ingestion pursued in Phase 2 only where access and conversation coverage are proven.
 - Reduced manual data entry effort for the SolTech team, measured qualitatively through client feedback.
