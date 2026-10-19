@@ -2,7 +2,7 @@
 
 Status: agreed entity-resolution decision for SNX-20; remaining SNX-20 data and API contracts are pending.
 
-This contract covers Gmail and Facebook Page messages in Phase 1. The same identity boundary applies to supported Viber messages in Phase 2. A clinic created through initial spreadsheet migration or by staff has its own internal `clinic_id`. Message ingestion never creates or merges clinics.
+This contract covers Gmail and Facebook Page messages in Phase 1. The same identity boundary applies to supported Viber messages in Phase 2. A clinic created through initial spreadsheet migration or by staff has its own internal `clinic_id`. Message ingestion never creates or merges clinics. It may create an unresolved **inquiry** row with no clinic name so staff can see and contact the lead; this does not confirm a clinic identity or link a message to a clinic.
 
 ## Source identity and evidence
 
@@ -22,6 +22,8 @@ For each ingested message, preserve the original source identifiers and unmodifi
 | `needs_review` | No confirmed mapping, incomplete source identity, more than one active confirmed mapping, or detected conflicting evidence. | `null` | Yes |
 
 First-contact messages remain unlinked until staff confirms the source identity's clinic mapping, even when clinic name, sender name, and location appear to match. An absent location does not block a link through an otherwise unambiguous confirmed mapping. If evidence conflicts with a confirmed mapping, the message remains unlinked for staff review; the mapping does not override the conflict. No match, multiple matches, and conflicting evidence all require review.
+
+For a first-contact inquiry, display `clinic_name: null` as **Clinic name unknown** and prompt SolTech staff to email the lead for the clinic name. Only a staff-reviewed reply to that question can supply the operational name; a name in the initial message is candidate evidence only. The inquiry remains distinct from `app.clinics` until staff confirms its clinic and source identity. This preserves the unlinked-message rule while making the follow-up visible in the dashboard.
 
 For review reporting, use `no_match` when no clinic candidate is found, `multiple_candidates` when the evidence suggests several clinics and no confirmed source mapping resolves them, `unconfirmed_source_identity` when a plausible clinic exists but the source identity has not been staff-confirmed, `incomplete_source_identity` when the source key is missing a part, `multiple_confirmed_mappings` when one key has competing active confirmations, and `conflicting_evidence` when message evidence contradicts the confirmed clinic. Candidate lookup cannot authorize a link on its own. A confirmed unique mapping may still link a message that mentions a clinic name shared by several records, provided there is no conflicting evidence.
 

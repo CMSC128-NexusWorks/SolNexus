@@ -15,14 +15,22 @@
     "invalid_response": {"error": {"code": "validation_error", "message": "Clinic name is required", "details": [{"field": "clinic_name", "reason": "blank"}]}}
   },
   "correct_clinic": {
-    "request": {"version": 1, "status_code": "follow_up_needed", "next_action_date": "2026-10-19"},
-    "response": {"clinic_id": "10000000-0000-4000-8000-000000000001", "status_code": "follow_up_needed", "next_action_date": "2026-10-19", "version": 2, "pending_projection": true},
+    "request": {"version": 1, "contact_person": "Sam Example", "calling_notes": "Asked for a follow-up email", "person_spoken_to": "Sam Example", "status_code": "follow_up_needed", "next_action_date": "2026-10-19"},
+    "response": {"clinic_id": "10000000-0000-4000-8000-000000000001", "contact_person": "Sam Example", "calling_notes": "Asked for a follow-up email", "person_spoken_to": "Sam Example", "status_code": "follow_up_needed", "next_action_date": "2026-10-19", "version": 2, "pending_projection": true},
     "stale_version_response": {"error": {"code": "version_conflict", "message": "Clinic changed since it was opened", "details": []}}
+  },
+  "first_contact_inquiry": {
+    "initial_message": {"source_channel": "gmail", "source_account_id": "test-mailbox", "external_participant_id": "newlead@example.test", "source_message_id": "inbound-unknown-1", "message_clinic_id": null},
+    "dashboard_row": {"lead_id": "70000000-0000-4000-8000-000000000001", "record_type": "inquiry", "clinic_name": null, "clinic_name_state": "unknown", "display_clinic_name": "Clinic name unknown", "next_action": "request_clinic_name", "action_label": "Email to ask", "version": 1},
+    "confirm_request": {"version": 1, "clinic_name": "Meadow Clinic", "outbound_question_message_id": "ask-clinic-name-1", "inbound_reply_message_id": "reply-clinic-name-1", "create_clinic": true, "source_identity_confirmation_reason": "confirmed_from_lead_reply"},
+    "confirm_response": {"inquiry_id": "70000000-0000-4000-8000-000000000001", "state": "closed", "clinic_id": "10000000-0000-4000-8000-000000000005", "clinic_name": "Meadow Clinic", "clinic_name_state": "confirmed", "version": 2},
+    "invalid_initial_name_write": {"error": {"code": "confirmation_evidence_required", "message": "Clinic name requires staff-reviewed reply evidence", "details": []}}
   },
   "import": {
     "request": "multipart field file: synthetic-lead-import-v1.xlsx",
     "synthetic_source_rows": {
-      "synthetic_ljs_row_1_positions": {"A": "Region Sample", "B": "Province Sample", "C": "Harborview Clinic", "D": "0917 000 0101", "E": "harborview@example.test", "F": "Sample Street", "G": "Sample City", "H": null, "I": null},
+      "synthetic_ljs_row_1_positions": {"A": "Region Sample", "B": "Province Sample", "C": "Harborview Clinic", "D": "0917 000 0101", "E": "harborview@example.test", "F": "Sample Street", "G": "Sample City", "H": "Asked for a follow-up email", "I": "Sam Example"},
+      "synthetic_ljs_meaning": {"H": "calling_notes", "I": "person_spoken_to"},
       "synthetic_jacks_header_positions": {"A": "Facility", "B": "Name", "C": "Email", "D": "Status", "H": "Status", "I": "Next Step", "J": "Contact", "K": "Point Person"},
       "synthetic_jacks_row_2_positions": {"A": "Harborview Clinic", "B": "Sam Example", "C": "harborview@example.test", "D": "0917 000 0199", "H": "Contacted", "I": "Call next week", "J": "unmapped contact example", "K": "Staff Example"},
       "synthetic_jacks_corrected_meaning": {"D": "contact_number_despite_status_header", "H": "status_source", "J": "unconfirmed"}
@@ -47,13 +55,15 @@
   },
   "leads": {
     "request": "/api/v1/leads?status=contacted&q=harbor&limit=20",
-    "response": {"as_of": "2026-10-19T03:00:00Z", "published_at": "2026-10-19T02:55:00Z", "items": [{"clinic_id": "10000000-0000-4000-8000-000000000001", "clinic_name": "Harborview Clinic", "status_code": "contacted", "next_action_date": "2026-10-20", "last_contact_at": null, "pending_projection": true}], "next_cursor": null}
+    "response": {"as_of": "2026-10-19T03:00:00Z", "published_at": "2026-10-19T02:55:00Z", "items": [{"lead_id": "10000000-0000-4000-8000-000000000001", "record_type": "clinic", "clinic_id": "10000000-0000-4000-8000-000000000001", "clinic_name": "Harborview Clinic", "clinic_name_state": "confirmed", "status_code": "contacted", "next_action_date": "2026-10-20", "last_contact_at": null, "pending_projection": true}], "next_cursor": null},
+    "unknown_name_item": {"lead_id": "70000000-0000-4000-8000-000000000001", "record_type": "inquiry", "clinic_id": null, "clinic_name": null, "clinic_name_state": "unknown", "next_action": "request_clinic_name", "next_action_date": null, "version": 1}
   },
   "due_cases": [
     {"case": "overdue", "status_code": "contacted", "next_action_date": "2026-10-18", "included": true},
     {"case": "today", "status_code": "follow_up_needed", "next_action_date": "2026-10-19", "included": true},
     {"case": "future", "status_code": "contacted", "next_action_date": "2026-10-20", "included": false},
     {"case": "no_date", "status_code": "contacted", "next_action_date": null, "included": false},
+    {"case": "unknown_clinic_name_no_date", "record_type": "inquiry", "clinic_name": null, "clinic_name_state": "unknown", "next_action_date": null, "included": false, "needs_clinic_name_group": true},
     {"case": "closed", "status_code": "closed", "next_action_date": "2026-10-18", "included": false}
   ],
   "history": {
@@ -73,5 +83,5 @@
     {"case": "same_file_reupload", "expected_action": "return_completed_batch_without_clinic_changes"},
     {"case": "changed_file_after_staff_edit", "expected_action": "do_not_overwrite_staff_value"}
   ],
-  "export": {"format_marker": "solnexus-leads-v1", "columns": ["clinic_id", "clinic_name", "contact_person", "contact_number", "email", "region", "province", "municipality", "address", "status_code", "next_action_date", "next_step", "point_person", "discovery_source", "last_contact_at", "origin"], "includes_manual_and_imported": true, "includes_raw_messages": false}
+  "export": {"format_marker": "solnexus-leads-v1", "columns": ["lead_id", "record_type", "clinic_name", "clinic_name_state", "contact_person", "contact_number", "email", "region", "province", "municipality", "address", "status_code", "next_action_date", "next_step", "calling_notes", "person_spoken_to", "point_person", "discovery_source", "last_contact_at", "origin"], "includes_manual_and_imported": true, "includes_raw_messages": false, "unknown_name_case": {"record_type": "inquiry", "clinic_name": null, "clinic_name_state": "unknown"}}
 }
