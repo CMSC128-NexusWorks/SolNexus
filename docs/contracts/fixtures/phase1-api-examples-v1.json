@@ -75,6 +75,18 @@
     "response": {"mapping_id": "40000000-0000-4000-8000-000000000001", "confirmed_by": "00000000-0000-4000-8000-000000000001", "recheck_job_id": "50000000-0000-4000-8000-000000000001"},
     "conflicting_evidence_result": {"raw_message_id": "30000000-0000-4000-8000-000000000003", "resolution_status": "needs_review", "review_reason": "conflicting_evidence", "clinic_id": null}
   },
+  "source_identity_correction": {
+    "path_mapping_id": "40000000-0000-4000-8000-000000000001",
+    "request": {"clinic_id": "10000000-0000-4000-8000-000000000003", "expected_active_mapping_id": "40000000-0000-4000-8000-000000000001", "reason": "staff_corrected_identity"},
+    "response": {"revoked_mapping_id": "40000000-0000-4000-8000-000000000001", "mapping_id": "40000000-0000-4000-8000-000000000002", "recheck_job_id": "50000000-0000-4000-8000-000000000002"},
+    "stale_result": {"error": {"code": "mapping_conflict", "message": "Source identity mapping changed; refresh and retry", "details": []}}
+  },
+  "source_identity_revocation": {
+    "path_mapping_id": "40000000-0000-4000-8000-000000000002",
+    "request": {"expected_active_mapping_id": "40000000-0000-4000-8000-000000000002", "reason": "staff_revoked_identity"},
+    "response": {"revoked_mapping_id": "40000000-0000-4000-8000-000000000002", "recheck_job_id": "50000000-0000-4000-8000-000000000003"},
+    "history_before_recheck": {"items": [], "reason": "no_active_mapping_for_old_clinic"}
+  },
   "replay_cases": [
     {"case": "same_message_twice", "source_key": ["gmail", "test-mailbox", "message-1"], "expected_bronze_rows": 1, "expected_silver_rows": 1},
     {"case": "same_name_different_clinics", "expected_action": "needs_review"},

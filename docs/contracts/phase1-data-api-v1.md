@@ -1,6 +1,6 @@
 # Phase 1 data and API contract — proposed v1
 
-Status: **implementation proposal for SNX-20**. The staff-confirmed message identity rule in [phase1-identity-v1.md](phase1-identity-v1.md) is already agreed. Product choices listed under **Approval gates** still need team/client confirmation before dependent tickets claim acceptance. This document defines behavior for SNX-26–SNX-33, SNX-48, SNX-53, and FR-21's editable dashboard row workflow. It does not claim those features are implemented.
+Status: **implementation proposal for SNX-20**. The staff-confirmed message identity boundary in [phase1-identity-v1.md](phase1-identity-v1.md) is already agreed; its historical re-evaluation lifecycle is now specified consistently here and in the identity contract for team review. Product choices listed under **Approval gates** still need team/client confirmation before dependent tickets claim acceptance. This document defines behavior for SNX-26–SNX-33, SNX-48, SNX-53, and FR-21's editable dashboard row workflow. It does not claim those features are implemented.
 
 ## Data ownership and grain
 
@@ -23,7 +23,7 @@ An accepted connector record has `source_channel` (`gmail` or `facebook`), `sour
 
 The uniqueness key is scoped by channel **and connected account**. On retry, an identical message is acknowledged without a second bronze or silver row. If the same key arrives with different payload bytes, preserve the first evidence and record a discrepancy for review. Commit the connector cursor/checkpoint only after the complete page is durable. Thread IDs group messages; they are not message IDs or clinic IDs.
 
-Message-to-clinic association follows [the identity contract](phase1-identity-v1.md): a staff-confirmed exact `(channel, source account, external participant)` mapping is required, and conflicting evidence still sends the message to review. On confirmation or correction, re-evaluate prior messages for **that exact source key** in a bounded, auditable job; leave messages with conflicting evidence unlinked. Record actor, timestamp, old/new `clinic_id`, and reason for every resolution change. A name, phone, or workbook email may suggest a candidate, but cannot create a link or merge clinics automatically. Imported and manual clinics use the same linking process.
+Message-to-clinic association follows [the identity contract](phase1-identity-v1.md): a staff-confirmed exact `(channel, source account, external participant)` mapping is required, and conflicting evidence still sends the message to review. On confirmation, correction, or revocation, re-evaluate prior messages for **that exact source key** in bounded, retryable batches; leave conflicting messages unlinked and remove stale links after revocation. Record actor, timestamp, old/new `clinic_id`, mapping decision, and reason for every changed resolution. A name, phone, or workbook email may suggest a candidate, but cannot create a link or merge clinics automatically. Imported and manual clinics use the same linking process. Clinic history reads must check both the current `app.message_resolutions` link and the currently active exact source-key mapping for the same clinic, so an old silver projection or a pending replay batch cannot expose a revoked or corrected association.
 
 ## Workbook migration (FR-02)
 
@@ -109,6 +109,8 @@ All endpoints require the authenticated SolTech staff session except login. Use 
 | `GET /api/v1/leads/{clinic_id}/history` | `limit`, `cursor` | `200` linked interactions ordered by event time |
 | `GET /api/v1/messages/review` | `reason`, `limit`, `cursor` | `200` unresolved messages with candidate evidence for authorized staff |
 | `POST /api/v1/source-identities/confirm` | Exact source identity key, `clinic_id`, nullable `expected_active_mapping_id`, reason | `200` recorded confirmation and bounded re-evaluation job ID; conflicting active mapping `409` |
+| `POST /api/v1/source-identities/{mapping_id}/correct` | New `clinic_id`, required reason and `expected_active_mapping_id` equal to path ID | `200` old mapping revoked, new mapping ID and re-evaluation job ID; stale mapping `409` |
+| `POST /api/v1/source-identities/{mapping_id}/revoke` | Required reason and `expected_active_mapping_id` equal to path ID | `200` mapping revoked and re-evaluation job ID; stale mapping `409` |
 | `GET /api/v1/leads/export` | No body | `200` spreadsheet with format/version marker and snapshot time |
 
 Pagination uses an opaque cursor with stable tie-break keys and an upper bound (proposed 100 per page); invalid cursors return `422`. `published_at` denotes the last successful silver publication, not the latest connector poll. `as_of` is the response time. A newly created clinic may be read through from `app.clinics` before publication, with `pending_projection: true` so freshness is honest. The exact API examples are in [phase1-api-examples-v1.json](fixtures/phase1-api-examples-v1.json); payloads use synthetic data.
@@ -127,5 +129,6 @@ Proposed response-time grain is one eligible inbound message. Pair it to the fir
 2. SolTech/team approves the proposed status vocabulary, due/overdue and closed rules, Manila business date, filter behavior, refresh expectation, upload limits, export columns, and retention period.
 3. Team records Phase 1 capacity and reviews the updated FR-21 backlog/acceptance gate for editable dashboard rows and the unknown-name inquiry workflow. Call logging remains separately decided.
 4. SNX-26 implements durable schema/migrations; SNX-28 implements the adapter; SNX-29 owns silver models; SNX-30 owns read APIs; SNX-48/53 own create/export. Each ticket validates against synthetic examples and records any contract revision.
+5. Team reviews the bounded historical re-evaluation, revocation and current-link history rules in the identity contract. The rules are technically reconciled across these documents but are not represented as a completed implementation or a recorded team sign-off.
 
 These are explicit gates, not evidence of client approval or implementation completion.

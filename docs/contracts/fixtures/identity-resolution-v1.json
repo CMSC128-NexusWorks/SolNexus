@@ -249,5 +249,49 @@
         "review_reason": null
       }
     }
+  ],
+  "mapping_change_cases_are_independent": true,
+  "mapping_change_cases": [
+    {
+      "case_id": "confirm_exact_gmail_identity_rechecks_history",
+      "action": "staff_confirm",
+      "source_identity": ["gmail", "soltech-test-mailbox", "alex@harbor.example"],
+      "clinic_id": "clinic-001",
+      "expected_message_changes": [
+        {"source_message_id": "gmail-001", "resolution_status": "linked", "clinic_id": "clinic-001"}
+      ],
+      "unchanged_message_ids": ["facebook-002"],
+      "audit_required": true,
+      "replay_must_not_duplicate_audit": true
+    },
+    {
+      "case_id": "correct_exact_gmail_identity_replaces_old_links",
+      "action": "staff_correct",
+      "source_identity": ["gmail", "soltech-test-mailbox", "mira@harbor.example"],
+      "old_clinic_id": "clinic-001",
+      "clinic_id": "clinic-002",
+      "expected_message_changes": [
+        {"source_message_id": "gmail-002", "resolution_status": "linked", "clinic_id": "clinic-002"},
+        {"source_message_id": "gmail-004", "resolution_status": "linked", "clinic_id": "clinic-002"},
+        {"source_message_id": "gmail-005", "resolution_status": "linked", "clinic_id": "clinic-002"}
+      ],
+      "unchanged_message_ids": ["facebook-003"],
+      "history_must_use_current_resolution_and_mapping": true,
+      "audit_required": true,
+      "replay_must_not_duplicate_audit": true
+    },
+    {
+      "case_id": "revoke_exact_gmail_identity_removes_old_links",
+      "action": "staff_revoke",
+      "source_identity": ["gmail", "soltech-test-mailbox", "mira@harbor.example"],
+      "expected_message_changes": [
+        {"source_message_id": "gmail-002", "resolution_status": "needs_review", "clinic_id": null},
+        {"source_message_id": "gmail-005", "resolution_status": "needs_review", "clinic_id": null}
+      ],
+      "unchanged_message_ids": ["facebook-003"],
+      "history_must_use_current_resolution_and_mapping": true,
+      "audit_required": true,
+      "replay_must_not_duplicate_audit": true
+    }
   ]
 }

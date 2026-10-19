@@ -1,6 +1,6 @@
 # Phase 1 clinic and message identity contract — v1
 
-Status: agreed entity-resolution decision for SNX-20; remaining SNX-20 data and API contracts are pending.
+Status: agreed entity-resolution boundary for SNX-20. The historical re-evaluation lifecycle below is the reconciled technical decision for team review; remaining SNX-20 product approvals are pending.
 
 This contract covers Gmail and Facebook Page messages in Phase 1. The same identity boundary applies to supported Viber messages in Phase 2. A clinic created through initial spreadsheet migration or by staff has its own internal `clinic_id`. Message ingestion never creates or merges clinics. It may create an unresolved **inquiry** row with no clinic name so staff can see and contact the lead; this does not confirm a clinic identity or link a message to a clinic.
 
@@ -27,7 +27,9 @@ For a first-contact inquiry, display `clinic_name: null` as **Clinic name unknow
 
 For review reporting, use `no_match` when no clinic candidate is found, `multiple_candidates` when the evidence suggests several clinics and no confirmed source mapping resolves them, `unconfirmed_source_identity` when a plausible clinic exists but the source identity has not been staff-confirmed, `incomplete_source_identity` when the source key is missing a part, `multiple_confirmed_mappings` when one key has competing active confirmations, and `conflicting_evidence` when message evidence contradicts the confirmed clinic. Candidate lookup cannot authorize a link on its own. A confirmed unique mapping may still link a message that mentions a clinic name shared by several records, provided there is no conflicting evidence.
 
-Review must expose the raw message, source identifiers, candidate clinic information when available, and the reason it was not linked. Staff may confirm or correct a source identity mapping and resolve a message to an existing clinic. Review does not create or merge clinics automatically. The contract does not yet decide whether resolving one message retrospectively relinks other messages from the same sender.
+Review must expose the raw message, source identifiers, candidate clinic information when available, and the reason it was not linked. Staff may confirm or correct a source identity mapping and resolve a message to an existing clinic. Review does not create or merge clinics automatically.
+
+After staff confirms, corrects, or revokes a mapping, re-evaluate previously stored messages for **that exact `(source_channel, source_account_id, external_participant_id)` key** in bounded, retryable batches. Apply the same resolution rules as for new messages: link only with one active staff-confirmed mapping and no conflicting evidence; otherwise keep or return the message to `needs_review` with a null clinic link. Clinic history may show a linked message only when its current resolution's clinic also matches the currently active mapping for the message's exact source key. That read rule suppresses stale links immediately after correction or revocation, before the replay batch reaches them. Record every changed resolution with the actor, time, old and new clinic links, mapping decision, and reason; unchanged resolutions need no duplicate audit event. A completed batch must be safe to replay after interruption. Confirmation never relinks messages from a merely similar sender, another connected account, or another channel.
 
 ## Minimum fields at this boundary
 
@@ -42,4 +44,4 @@ Review must expose the raw message, source identifiers, candidate clinic informa
 | `resolution_status`, `review_reason` | `linked` or `needs_review`, plus the reason for review. |
 | `confirmed_by`, `confirmed_at` | Staff user and time on the source-to-clinic mapping, not inferred from message text. |
 
-The connector-specific format of source IDs, candidate matching and conflict detection, storage tables, review UI, and retrospective relinking remain implementation decisions for dependent tickets. Those choices must preserve the rules above. The synthetic cases in [identity-resolution-v1.json](fixtures/identity-resolution-v1.json) illustrate the required outcomes without client data.
+The connector-specific format of source IDs, candidate matching and conflict detection, storage tables, review UI, and batch size/checkpoint implementation remain decisions for dependent tickets. Those choices must preserve the rules above. The synthetic cases in [identity-resolution-v1.json](fixtures/identity-resolution-v1.json) illustrate the required outcomes without client data.
