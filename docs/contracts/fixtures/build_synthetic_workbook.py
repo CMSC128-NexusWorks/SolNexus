@@ -30,6 +30,7 @@ LJS = [
         "A": "Region Sample", "B": "Province Sample", "C": "Harborview Clinic",
         "D": "0917 000 0101", "E": "harborview@example.test",
         "F": "Sample Street", "G": "Sample City",
+        "H": "Asked for a follow-up email", "I": "Sam Example",
     },
     {"A": "Region Sample", "B": "Province Sample", "C": "", "D": "0917 000 0303"},
     {
