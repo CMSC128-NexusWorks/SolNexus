@@ -15,8 +15,8 @@ SolNexus is a unified lead and client communication pipeline for SolTech EMR. It
 ### Phase 1: minimum finished product for this semester
 
 - Automated Gmail and Facebook Page ingestion.
-- Upload of the existing SolTech lead spreadsheet and download of the current lead list; spreadsheet rows are clinic/lead records, not conversation exports.
-- Manual clinic creation before any message arrives.
+- Upload of both sheets of the existing SolTech lead spreadsheet through separate format adapters and download of the current lead list; spreadsheet rows are clinic/lead records, not conversation exports.
+- Manual clinic creation before any message arrives, plus basic in-app status and next-action-date correction.
 - PostgreSQL bronze storage and dbt silver models for leads and interactions.
 - Airflow orchestration with retries.
 - FastAPI backend and React dashboard.
