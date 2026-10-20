@@ -1,21 +1,23 @@
 # SolNexus
 
-SolNexus is a unified lead and client communication pipeline for SolTech EMR. It brings lead conversations from email, Facebook Messenger, and Viber into one searchable system, helping the team track follow-ups and client history without relying on a manually maintained spreadsheet.
+A unified lead and client communication pipeline for SolTech EMR. SolNexus brings lead conversations from email, Facebook Messenger and Viber into one searchable system, so the team can track follow-ups and client history without a manually maintained spreadsheet.
 
-## Project Goals
+Built by the NexusWorks team for CMSC 128/129.
+
+## Goals
 
 - Centralize lead and interaction data from multiple communication channels.
 - Show which leads need follow-up today.
 - Provide a searchable history of all leads and conversations.
-- Automate ingestion, transformation, and pipeline monitoring.
+- Automate ingestion, transformation and pipeline monitoring.
 - Support future analytics and AI-assisted lead classification.
 
-## Planned Phases
+## Roadmap
 
 ### Phase 1: minimum finished product for this semester
 
 - Automated Gmail and Facebook Page ingestion.
-- Upload of both sheets of the existing SolTech lead spreadsheet through separate format adapters and download of the current lead list; spreadsheet rows are clinic/lead records, not conversation exports.
+- Upload of both sheets of the existing SolTech lead spreadsheet through separate format adapters, and download of the current lead list. Spreadsheet rows are clinic/lead records, not conversation exports.
 - Manual clinic creation before any message arrives, plus basic in-app status and next-action-date correction.
 - PostgreSQL bronze storage and dbt silver models for leads and interactions.
 - Airflow orchestration with retries.
@@ -25,14 +27,16 @@ SolNexus is a unified lead and client communication pipeline for SolTech EMR. It
 ### Phase 2: expansion after Phase 1 acceptance, as capacity allows
 
 - Automated Viber bot ingestion, subject to access and conversation coverage.
-- LLM-based extraction of lead status, next actions, and urgency.
+- LLM-based extraction of lead status, next actions and urgency.
 - Amazon S3 raw data lake and dbt gold analytics models.
 - Conversion funnel and response-time reporting.
-- Pipeline failure alerts and optional finance tracking and daily digest features.
+- Pipeline failure alerts, and optional finance tracking and daily digest features.
+
+Sprint targets and ticket mapping are in the [implementation roadmap](docs/implementation_roadmap.md).
 
 ## Architecture
 
-The system follows a bronze/silver/gold data architecture:
+The pipeline follows a bronze/silver/gold (medallion) architecture. The diagram shows the full target system, including Phase 2 and stretch components.
 
 ```mermaid
 flowchart LR
@@ -96,54 +100,98 @@ flowchart LR
     E4 --> FINVIEW
 ```
 
-The dashboard provides two core views: **Leads to Follow Up Today** and **All Leads**.
+The dashboard has two core views on one screen: **Due today** (leads to follow up today) above **All leads**.
 
-## Technology Stack
+See [System Architecture](docs/architecture.md) for details.
 
-- **Backend:** FastAPI and Python
-- **Frontend:** React
-- **Data:** PostgreSQL, dbt, and Amazon S3 (Phase 2)
-- **Pipeline:** Apache Airflow
-- **Integrations:** Gmail API, Facebook Graph API, Viber API, and AWS Cost Explorer
+## Tech stack
 
-## Local development
+| Layer | Tools |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui |
+| Backend | FastAPI (Python) |
+| Data | PostgreSQL, dbt, Amazon S3 (Phase 2) |
+| Pipeline | Apache Airflow |
+| Integrations | Gmail API, Facebook Graph API, Viber API, AWS Cost Explorer |
 
-The Phase 1 scaffold runs as Docker Compose services: PostgreSQL, FastAPI, the React frontend, and Apache Airflow (webserver + scheduler).
+## Getting started
 
 ### Prerequisites
 
-- Docker and Docker Compose
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose, to run the full stack
+- [Node.js](https://nodejs.org/) 22 or later, only if you work on the frontend outside Docker
 
-### Start
+### Run the full stack
+
+The Phase 1 scaffold runs as Docker Compose services: PostgreSQL, FastAPI, the React frontend and Apache Airflow (webserver and scheduler).
 
 ```bash
 cp .env.example .env
-docker compose build
 docker compose up -d --build
 ```
-
-### Endpoints
 
 | Service | URL |
 |---|---|
 | React dashboard | http://localhost:5173 |
 | FastAPI (`GET /health`) | http://localhost:8000/health |
 | Airflow UI | http://localhost:8080 |
-| PostgreSQL | localhost:5433 |
+| PostgreSQL | `localhost:5433` |
 
-Default Airflow login is `admin` / `admin` (override in `.env`).
+The default Airflow login is `admin` / `admin`; override it in `.env`.
 
-### Stop
+To stop everything:
 
 ```bash
-docker compose down
+docker compose down        # keep data
+docker compose down -v     # also delete the Postgres volume
 ```
 
-Use `docker compose down -v` to also remove the Postgres volume.
+After pulling changes to `frontend/package.json`, refresh the frontend's packages with `docker compose run --rm web npm install`.
+
+### Frontend only (no Docker)
+
+The frontend ships with a mock API, so you can build screens before the backend endpoints exist. Create `frontend/.env.local` containing `VITE_USE_MOCKS=true` (git-ignored), then:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+See the [frontend README](frontend/README.md) for scripts and conventions.
+
+## Project structure
+
+```
+.
+├── airflow/    Airflow image and DAGs
+├── backend/    FastAPI app
+├── dbt/        dbt project (bronze/silver models)
+├── docker/     container init scripts (Postgres)
+├── docs/       proposal, requirements, architecture, contracts, roadmap, wireframes
+├── frontend/   React dashboard
+└── compose.yaml
+```
+
+## Contributing
+
+- Work is tracked in Jira project **SNX**. Pick up a ticket, then branch from `main` as `<type>/snx-<number>-short-name` (`feat`, `fix`, `docs` or `chore`).
+- Write commits as [Conventional Commits](https://www.conventionalcommits.org/) with the ticket as scope, e.g. `feat(snx-54): add app shell`.
+- Run the checks for the area you changed before opening a PR. Frontend: `npm run typecheck && npm run lint && npm run test`.
+- Open a PR into `main`. It needs one approval from someone other than the last pusher.
+- Use synthetic data only in fixtures, mocks, tests and screenshots. Real client data stays in the git-ignored `leads-data/` folder.
+
+AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project context.
 
 ## Documentation
 
 - [Project Proposal](docs/project_proposal.md)
 - [Software Requirements](docs/software_requirements.md)
 - [System Architecture](docs/architecture.md)
+- [Implementation Roadmap](docs/implementation_roadmap.md)
+- [Phase 1 Data and API Contract](docs/contracts/phase1-data-api-v1.md)
 - [Wireframes](docs/wireframes)
+
+## Team
+
+JM Briz (Product Owner) · JP Salomeo (Scrum Master) · Luis Borbolla · Seth Caballero · Dan Guevara
