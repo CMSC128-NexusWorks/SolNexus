@@ -69,6 +69,7 @@ services:
       context: ./frontend
     environment:
       VITE_API_URL: ${VITE_API_URL}
+      VITE_USE_MOCKS: ${VITE_USE_MOCKS:-true}
     ports:
       - "${WEB_PORT:-5173}:5173"
     volumes:
