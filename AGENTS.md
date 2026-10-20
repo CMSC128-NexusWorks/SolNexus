@@ -23,7 +23,7 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 
 ## Team and workflow
 
-- Five developers: Briz, Borbolla, Caballero, Salomeo, Guevara. Nobody has a fixed dev area. JP Salomeo is Scrum Master; JM is Product Owner and sets backlog priority.
+- Five developers: JM Briz, Luis Borbolla, Seth Caballero, JP Salomeo, Dan Guevara. Nobody has a fixed dev area. JP Salomeo is Scrum Master; JM Briz is Product Owner and sets backlog priority.
 - Work is tracked in Jira project **SNX**. Every branch, commit and PR names its ticket.
 - Branch names: `<type>/snx-<number>-short-name`, where type is `feat`, `fix`, `docs` or `chore`.
 - Commits follow Conventional Commits with the ticket as scope, e.g. `feat(snx-54): add app shell`.
