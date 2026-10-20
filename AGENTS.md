@@ -1,0 +1,31 @@
+# SolNexus
+
+Lead and client communication pipeline for SolTech EMR, our client. Conversations (Gmail and Facebook in Phase 1, Viber in Phase 2) land in PostgreSQL bronze tables, dbt builds silver models, FastAPI serves them, and a React dashboard shows them to SolTech staff. This is a CMSC 128/129 student team project.
+
+## Where to look
+
+- **API shapes, data ownership, import rules:** `docs/contracts/phase1-data-api-v1.md`. Message-to-clinic linking is in `docs/contracts/phase1-identity-v1.md`. The contract is the single source of truth: when it changes, update `frontend/src/lib/api/types.ts` and `frontend/src/mocks/` in the same PR.
+- **Scope and sprint targets:** `docs/implementation_roadmap.md`. Phase 1 is the semester deliverable; Phase 2 work starts only after Phase 1 is accepted.
+- **Requirement IDs (FR-xx, NFR-xx):** `docs/software_requirements.md`.
+- **Screens:** `docs/wireframes/`. They are low-fidelity: follow their structure and fields, not their visual styling.
+- **Frontend work:** `frontend/README.md`.
+- **Local setup and ports:** `README.md`.
+
+## Data rules
+
+- Fixtures, mocks, tests, logs, Jira and PR text use synthetic data only: invented clinic names, `example.test` emails, placeholder numbers. Real client rows stay in the git-ignored `leads-data/` folder.
+- Secrets live in `.env` (git-ignored). `.env.example` holds placeholders only.
+
+## Terms
+
+- **SolTech staff / "the two SolTech team members"** in the docs are the client's two dashboard users, not our dev team.
+- **Lead:** a confirmed clinic or an open inquiry (`record_type`). **Inquiry:** a first contact whose clinic name is still unknown; it shows "Clinic name unknown" until staff confirm the name.
+
+## Team and workflow
+
+- Five developers: Briz, Borbolla, Caballero, Salomeo, Guevara. Nobody has a fixed dev area. JP Salomeo is Scrum Master; JM is Product Owner and sets backlog priority.
+- Work is tracked in Jira project **SNX**. Every branch, commit and PR names its ticket.
+- Branch names: `<type>/snx-<number>-short-name`, where type is `feat`, `fix`, `docs` or `chore`.
+- Commits follow Conventional Commits with the ticket as scope, e.g. `feat(snx-54): add app shell`.
+- PRs go into `main`, which is protected: one approval from someone other than the last pusher, no direct pushes.
+- Before opening a PR, run the checks for the area you changed. Frontend: `npm run typecheck && npm run lint && npm run test` in `frontend/`. Backend, dbt and Airflow have no automated checks yet.
