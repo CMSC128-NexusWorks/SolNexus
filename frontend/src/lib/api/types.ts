@@ -13,7 +13,7 @@ export const STATUS_LABELS: Record<StatusCode, string> = {
   closed: "Closed",
 };
 
-export type Channel = "gmail" | "facebook";
+export type Channel = "gmail";
 
 export type RecordType = "clinic" | "inquiry";
 
