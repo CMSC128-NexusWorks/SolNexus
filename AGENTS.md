@@ -1,6 +1,6 @@
 # SolNexus
 
-Lead and client communication pipeline for SolTech EMR, our client. Conversations (Gmail and Facebook in Phase 1, Viber in Phase 2) land in PostgreSQL bronze tables, dbt builds silver models, FastAPI serves them, and a React dashboard shows them to SolTech staff. This is a CMSC 128/129 student team project.
+Lead and client communication pipeline for SolTech EMR, our client. Conversations (Gmail in Phase 1; Facebook Page and Viber in Phase 2, only after Phase 1 acceptance) land in PostgreSQL bronze tables, dbt builds silver models, FastAPI serves them, and a React dashboard shows them to SolTech staff. This is a CMSC 128/129 student team project.
 
 ## Where to look
 
