@@ -19,7 +19,7 @@ Architecture is presented for **Phase 1**, this semester's minimum finished prod
 The system is organized into five layers:
 
 - **Source Systems** — the external platforms where lead conversations originate (Gmail, Facebook Messenger, Viber), plus AWS billing data for the stretch-goal finance module.
-- **Ingestion Layer** — Gmail and Facebook Page conversation connectors, plus staff import of existing clinic/lead spreadsheet records in Phase 1. Phase 2 adds supported Viber bot conversations after access and coverage are proven. Spreadsheet rows are not conversation messages.
+- **Ingestion Layer** — Gmail conversation connector, plus staff import of existing clinic/lead spreadsheet records in Phase 1. Phase 2 adds Facebook Page ingestion after access review and supported Viber bot conversations after access and coverage are proven. Spreadsheet rows are not conversation messages.
 - **Storage & Transformation Layer** — the bronze/silver/gold medallion architecture: raw storage, normalized structured tables, and (in Phase 2) aggregated analytics tables.
 - **Serving Layer** — a FastAPI REST backend that exposes leads, interactions, and analytics data.
 - **Application Layer** — the React dashboard used by SolTech's two authenticated team members. Phase 1 includes versioned operational row editing and a visible inquiry state for leads whose clinic name is still unknown. Phase 2 may add a daily digest email.
@@ -32,13 +32,11 @@ Authentication (FR-10) gates access to the dashboard and, transitively, to the A
 flowchart TB
     subgraph SRC["Source Systems"]
         GMAIL["Gmail\n(Google Workspace)"]
-        FB["Facebook Page\n(Graph API)"]
         STAFF["SolTech Staff\n(existing lead spreadsheet)"]
     end
 
     subgraph ING["Ingestion Layer"]
         GMAILCONN["Gmail API Connector"]
-        FBCONN["Facebook Graph API Connector"]
         UPLOAD["Lead spreadsheet\nimport/export"]
         AF["Apache Airflow\n(scheduling, retries, monitoring)"]
     end
@@ -60,7 +58,6 @@ flowchart TB
     end
 
     GMAIL --> GMAILCONN --> AF
-    FB --> FBCONN --> AF
     STAFF --> UPLOAD --> LEADTOOLS
     AF --> BRONZE
     AF -. "orchestrates dbt run" .-> SILVER
@@ -75,7 +72,7 @@ flowchart TB
 
 ### 1.3 Diagram — Phase 2 (Semester 2 / SWE 2)
 
-Phase 2 adds supported Viber bot ingestion to Phase 1's Gmail and Facebook connectors, introduces LLM extraction, adds S3 raw retention and gold analytics, and adds failure alerting. The existing lead spreadsheet cannot supply missing Viber conversation history. The daily digest is optional.
+Phase 2 adds Facebook Page and supported Viber bot ingestion to Phase 1's Gmail connector, introduces LLM extraction, adds S3 raw retention and gold analytics, and adds failure alerting. The existing lead spreadsheet cannot supply missing Viber conversation history. The daily digest is optional.
 
 ```mermaid
 flowchart TB
@@ -151,7 +148,7 @@ flowchart TB
 |---|---|---|
 | Gmail API Connector | Automated ingestion of lead email threads | FR-01 |
 | Lead Spreadsheet Import | Staff-driven import of clinic/lead records from the existing SolTech workbook | FR-02 |
-| Facebook Graph API Connector | Automated Facebook Page ingestion in Phase 1 | FR-11 |
+| Facebook Graph API Connector | Automated Facebook Page ingestion in Phase 2 | FR-11 |
 | Viber Bot API Connector | Phase 2 ingestion of supported bot conversations after access review | FR-12 |
 | Lead Spreadsheet and Add Clinic UI | Download current lead records and create named outbound clinic leads | FR-19, FR-20 |
 | Editable dashboard rows | Correct operational fields with audit and version checks; show first-contact inquiries as Clinic name unknown until staff confirms a reply | FR-21 |
@@ -187,7 +184,6 @@ The pipeline is orchestrated end-to-end by Apache Airflow, which triggers extrac
 flowchart LR
     subgraph EXTRACT["Extraction"]
         E1["Gmail API\nExtraction Script"]
-        E3["Facebook Graph API\nConnector"]
         E2["Existing lead spreadsheet\nimport"]
         E4["Add clinic"]
     end
@@ -212,7 +208,6 @@ flowchart LR
     end
 
     E1 --> DAG1 --> RAW
-    E3 --> DAG1
     E2 -. "lead records; two sheet adapters in SNX-20" .-> CLINICS
     E4 -. "named clinic creation" .-> CLINICS
     RAW --> INQUIRIES
@@ -296,7 +291,7 @@ flowchart LR
 
 | Layer | Phase 1 | Phase 2 |
 |---|---|---|
-| Extraction | Gmail and Facebook Graph APIs + existing lead spreadsheet import | Adds supported Viber bot messages; AWS Cost Explorer is stretch only |
+| Extraction | Gmail API + existing lead spreadsheet import | Adds Facebook Page and supported Viber bot messages; AWS Cost Explorer is stretch only |
 | Orchestration | Airflow DAGs with retries | Airflow DAGs with retries + failure alerting |
 | Bronze / Raw | PostgreSQL, source + timestamp tagged | PostgreSQL + Amazon S3 (data lake) |
 | Intelligence | Rule-based status parsing (baseline) | LLM-based extraction & classification |
