@@ -6,9 +6,13 @@ Run through the Compose gmail-spike service; see this directory's README.
 import argparse
 import base64
 import hashlib
+import hmac
 import os
+import time
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -23,6 +27,56 @@ SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 SECRET_DIR = Path(os.environ.get("SNX_21_SECRET_DIR", "/run/snx-21-secrets"))
 CLIENT_FILE = SECRET_DIR / "gmail-oauth-client.json"
 TOKEN_FILE = SECRET_DIR / "gmail-token.json"
+CALLBACK_PORT = 8765
+
+
+class OAuthCallbackHandler(BaseHTTPRequestHandler):
+    """Ignore unrelated localhost requests instead of ending the OAuth flow."""
+
+    def do_GET(self):
+        query = parse_qs(urlsplit(self.path).query)
+        supplied_state = query.get("state", [""])
+        valid_state = len(supplied_state) == 1 and hmac.compare_digest(
+            supplied_state[0], self.server.expected_state
+        )
+        has_result = len(query.get("code", [])) == 1 or len(query.get("error", [])) == 1
+        if not valid_state or not has_result:
+            self.send_error(400, "This is not the current OAuth callback")
+            return
+
+        # Construct the URI ourselves: a hostile Host header must not change
+        # the redirect URI passed to the OAuth library's token exchange.
+        self.server.callback_uri = f"https://localhost:{CALLBACK_PORT}{self.path}"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(b"Authorization received. Return to the terminal.")
+
+    def log_message(self, format, *args):
+        # The callback path can contain an authorization code; never log it.
+        pass
+
+
+def authorize_test_mailbox():
+    """Wait for a matching local OAuth callback and exchange its code for tokens."""
+    flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_FILE), [SCOPE])
+    flow.redirect_uri = f"http://localhost:{CALLBACK_PORT}/"
+    auth_url, state = flow.authorization_url(access_type="offline", prompt="consent")
+    server = HTTPServer(("0.0.0.0", CALLBACK_PORT), OAuthCallbackHandler)
+    server.expected_state = state
+    server.callback_uri = None
+    server.timeout = 1
+    try:
+        print("Open this URL in a browser on the Docker host:", auth_url, flush=True)
+        deadline = time.monotonic() + 300
+        while server.callback_uri is None and time.monotonic() < deadline:
+            server.handle_request()
+        if server.callback_uri is None:
+            raise RuntimeError("Timed out waiting for OAuth consent")
+        flow.fetch_token(authorization_response=server.callback_uri)
+        return flow.credentials
+    finally:
+        server.server_close()
 
 
 def credentials(force_refresh=False):
@@ -38,13 +92,9 @@ def credentials(force_refresh=False):
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     elif not creds or not creds.valid:
-        # Desktop OAuth uses a temporary local callback; the human grants consent in a browser.
-        flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_FILE), [SCOPE])
-        # The container listens on all interfaces, while the browser redirects to
-        # localhost on the host's published port. Compose binds that port to loopback.
-        creds = flow.run_local_server(
-            host="localhost", bind_addr="0.0.0.0", port=8765, open_browser=False
-        )
+        # The human grants consent in a browser, then Google redirects to the
+        # temporary callback published only on the Docker host's loopback port.
+        creds = authorize_test_mailbox()
     if not creds.refresh_token:
         raise RuntimeError("No refresh token was issued; consent must request offline access")
     if force_refresh:
