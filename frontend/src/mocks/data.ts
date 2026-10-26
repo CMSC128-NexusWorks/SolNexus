@@ -54,7 +54,7 @@ export const MOCK_LEADS: LeadRow[] = [
     next_action_date: businessDate(0),
     next_step: "Asked us to call back this week",
     last_contact_at: daysAgo(7),
-    channels: ["facebook"],
+    channels: ["gmail"],
     version: 1,
   },
   {
@@ -70,7 +70,7 @@ export const MOCK_LEADS: LeadRow[] = [
     next_action_date: businessDate(0),
     next_step: "Waiting on their admin to confirm",
     last_contact_at: daysAgo(9),
-    channels: ["gmail", "facebook"],
+    channels: ["gmail"],
     version: 1,
   },
   {
@@ -86,7 +86,7 @@ export const MOCK_LEADS: LeadRow[] = [
     next_action_date: businessDate(3),
     next_step: "No answer, try again",
     last_contact_at: daysAgo(3),
-    channels: ["facebook"],
+    channels: ["gmail"],
     version: 1,
   },
   {
@@ -159,7 +159,7 @@ export const MOCK_HISTORY: Record<string, Interaction[]> = {
     },
     {
       raw_message_id: "30000000-0000-4000-8000-000000000001",
-      channel: "facebook",
+      channel: "gmail",
       direction: "inbound",
       event_at: daysAgo(19, 12),
       excerpt: "Interested in your EMR. How much per month?",

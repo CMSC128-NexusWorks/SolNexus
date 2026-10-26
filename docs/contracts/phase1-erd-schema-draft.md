@@ -1,6 +1,6 @@
 # Phase 1 ERD and database schema — review draft
 
-Status: **draft for SNX-20 review**, not an approved migration. Read with [the proposed data/API contract](phase1-data-api-v1.md). Scope: Phase 1 (FR-01–FR-11, FR-19–FR-21, including editable dashboard rows and unknown-name inquiries; capacity review remains open). Phase 2 adds Viber to the same message envelope and later adds enrichment and gold models; finance is outside this schema.
+Status: **draft for SNX-20 review**, not an approved migration. Read with [the proposed data/API contract](phase1-data-api-v1.md). Scope: Phase 1 (FR-01–FR-10, FR-19–FR-21, including editable dashboard rows and unknown-name inquiries; capacity review remains open). Phase 2 adds Facebook and Viber to the same message envelope and later adds enrichment and gold models; finance is outside this schema.
 
 This design follows [the agreed identity contract](phase1-identity-v1.md). In particular, importing or manually creating a clinic gives it an internal ID, while a message remains unlinked until staff confirms its exact source identity. The app owns staff-entered clinic data and mappings; dbt owns rebuildable projections. No dbt run may replace the operational tables.
 
@@ -166,7 +166,7 @@ erDiagram
 flowchart LR
     subgraph INPUT["Inputs"]
         STAFF["Staff: Add clinic / workbook upload"]
-        CHANNELS["Gmail and Facebook connectors"]
+        CHANNELS["Gmail connector"]
     end
     subgraph APP["app schema · durable decisions"]
         CLINICS["clinics<br/>confirmed staff and imported lead data"]
@@ -235,7 +235,7 @@ Types and keys below are the intended migration contract once SNX-20 decisions a
 | `silver.interactions` | `raw_message_id uuid PK`, `clinic_id uuid NULL`, `source_channel text`, `source_thread_id text NULL`, `direction text`, `event_at timestamptz NULL`, `ingested_at timestamptz`, `topic text NULL`, `derived_status_code text NULL`, `derived_next_action_date date NULL`, `parser_version text NULL` | dbt projection, one row per raw message. Retain unresolved interactions with null clinic for review; only linked rows appear in a clinic history. Rule parsing may suggest status, but cannot silently overwrite staff-entered clinic fields. dbt model tests check uniqueness and relationships. |
 | `silver.leads` | `lead_id uuid`, `record_type text`, `clinic_id uuid NULL`, `clinic_name text NULL`, `clinic_name_state text`, `contact_person text NULL`, `person_spoken_to text NULL`, `calling_notes text NULL`, `contact_number text NULL`, `email text NULL`, `region text NULL`, `province text NULL`, `municipality text NULL`, `address text NULL`, `status_code text NULL`, `next_action_date date NULL`, `next_step text NULL`, `point_person text NULL`, `last_interaction_at timestamptz NULL`, `interaction_count int` | dbt projection with one row per confirmed clinic or open inquiry; unique `(record_type, lead_id)`. Inquiry names remain null/unknown. Current application values win; parser values are suggestions only. This table is rebuildable, never an API write target. |
 
-For `source_channel`, the Phase 1 allowed values are `gmail` and `facebook`; `viber` is added when Phase 2 is approved. Use check constraints or reference tables for fixed values. Prefer a migration tool for `app` and `bronze` DDL; dbt manages only `silver` model objects. A separate PostgreSQL database/schema for Airflow metadata must not be treated as app data.
+For `source_channel`, the Phase 1 allowed value is `gmail`; `facebook` and `viber` are added only after Phase 1 acceptance for Phase 2. Use check constraints or reference tables for fixed values. Prefer a migration tool for `app` and `bronze` DDL; dbt manages only `silver` model objects. A separate PostgreSQL database/schema for Airflow metadata must not be treated as app data.
 
 ## Required behavior and integrity checks
 

@@ -16,7 +16,7 @@ Built by the NexusWorks team for CMSC 128/129.
 
 ### Phase 1: minimum finished product for this semester
 
-- Automated Gmail and Facebook Page ingestion.
+- Automated Gmail ingestion with real synthetic API evidence.
 - Upload of both sheets of the existing SolTech lead spreadsheet through separate format adapters, and download of the current lead list. Spreadsheet rows are clinic/lead records, not conversation exports.
 - Manual clinic creation before any message arrives, plus basic in-app status and next-action-date correction.
 - PostgreSQL bronze storage and dbt silver models for leads and interactions.
@@ -24,9 +24,9 @@ Built by the NexusWorks team for CMSC 128/129.
 - FastAPI backend and React dashboard.
 - Authentication for SolTech staff.
 
-### Phase 2: expansion after Phase 1 acceptance, as capacity allows
+### Phase 2: expansion only after Phase 1 acceptance, as capacity allows
 
-- Automated Viber bot ingestion, subject to access and conversation coverage.
+- Automated Facebook Page ingestion after an access and review-path decision, and Viber bot ingestion subject to access and conversation coverage.
 - LLM-based extraction of lead status, next actions and urgency.
 - Amazon S3 raw data lake and dbt gold analytics models.
 - Conversion funnel and response-time reporting.

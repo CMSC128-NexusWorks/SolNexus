@@ -24,15 +24,17 @@ Requirements are grouped by delivery phase. Phase 1 is the minimum finished prod
 | FR-08 | **"All Leads" / Complete Lead History View** — The dashboard shall display confirmed clinics and open inquiries with their available interaction history, clinic name or explicit unknown state, contact person, contact number, engagement topic, current status, follow-up date, and prior linked interactions. Unlinked messages shall remain in staff review rather than be shown as another clinic's history. |
 | FR-09 | **Status Filtering** — The system shall allow users to filter the lead list by current status or required next action (e.g., proposal sent, awaiting demo, follow-up needed). |
 | FR-10 | **User Authentication** — The system shall require login authentication and shall support the two designated SolTech team members who manage lead tracking. Dashboard reads, row edits, imports, exports and identity confirmations shall require authorized staff access. |
-| FR-11 | **Automated Facebook Messenger Ingestion** — The system shall automatically ingest accessible Facebook Page conversations through the Facebook Graph API into the shared pipeline. A first-contact message with no confirmed clinic mapping shall remain unlinked and produce an explicitly unknown-name inquiry. Phase 1 acceptance requires a real API test with synthetic conversations; a mock alone does not satisfy this requirement. |
 | FR-19 | **Lead Spreadsheet Download** — Authorized staff shall be able to download a current lead snapshot using documented columns corresponding to the existing lead sheet where applicable. The export shall reflect edited operational values for imported and manually created clinics and open inquiries. An inquiry's clinic name shall be blank with an explicit `clinic_name_state=unknown`; the export shall not represent conversation history as spreadsheet rows or include raw messages. |
 | FR-20 | **Manual Clinic Creation** — Authorized staff shall be able to create a named clinic lead before any digital conversation arrives, as shown in wireframe 06. The form shall capture clinic name and allow contact person, contact number, email address, status, next-action date, and how the clinic was found. The clinic shall appear in the dashboard and survive pipeline rebuilds; later channel interactions shall attach only under the staff-confirmed source-identity rule. |
 | FR-21 | **Editable Dashboard Rows and Clinic-Name Confirmation** — Authorized staff shall be able to edit operational row values in the Due today, Needs clinic name and All leads dashboard views with spreadsheet-like controls, save/cancel, field validation, an audit trail, and stale-edit protection. Editable values include contact details, status, next-action date, notes, person spoken to and confirmed clinic fields; derived message fields remain read-only. A first-contact inquiry shall show **Clinic name unknown** and an **Email to ask** action. Staff may confirm its clinic name only after reviewing SolTech's question and the lead's reply, then explicitly associate the source identity with a clinic. The initial lead message shall not populate the confirmed clinic name. Edits and confirmations shall persist through pipeline rebuilds. Call logging, snooze and table-collapse preferences are separate decisions. |
 
 ### 1.2 Phase 2 — Multi-Source Automation, Intelligence & Analytics
 
+Phase 2 implementation starts only after Phase 1 acceptance. Provider access work and connector delivery are not Phase 1 acceptance dependencies.
+
 | ID | Requirement |
 |---|---|
+| FR-11 | **Automated Facebook Messenger Ingestion** — After a Phase 2 access and review-path decision, the system shall automatically ingest accessible Facebook Page conversations through the Facebook Graph API into the shared pipeline. A first-contact message with no confirmed clinic mapping shall remain unlinked and produce an explicitly unknown-name inquiry. Phase 2 acceptance requires a real API test with synthetic conversations; a mock alone does not satisfy this requirement. |
 | FR-12 | **Automated Viber Ingestion** — Subject to an evidenced access and conversation-coverage decision, the system shall automatically ingest supported Viber bot conversations through the Viber Bot/REST API. The Phase 1 lead spreadsheet does not satisfy this conversation-ingestion requirement. |
 | FR-13 | Use an LLM to read each conversation and convert what the client said into structured fields that the rest of our data pipeline can use. |
 | FR-14 | **Data Lake Storage** — The system shall extend raw conversation storage to Amazon S3 as the bronze/raw layer for scalable retention of unstructured source data. |
@@ -51,7 +53,7 @@ Requirements are grouped by delivery phase. Phase 1 is the minimum finished prod
 | NFR-04 | **Usability — Immediate Actionability** — Upon login, a user shall be able to identify, without additional navigation or filtering, which clinics require contact that day, directly replacing the manual spreadsheet lookup process. |
 | NFR-05 | **Searchability** — Users shall be able to locate a specific lead's history and status without manually scanning a spreadsheet, via the "All Leads" filterable view. |
 | NFR-06 | **Maintainability** — The pipeline shall follow a layered (bronze/silver/gold) data architecture with modular dbt transformation models, so that individual layers and models can be modified or extended independently. |
-| NFR-07 | **Scalability of Data Source Integration** — The architecture shall accommodate additional communication channels and increasing data volume, beginning with automated Gmail and Facebook in Phase 1 and adding Viber automation in Phase 2 without redesigning the core data model. |
+| NFR-07 | **Scalability of Data Source Integration** — The architecture shall accommodate additional communication channels and increasing data volume, beginning with automated Gmail in Phase 1 and adding Facebook and Viber automation in Phase 2 without redesigning the core data model. |
 | NFR-08 | **Observability** — The orchestration layer shall provide basic monitoring of pipeline runs in Phase 1, extended to alerting on failures in Phase 2, so pipeline health is visible to the team. |
 | NFR-09 | **Data Traceability** — Every ingested record shall retain its originating source channel and timestamp through the bronze layer, so that any lead or interaction can be traced back to its origin. |
 
@@ -59,8 +61,8 @@ Requirements are grouped by delivery phase. Phase 1 is the minimum finished prod
 
 | Category | Count |
 |---|---|
-| Functional Requirements — Phase 1 | 14 (FR-01 – FR-11, FR-19 – FR-21) |
-| Functional Requirements — Phase 2 | 7 (FR-12 – FR-18; FR-16 and FR-17 are stretch goals) |
+| Functional Requirements — Phase 1 | 13 (FR-01 – FR-10, FR-19 – FR-21) |
+| Functional Requirements — Phase 2 | 8 (FR-11 – FR-18; FR-16 and FR-17 are stretch goals) |
 | **Total Functional Requirements** | **21** |
 | **Total Non-Functional Requirements** | **9** |
 | **Overall Total** | **30** |
