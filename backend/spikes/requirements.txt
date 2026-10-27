@@ -1,0 +1,4 @@
+# Gmail API resource and method client used to fetch the synthetic thread.
+google-api-python-client>=2.0,<3.0
+# Desktop OAuth consent flow and refresh-token support.
+google-auth-oauthlib>=1.2,<2.0

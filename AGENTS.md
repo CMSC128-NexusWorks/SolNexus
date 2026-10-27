@@ -14,7 +14,11 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 ## Data rules
 
 - Fixtures, mocks, tests, logs, Jira and PR text use synthetic data only: invented clinic names, `example.test` emails, placeholder numbers. Real client rows stay in the git-ignored `leads-data/` folder.
-- Secrets live in `.env` (git-ignored). `.env.example` holds placeholders only.
+- Secrets live in `.env` (git-ignored). File-shaped OAuth credentials and tokens live in the git-ignored `.secrets/` directory. `.env.example` holds placeholders only.
+
+## Code comments
+
+- For every code change made by an AI agent, add meaningful comments or docstrings that explain the purpose and non-obvious decisions, especially data handling, security boundaries, and external API behavior. Keep comments accurate as code changes; avoid comments that merely restate a line of code.
 
 ## Terms
 

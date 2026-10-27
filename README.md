@@ -185,6 +185,7 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 
 ## Documentation
 
+- [SNX-21 Gmail OAuth findings and real synthetic API evidence](docs/spikes/SNX-21-gmail-oauth-findings.md) · [Docker probe runbook](backend/spikes/README.md)
 - [Project Proposal](docs/project_proposal.md)
 - [Software Requirements](docs/software_requirements.md)
 - [System Architecture](docs/architecture.md)
