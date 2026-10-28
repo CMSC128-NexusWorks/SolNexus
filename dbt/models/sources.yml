@@ -1,0 +1,20 @@
+version: 2
+
+# dbt only reads these schemas. Alembic (backend/migrations) owns their DDL, and the API and
+# ingestion own their rows. dbt builds and may rebuild only the silver schema.
+sources:
+  - name: bronze
+    description: Append-only source evidence. One row per source message.
+    tables:
+      - name: raw_messages
+        loaded_at_field: ingested_at
+
+  - name: app
+    description: Durable operational state written by the API, ingestion and import.
+    tables:
+      - name: clinics
+      - name: lead_inquiries
+      - name: clinic_source_identities
+        description: Active mappings have revoked_at IS NULL.
+      - name: message_resolutions
+      - name: clinic_status_events
