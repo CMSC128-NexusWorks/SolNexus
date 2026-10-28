@@ -13,11 +13,9 @@ snapshot-paths: ["snapshots"]
 target-path: target
 clean-targets: ["target", "dbt_packages"]
 
+# dbt owns only silver. bronze and app are Alembic-owned sources (models/sources.yml).
 models:
   solnexus:
-    bronze:
-      +schema: bronze
-      +materialized: view
     silver:
       +schema: silver
       +materialized: table
