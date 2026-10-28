@@ -4,7 +4,7 @@ How the two SolTech staff accounts sign in and how the API protects lead data (F
 
 ## How it works
 
-1. Staff sign in with email and password at `POST /api/v1/auth/login`.
+1. Staff sign in with email and password on the dashboard's `/login` page, which calls `POST /api/v1/auth/login`. A wrong email or password shows one generic error that never says which field was wrong.
 2. The API checks the password against an Argon2 hash in `app.staff_users`, creates a row in `app.staff_sessions`, and returns a session cookie.
 3. The browser sends the cookie with every API request. Every endpoint except login, logout and `/health` looks the session up and returns `401` if it is missing, expired, revoked, or belongs to a deactivated account.
 4. On load, the dashboard calls `GET /api/v1/auth/session` to learn who is signed in, because JavaScript cannot read the cookie. Any `401` afterwards sends the user back to sign-in.
