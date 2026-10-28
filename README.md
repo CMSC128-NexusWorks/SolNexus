@@ -133,6 +133,14 @@ docker compose run --rm --no-deps api alembic upgrade head
 
 The last command creates or upgrades the database schema. Rerun it after pulling new migrations; see [Database schema and ownership](docs/database.md).
 
+There is no sign-up page. Create a development staff account, using a synthetic email:
+
+```bash
+docker compose run --rm api python -m app.staff_account staff.one@example.test
+```
+
+See [Staff sign-in and sessions](docs/authentication.md) for session rules and cookie settings.
+
 | Service | URL |
 |---|---|
 | React dashboard | http://localhost:5173 |
@@ -180,7 +188,7 @@ See the [frontend README](frontend/README.md) for scripts and conventions.
 
 - Work is tracked in Jira project **SNX**. Pick up a ticket, then branch from `main` as `<type>/snx-<number>-short-name` (`feat`, `fix`, `docs` or `chore`).
 - Write commits as [Conventional Commits](https://www.conventionalcommits.org/) with the ticket as scope, e.g. `feat(snx-54): add app shell`.
-- Run the checks for the area you changed before opening a PR. Frontend: `npm run typecheck && npm run lint && npm run test`.
+- Run the checks for the area you changed before opening a PR. Frontend: `npm run typecheck && npm run lint && npm run test`. Backend: `docker compose run --rm api pytest` (uses a separate `solnexus_test` database).
 - Open a PR into `main`. It needs one approval from someone other than the last pusher.
 - Use synthetic data only in fixtures, mocks, tests and screenshots. Real client data stays in the git-ignored `leads-data/` folder.
 
@@ -195,6 +203,7 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 - [Implementation Roadmap](docs/implementation_roadmap.md)
 - [Phase 1 Data and API Contract](docs/contracts/phase1-data-api-v1.md)
 - [Database Schema and Ownership](docs/database.md)
+- [Staff Sign-in and Sessions](docs/authentication.md)
 - [Wireframes](docs/wireframes)
 
 ## Team

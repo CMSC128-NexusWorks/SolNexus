@@ -1,59 +1,61 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 
 import * as authApi from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
 import type { LoginRequest, StaffUser } from "@/lib/api/types";
+import { SESSION_QUERY_KEY } from "@/lib/query-client";
 
 interface AuthContextValue {
   user: StaffUser | null;
+  /** True until the API has answered whether a session exists. */
+  isChecking: boolean;
   signIn: (credentials: LoginRequest) => Promise<StaffUser>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// TODO(SNX-27): the session itself is an HttpOnly cookie the browser can't read.
-// The contract has no "who am I" endpoint yet, so we remember the signed-in user
-// for this tab only. Replace this with a session check once SNX-27 defines one.
-const STORAGE_KEY = "solnexus.user";
-
-function readStoredUser(): StaffUser | null {
+// The session is an HttpOnly cookie the browser can't read, so the API is the only source of truth.
+async function fetchSessionUser(): Promise<StaffUser | null> {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StaffUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-function storeUser(user: StaffUser | null) {
-  try {
-    if (user) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    else sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Storage can be unavailable (private mode); the in-memory state still works.
+    return await authApi.getSession();
+  } catch (error) {
+    if (error instanceof ApiError && error.isUnauthorized) return null;
+    throw error;
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<StaffUser | null>(readStoredUser);
+  const queryClient = useQueryClient();
+  const session = useQuery({ queryKey: SESSION_QUERY_KEY, queryFn: fetchSessionUser });
 
-  const signIn = useCallback(async (credentials: LoginRequest) => {
-    const signedIn = await authApi.login(credentials);
-    storeUser(signedIn);
-    setUser(signedIn);
-    return signedIn;
-  }, []);
+  const signIn = useCallback(
+    async (credentials: LoginRequest) => {
+      const signedIn = await authApi.login(credentials);
+      queryClient.setQueryData(SESSION_QUERY_KEY, signedIn);
+      return signedIn;
+    },
+    [queryClient],
+  );
 
   const signOut = useCallback(async () => {
     try {
       await authApi.logout();
     } finally {
-      storeUser(null);
-      setUser(null);
+      queryClient.setQueryData(SESSION_QUERY_KEY, null);
+      // Drop every cached lead too, so nothing private stays in memory after sign-out. Not clear():
+      // that would also remove the session query this provider is subscribed to.
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== SESSION_QUERY_KEY[0],
+      });
     }
-  }, []);
+  }, [queryClient]);
 
-  const value = useMemo(() => ({ user, signIn, signOut }), [user, signIn, signOut]);
+  const value = useMemo(
+    () => ({ user: session.data ?? null, isChecking: session.isPending, signIn, signOut }),
+    [session.data, session.isPending, signIn, signOut],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

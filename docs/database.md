@@ -53,7 +53,8 @@ Rules that follow from this:
 | Table | Holds | Change rule |
 |---|---|---|
 | `bronze.raw_messages` | One row per source message: exact payload bytes, source IDs, event and ingest times | Append-only. `INSERT ... ON CONFLICT DO NOTHING` on `raw_messages_source_key` |
-| `app.staff_users` | The SolTech dashboard accounts | Deactivate with `is_active`; never delete |
+| `app.staff_users` | The SolTech dashboard accounts | Create or reset with `python -m app.staff_account`; deactivate with `is_active`; never delete |
+| `app.staff_sessions` | Sign-in sessions; only a hash of each cookie token | Insert on login; revoke with `revoked_at`. See [authentication](authentication.md) |
 | `app.clinics` | Confirmed clinic leads | Versioned edits: `SET ..., version = version + 1 WHERE version = :expected` |
 | `app.lead_inquiries` | Unknown-name first contacts | Versioned edits, as for clinics |
 | `app.clinic_source_identities` | Staff-confirmed source identity to clinic links | Revoke once, then insert a replacement; no other change |

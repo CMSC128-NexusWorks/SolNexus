@@ -1,6 +1,11 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
+import { getSession } from "@/lib/api/auth";
+import { MOCK_USER } from "@/mocks/data";
+import { server } from "@/mocks/server";
 import { renderApp } from "@/test/render";
 
 describe("app routing", () => {
@@ -25,5 +30,39 @@ describe("app routing", () => {
     renderApp("/");
 
     expect(await screen.findByText(/^Synced /)).toBeInTheDocument();
+  });
+});
+
+describe("staff session", () => {
+  it("asks the API who is signed in instead of remembering it in the browser", async () => {
+    renderApp("/");
+
+    expect(await screen.findByText(MOCK_USER.email)).toBeInTheDocument();
+    expect(sessionStorage.getItem("solnexus.user")).toBeNull();
+  });
+
+  it("sends staff back to sign-in when the API says the session has ended", async () => {
+    server.use(
+      http.get("*/api/v1/leads/due", () =>
+        HttpResponse.json(
+          { error: { code: "unauthorized", message: "Sign in required", details: [] } },
+          { status: 401 },
+        ),
+      ),
+    );
+    const { router } = renderApp("/");
+
+    expect(await screen.findByText("Sign-in form")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/login");
+  });
+
+  it("ends the session on the API when staff sign out", async () => {
+    const { router } = renderApp("/");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByText("Sign-in form")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/login");
+    await expect(getSession()).rejects.toMatchObject({ status: 401 });
   });
 });

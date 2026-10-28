@@ -6,6 +6,8 @@
   "auth": {
     "login_request": {"email": "staff@example.test", "password": "example-only"},
     "login_response": {"user_id": "00000000-0000-4000-8000-000000000001", "email": "staff@example.test"},
+    "session_response": {"user_id": "00000000-0000-4000-8000-000000000001", "email": "staff@example.test"},
+    "invalid_credentials": {"error": {"code": "invalid_credentials", "message": "Invalid email or password", "details": []}},
     "unauthorized": {"error": {"code": "unauthorized", "message": "Sign in required", "details": []}}
   },
   "create_clinic": {

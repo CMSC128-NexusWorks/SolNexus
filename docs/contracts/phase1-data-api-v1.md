@@ -98,10 +98,13 @@ FR-19 export is a current **snapshot** of authorized lead data, not a backup or 
 
 All endpoints require the authenticated SolTech staff session except login. Use JSON errors `{ "error": { "code": "...", "message": "...", "details": [] } }`; omit private row content. `401` means no valid session, `403` means insufficient permission, `409` means concurrent edit or unresolved identity conflict, `422` means field validation failure, and `503` means temporarily unavailable data. Never return a success response while showing stale data as fresh.
 
+Sessions are server-side: they expire after 8 hours without an API request or 7 days after sign-in, whichever comes first, and logout or a password reset revokes them. Unknown email, wrong password and deactivated account return the same `401 invalid_credentials`. Cookie attributes and deployment constraints are in [Staff sign-in and sessions](../authentication.md).
+
 | Method/path | Request | Success |
 |---|---|---|
 | `POST /api/v1/auth/login` | Email/password over HTTPS | `200` session cookie (HttpOnly, Secure, SameSite) plus staff summary; invalid credentials `401` |
 | `POST /api/v1/auth/logout` | Session | `204`; invalidate server session |
+| `GET /api/v1/auth/session` | Session | `200` staff summary (same shape as login); no or expired session `401` |
 | `POST /api/v1/clinics` | Required `clinic_name`; optional FR-20 contact/status/date/discovery fields | `201` clinic with stable `clinic_id` and `version` |
 | `PATCH /api/v1/clinics/{clinic_id}` | Changed operational fields plus `version`; confirmed-name corrections require reason | `200` updated clinic; stale version `409` |
 | `PATCH /api/v1/inquiries/{inquiry_id}` | Changed contact/follow-up fields plus `version` | `200` updated inquiry; stale version `409` |
