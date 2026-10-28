@@ -128,7 +128,10 @@ The Phase 1 scaffold runs as Docker Compose services: PostgreSQL, FastAPI, the R
 ```bash
 cp .env.example .env
 docker compose up -d --build
+docker compose run --rm --no-deps api alembic upgrade head
 ```
+
+The last command creates or upgrades the database schema. Rerun it after pulling new migrations; see [Database schema and ownership](docs/database.md).
 
 | Service | URL |
 |---|---|
@@ -165,8 +168,8 @@ See the [frontend README](frontend/README.md) for scripts and conventions.
 ```
 .
 ├── airflow/    Airflow image and DAGs
-├── backend/    FastAPI app
-├── dbt/        dbt project (bronze/silver models)
+├── backend/    FastAPI app, Alembic migrations and dev seed
+├── dbt/        dbt project (silver models; reads bronze and app as sources)
 ├── docker/     container init scripts (Postgres)
 ├── docs/       proposal, requirements, architecture, contracts, roadmap, wireframes
 ├── frontend/   React dashboard
@@ -190,6 +193,7 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 - [System Architecture](docs/architecture.md)
 - [Implementation Roadmap](docs/implementation_roadmap.md)
 - [Phase 1 Data and API Contract](docs/contracts/phase1-data-api-v1.md)
+- [Database Schema and Ownership](docs/database.md)
 - [Wireframes](docs/wireframes)
 
 ## Team
