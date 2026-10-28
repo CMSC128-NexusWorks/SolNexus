@@ -39,7 +39,8 @@ export interface LeadRow {
   /** UTC instant; null when no linked interaction has a trustworthy event time. */
   last_contact_at?: string | null;
   channels?: Channel[];
-  version?: number;
+  /** Send back unchanged on every edit; the API returns 409 if someone saved first. */
+  version: number;
   /** True when a staff edit is visible before the next silver refresh. */
   pending_projection?: boolean;
 }
