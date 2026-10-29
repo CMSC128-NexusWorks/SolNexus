@@ -1,0 +1,120 @@
+version: 2
+
+# Scenario tests for SNX-29's acceptance criteria. Each test feeds a model synthetic inputs
+# and compares the output rows, so the cases need no seed data and run on every dbt build.
+# Staging models are ephemeral, so their inputs must use format: sql with every column typed.
+
+unit_tests:
+  - name: interactions_link_only_with_matching_active_mapping
+    description: >
+      A message links only when its resolution is 'linked' AND an active mapping for the exact
+      (channel, account, participant) points to the same clinic. Covers a stale link after
+      revocation, a correction awaiting re-check, account scoping, a pending message and a
+      message without a participant.
+    model: interactions
+    given:
+      - input: ref('stg_bronze__raw_messages')
+        format: sql
+        rows: |
+          select m.raw_message_id::uuid, 'gmail'::text as source_channel, m.account::text as source_account_id,
+                 m.msg::text as source_message_id, null::text as source_thread_id,
+                 m.participant::text as external_participant_id, 'inbound'::text as direction,
+                 null::text as source_sender_id, '2026-10-18 02:00:00+00'::timestamptz as source_event_at,
+                 '2026-10-18 02:05:00+00'::timestamptz as ingested_at, null::jsonb as parsed_payload
+          from (values
+              ('30000000-0000-4000-8000-0000000000a1', 'test-mailbox',  'm-linked',     'a@example.test'),
+              ('30000000-0000-4000-8000-0000000000a2', 'test-mailbox',  'm-revoked',    'b@example.test'),
+              ('30000000-0000-4000-8000-0000000000a3', 'test-mailbox',  'm-corrected',  'c@example.test'),
+              ('30000000-0000-4000-8000-0000000000a4', 'other-mailbox', 'm-other-acct', 'a@example.test'),
+              ('30000000-0000-4000-8000-0000000000a5', 'test-mailbox',  'm-pending',    'd@example.test'),
+              ('30000000-0000-4000-8000-0000000000a6', 'test-mailbox',  'm-no-party',   null)
+          ) as m(raw_message_id, account, msg, participant)
+      - input: ref('stg_app__message_resolutions')
+        format: sql
+        rows: |
+          select r.raw_message_id::uuid, r.status::text as resolution_status, r.clinic_id::uuid,
+                 r.reason::text as review_reason, null::timestamptz as resolved_at
+          from (values
+              ('30000000-0000-4000-8000-0000000000a1', 'linked', '10000000-0000-4000-8000-0000000000c1', null),
+              ('30000000-0000-4000-8000-0000000000a2', 'linked', '10000000-0000-4000-8000-0000000000c1', null),
+              ('30000000-0000-4000-8000-0000000000a3', 'linked', '10000000-0000-4000-8000-0000000000c1', null),
+              ('30000000-0000-4000-8000-0000000000a4', 'linked', '10000000-0000-4000-8000-0000000000c1', null),
+              ('30000000-0000-4000-8000-0000000000a6', 'needs_review', null, 'incomplete_source_identity')
+          ) as r(raw_message_id, status, clinic_id, reason)
+      - input: ref('stg_app__clinic_source_identities')
+        format: sql
+        rows: |
+          select x.mapping_id::uuid, 'gmail'::text as source_channel, 'test-mailbox'::text as source_account_id,
+                 x.participant::text as external_participant_id, x.clinic_id::uuid,
+                 '2026-10-18 00:00:00+00'::timestamptz as confirmed_at, x.revoked_at::timestamptz,
+                 x.revoked_at is null as is_active
+          from (values
+              ('40000000-0000-4000-8000-0000000000b1', 'a@example.test', '10000000-0000-4000-8000-0000000000c1', null),
+              -- b: staff revoked the mapping; the resolution job has not re-checked m-revoked yet
+              ('40000000-0000-4000-8000-0000000000b2', 'b@example.test', '10000000-0000-4000-8000-0000000000c1', '2026-10-19 00:00:00+00'),
+              -- c: staff corrected the mapping to clinic c2; the old resolution still says c1
+              ('40000000-0000-4000-8000-0000000000b3', 'c@example.test', '10000000-0000-4000-8000-0000000000c2', null)
+          ) as x(mapping_id, participant, clinic_id, revoked_at)
+    expect:
+      rows:
+        - {raw_message_id: '30000000-0000-4000-8000-0000000000a1', is_linked: true,  resolution_status: linked,       clinic_id: '10000000-0000-4000-8000-0000000000c1', mapping_id: '40000000-0000-4000-8000-0000000000b1'}
+        - {raw_message_id: '30000000-0000-4000-8000-0000000000a2', is_linked: false, resolution_status: linked,       clinic_id: null, mapping_id: null}
+        - {raw_message_id: '30000000-0000-4000-8000-0000000000a3', is_linked: false, resolution_status: linked,       clinic_id: null, mapping_id: null}
+        - {raw_message_id: '30000000-0000-4000-8000-0000000000a4', is_linked: false, resolution_status: linked,       clinic_id: null, mapping_id: null}
+        - {raw_message_id: '30000000-0000-4000-8000-0000000000a5', is_linked: false, resolution_status: null,         clinic_id: null, mapping_id: null}
+        - {raw_message_id: '30000000-0000-4000-8000-0000000000a6', is_linked: false, resolution_status: needs_review, clinic_id: null, mapping_id: null}
+
+  - name: leads_project_clinics_and_open_inquiries
+    description: >
+      Two clinics with the same name stay separate leads (never auto-merged); a clinic without
+      messages still appears with zero activity; only linked interactions count; a late-arriving
+      message with an older event time and a message without an event time never become the
+      last contact; a closed inquiry is replaced by its clinic and an open one keeps its
+      unknown name.
+    model: leads
+    given:
+      - input: ref('stg_app__clinics')
+        format: sql
+        rows: |
+          select c.clinic_id::uuid, c.clinic_name::text, null::text as contact_person, null::text as person_spoken_to,
+                 null::text as calling_notes, null::text as contact_number, null::text as email,
+                 null::text as region, null::text as province, null::text as municipality, null::text as address,
+                 c.status_code::text, null::date as next_action_date, null::text as next_step,
+                 null::text as point_person, null::text as discovery_source, c.origin::text, 1 as version,
+                 '2026-10-01 00:00:00+00'::timestamptz as created_at, '2026-10-01 00:00:00+00'::timestamptz as updated_at
+          from (values
+              ('10000000-0000-4000-8000-0000000000c1', 'Harbor Clinic', 'contacted',     'import'),
+              ('10000000-0000-4000-8000-0000000000c2', 'Harbor Clinic', 'proposal_sent', 'manual'),
+              ('10000000-0000-4000-8000-0000000000c3', 'Quiet Clinic',  null,            'inquiry')
+          ) as c(clinic_id, clinic_name, status_code, origin)
+      - input: ref('stg_app__lead_inquiries')
+        format: sql
+        rows: |
+          select i.inquiry_id::uuid, 'gmail'::text as source_channel, 'test-mailbox'::text as source_account_id,
+                 i.participant::text as external_participant_id, i.origin_msg::uuid as origin_raw_message_id,
+                 i.name_state::text as clinic_name_state, null::text as contact_person, null::text as contact_number,
+                 i.participant::text as email, null::text as status_code, null::date as next_action_date,
+                 null::text as next_step, null::text as calling_notes, i.state::text,
+                 i.confirmed_clinic_id::uuid, 1 as version,
+                 '2026-10-01 00:00:00+00'::timestamptz as created_at, '2026-10-01 00:00:00+00'::timestamptz as updated_at
+          from (values
+              ('70000000-0000-4000-8000-0000000000d1', 'new@example.test',   '30000000-0000-4000-8000-0000000000e1', 'unknown',   'open',   null),
+              -- confirmed into clinic c3, so it must appear only as that clinic
+              ('70000000-0000-4000-8000-0000000000d2', 'quiet@example.test', '30000000-0000-4000-8000-0000000000e2', 'confirmed', 'closed', '10000000-0000-4000-8000-0000000000c3')
+          ) as i(inquiry_id, participant, origin_msg, name_state, state, confirmed_clinic_id)
+      - input: ref('interactions')
+        rows:
+          - {clinic_id: '10000000-0000-4000-8000-0000000000c1', is_linked: true,  event_at: '2026-10-18 02:00:00+00', ingested_at: '2026-10-18 02:05:00+00'}
+          # late arrival: ingested last, but its conversation happened earlier
+          - {clinic_id: '10000000-0000-4000-8000-0000000000c1', is_linked: true,  event_at: '2026-10-17 00:00:00+00', ingested_at: '2026-10-25 00:00:00+00'}
+          # no provider event time: counted, never the last contact
+          - {clinic_id: '10000000-0000-4000-8000-0000000000c1', is_linked: true,  event_at: null,                     ingested_at: '2026-10-26 00:00:00+00'}
+          - {clinic_id: '10000000-0000-4000-8000-0000000000c2', is_linked: true,  event_at: '2026-10-20 00:00:00+00', ingested_at: '2026-10-20 00:05:00+00'}
+          # unlinked message: belongs to no lead
+          - {clinic_id: null,                                   is_linked: false, event_at: '2026-10-27 00:00:00+00', ingested_at: '2026-10-27 00:05:00+00'}
+    expect:
+      rows:
+        - {record_type: clinic,  lead_id: '10000000-0000-4000-8000-0000000000c1', clinic_name: Harbor Clinic, clinic_name_state: confirmed, interaction_count: 3, last_interaction_at: '2026-10-18 02:00:00+00'}
+        - {record_type: clinic,  lead_id: '10000000-0000-4000-8000-0000000000c2', clinic_name: Harbor Clinic, clinic_name_state: confirmed, interaction_count: 1, last_interaction_at: '2026-10-20 00:00:00+00'}
+        - {record_type: clinic,  lead_id: '10000000-0000-4000-8000-0000000000c3', clinic_name: Quiet Clinic,  clinic_name_state: confirmed, interaction_count: 0, last_interaction_at: null}
+        - {record_type: inquiry, lead_id: '70000000-0000-4000-8000-0000000000d1', clinic_name: null,          clinic_name_state: unknown,   interaction_count: 0, last_interaction_at: null}
