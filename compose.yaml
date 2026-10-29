@@ -83,6 +83,21 @@ services:
     ports:
       - "127.0.0.1:8765:8765"
 
+  # Connector tests in the same image the DAGs run in: docker compose --profile test run --rm airflow-tests
+  # SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests (see airflow/README.md).
+  airflow-tests:
+    profiles: ["test"]
+    <<: *airflow-common
+    depends_on: []
+    working_dir: /opt/airflow/project
+    environment:
+      SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
+    volumes:
+      - ./airflow:/opt/airflow/project:ro
+    entrypoint: ["bash", "-c"]
+    # The project mount is read-only, so pytest's cache is disabled rather than written into it.
+    command: ["pip install --quiet --disable-pip-version-check -r requirements-dev.txt && python -m pytest -p no:cacheprovider \"$$@\"", "--"]
+
   web:
     build:
       context: ./frontend

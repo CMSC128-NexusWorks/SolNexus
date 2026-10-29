@@ -1,0 +1,3 @@
+# Test-only dependencies, installed by the "airflow-tests" Compose service (profile "test").
+# Runtime dependencies (google-auth, requests, psycopg2) already ship with the Airflow image.
+pytest>=8,<9
