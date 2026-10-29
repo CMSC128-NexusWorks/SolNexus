@@ -175,7 +175,7 @@ See the [frontend README](frontend/README.md) for scripts and conventions.
 
 ```
 .
-├── airflow/    Airflow image and DAGs
+├── airflow/    Airflow image, DAGs and the Gmail connector (see airflow/README.md)
 ├── backend/    FastAPI app, Alembic migrations and dev seed
 ├── dbt/        dbt project (silver models; reads bronze and app as sources)
 ├── docker/     container init scripts (Postgres)
