@@ -17,6 +17,15 @@ function fields() {
   };
 }
 
+type RequestStartListener = Parameters<typeof server.events.on<"request:start">>[1];
+let requestListener: RequestStartListener | null = null;
+
+/** Watch requests for one test. Only this listener is removed afterwards, not every listener. */
+function watchRequests(listener: RequestStartListener) {
+  requestListener = listener;
+  server.events.on("request:start", listener);
+}
+
 async function renderLogin(path = "/login") {
   const result = renderApp(path, { user: null });
   await screen.findByRole("heading", { name: "Sign in" });
@@ -27,6 +36,8 @@ describe("login page", () => {
   // Cleanup lives here, not at the end of a test, so it still runs when a test fails.
   afterEach(() => {
     vi.unstubAllEnvs();
+    if (requestListener) server.events.removeListener("request:start", requestListener);
+    requestListener = null;
   });
 
   it("signs in with valid credentials and opens the dashboard", async () => {
@@ -103,7 +114,7 @@ describe("login page", () => {
 
   it("asks for missing fields without calling the API", async () => {
     let loginCalls = 0;
-    server.events.on("request:start", ({ request }) => {
+    watchRequests(({ request }) => {
       if (request.url.endsWith("/auth/login")) loginCalls += 1;
     });
     await renderLogin();
@@ -115,7 +126,6 @@ describe("login page", () => {
     expect(fields().email).toHaveAttribute("aria-invalid", "true");
     expect(fields().email).toHaveFocus();
     expect(loginCalls).toBe(0);
-    server.events.removeAllListeners();
   });
 
   it("submits with the Enter key", async () => {
@@ -135,7 +145,7 @@ describe("login page", () => {
         return HttpResponse.json({ user_id: "u-1", email: MOCK_CREDENTIALS.email });
       }),
     );
-    await renderLogin();
+    const { router } = await renderLogin();
 
     await userEvent.type(fields().email, MOCK_CREDENTIALS.email);
     await userEvent.type(fields().password, MOCK_CREDENTIALS.password);
@@ -144,6 +154,8 @@ describe("login page", () => {
     const pending = await screen.findByRole("button", { name: "Signing in…" });
     expect(pending).toBeDisabled();
     release();
+    // Let the sign-in finish inside this test, so its state updates don't land after cleanup.
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/"));
   });
 
   it("tells staff to try again when the API can't be reached", async () => {
