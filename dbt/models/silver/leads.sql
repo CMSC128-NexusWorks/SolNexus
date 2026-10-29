@@ -23,7 +23,8 @@ clinic_activity as (
         -- max() skips null event_at, so a message without a provider time adds to the count
         -- but never becomes the last contact (sync time is not conversation time).
         max(event_at) as last_interaction_at,
-        count(*) as interaction_count
+        -- int, not count()'s bigint: the ERD declares interaction_count int.
+        cast(count(*) as int) as interaction_count
     from interactions
     where is_linked
     group by clinic_id

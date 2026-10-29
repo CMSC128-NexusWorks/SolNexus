@@ -53,7 +53,7 @@ joined as (
 
 select
     raw_message_id,
-    source_channel as channel,
+    source_channel,
     source_account_id,
     source_message_id,
     source_thread_id,
@@ -68,11 +68,13 @@ select
     is_linked,
     case when is_linked then resolved_clinic_id end as clinic_id,
     case when is_linked then active_mapping_id end as mapping_id,
-    -- Baseline parser output: suggestions only, never written back to app.clinics.
+    -- Baseline parser output (columns per docs/contracts/phase1-erd-schema-draft.md):
+    -- suggestions only, never written back to app.clinics.
     -- Null until the rules get contract sign-off and ingestion fills parsed_payload with
     -- message text; reserving the columns now keeps the API history shape stable.
     -- parser_version names the rule set that produced a suggestion (null = no parser ran).
     cast(null as text) as topic,
     cast(null as text) as derived_status_code,
+    cast(null as date) as derived_next_action_date,
     cast(null as text) as parser_version
 from joined
