@@ -54,3 +54,43 @@ models:
               arguments:
                 to: source('app', 'clinic_source_identities')
                 field: mapping_id
+
+  - name: leads
+    description: >
+      One row per confirmed clinic or open inquiry, unique on (record_type, lead_id).
+      Operational fields come from app unchanged; activity columns count only linked interactions.
+    columns:
+      - name: lead_id
+        description: The clinic_id or inquiry_id, depending on record_type.
+        tests:
+          - not_null
+      - name: record_type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['clinic', 'inquiry']
+      - name: clinic_id
+        description: Set for clinics; null for inquiries.
+        tests:
+          - relationships:
+              arguments:
+                to: source('app', 'clinics')
+                field: clinic_id
+      - name: clinic_name_state
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['confirmed', 'unknown']
+      - name: status_code
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['contacted', 'proposal_sent', 'awaiting_demo', 'follow_up_needed', 'closed']
+      - name: last_interaction_at
+        description: Latest provider event time among linked interactions; null when there is none.
+      - name: interaction_count
+        description: Number of linked interactions; 0 for inquiries and clinics without messages.
+        tests:
+          - not_null
