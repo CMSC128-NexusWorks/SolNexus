@@ -48,10 +48,10 @@ def api_message(
     return message
 
 
-def inbound(message_id: str = "m-in-1", sender: str = LEAD, **kwargs) -> dict:
-    return api_message(message_id, rfc822(sender=sender, to=MAILBOX), **kwargs)
+def inbound(message_id: str = "m-in-1", sender: str = LEAD, mailbox: str = MAILBOX, **kwargs) -> dict:
+    return api_message(message_id, rfc822(sender=sender, to=mailbox), **kwargs)
 
 
-def outbound(message_id: str = "m-out-1", to: str = LEAD, **kwargs) -> dict:
+def outbound(message_id: str = "m-out-1", to: str = LEAD, mailbox: str = MAILBOX, **kwargs) -> dict:
     kwargs.setdefault("labels", ("SENT",))
-    return api_message(message_id, rfc822(sender=MAILBOX, to=to, body="Thanks, which clinic is this?"), **kwargs)
+    return api_message(message_id, rfc822(sender=mailbox, to=to, body="Thanks, which clinic is this?"), **kwargs)
