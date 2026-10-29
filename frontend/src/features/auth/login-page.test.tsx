@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SESSION_QUERY_KEY } from "@/lib/query-client";
 import { MOCK_CREDENTIALS } from "@/mocks/credentials";
@@ -23,6 +23,11 @@ async function renderLogin(path = "/login") {
 }
 
 describe("login page", () => {
+  // Cleanup lives here, not at the end of a test, so it still runs when a test fails.
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("signs in with valid credentials and opens the dashboard", async () => {
     const { router } = await renderLogin();
     const { email, password, submit } = fields();
@@ -152,6 +157,14 @@ describe("login page", () => {
       await screen.findByText("Couldn't reach SolNexus. Check your connection and try again."),
     ).toBeInTheDocument();
     expect(fields().password).toHaveValue(MOCK_CREDENTIALS.password);
+  });
+
+  it("never prints the mock password outside the dev server", async () => {
+    vi.stubEnv("VITE_USE_MOCKS", "true");
+    vi.stubEnv("DEV", false);
+    await renderLogin();
+
+    expect(screen.queryByText(new RegExp(MOCK_CREDENTIALS.password))).toBeNull();
   });
 
   it("has no sign-up link", async () => {

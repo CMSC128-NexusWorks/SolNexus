@@ -83,7 +83,9 @@ export function LoginPage() {
           <p className="text-sm text-muted-foreground">Lead tracking for the SolTech sales team</p>
         </div>
 
-        {import.meta.env.VITE_USE_MOCKS === "true" && (
+        {/* Dev server only. VITE_USE_MOCKS defaults to true in .env.example and compose.yaml, so a
+            built bundle could have it on too, and a sign-in page shouldn't print a password. */}
+        {import.meta.env.DEV && import.meta.env.VITE_USE_MOCKS === "true" && (
           // role="note": this is a hint, not an error, so screen readers shouldn't announce it.
           <Alert role="note">
             <AlertDescription>
