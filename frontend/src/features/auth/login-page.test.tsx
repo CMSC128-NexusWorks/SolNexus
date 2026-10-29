@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
+import { SESSION_QUERY_KEY } from "@/lib/query-client";
 import { MOCK_CREDENTIALS } from "@/mocks/credentials";
 import { server } from "@/mocks/server";
 import { renderApp } from "@/test/render";
@@ -48,6 +49,34 @@ describe("login page", () => {
       const { pathname, search, hash } = router.state.location;
       expect(`${pathname}${search}${hash}`).toBe("/leads/clinic-0001?tab=history#latest");
     });
+  });
+
+  it("stays signed in when an older session check answers 401 after sign-in", async () => {
+    const { router, queryClient } = await renderLogin();
+    let answerOldCheck!: () => void;
+    server.use(
+      http.get("*/api/v1/auth/session", async () => {
+        await new Promise<void>((resolve) => (answerOldCheck = resolve));
+        return HttpResponse.json(
+          { error: { code: "unauthorized", message: "Sign in required", details: [] } },
+          { status: 401 },
+        );
+      }),
+    );
+    // A session check that left before the cookie existed, e.g. a refetch on window focus.
+    void queryClient.refetchQueries({ queryKey: SESSION_QUERY_KEY });
+    await vi.waitFor(() => expect(answerOldCheck).toBeDefined());
+
+    await userEvent.type(fields().email, MOCK_CREDENTIALS.email);
+    await userEvent.type(fields().password, MOCK_CREDENTIALS.password);
+    await userEvent.click(fields().submit);
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    answerOldCheck();
+
+    expect(
+      await screen.findByRole("heading", { name: "Clinics to call today" }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/");
   });
 
   it("shows one generic error for wrong credentials, without saying which field was wrong", async () => {
