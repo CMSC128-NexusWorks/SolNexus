@@ -30,6 +30,8 @@ def health() -> dict[str, str]:
 app.include_router(auth_router, prefix="/api/v1")
 
 # Every feature endpoint requires a signed-in staff member (FR-10, NFR-03). Add feature routers to
-# `protected` with protected.include_router(...) above the app.include_router(protected) line.
+# `protected` with protected.include_router(...); a route added straight to `app` is public.
+# tests/test_api_protection.py fails if any /api route other than login and logout answers without
+# a session.
 protected = APIRouter(prefix="/api/v1", dependencies=[Depends(require_staff)])
 app.include_router(protected)

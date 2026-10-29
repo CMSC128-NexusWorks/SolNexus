@@ -50,7 +50,11 @@ Use synthetic emails and throwaway passwords in development. Real SolTech accoun
 
 ## Adding a protected endpoint
 
-Put new routers on the `protected` router in `backend/app/main.py`. It requires a signed-in staff member, so an endpoint is protected by default. If a route needs the current user, for example to record who made an edit, add the `require_staff` dependency to it to receive the `StaffUser`.
+Put new routers on the `protected` router in `backend/app/main.py` with `protected.include_router(...)`. That router requires a signed-in staff member. A route added straight to `app` with `app.include_router(...)` or `@app.get(...)` is **not** protected.
+
+`test_every_api_operation_rejects_requests_without_a_session` in `backend/tests/test_api_protection.py` calls every `/api` operation without a cookie and fails if one answers anything but `401`. The only exceptions are login and logout, listed in `PUBLIC_API_OPERATIONS`. Adding to that list is a security decision, so explain it in the PR.
+
+If a route needs the current user, for example to record who made an edit, add the `require_staff` dependency to it to receive the `StaffUser`.
 
 ## Not built in Phase 1
 

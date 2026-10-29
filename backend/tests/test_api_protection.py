@@ -1,9 +1,39 @@
+import re
+
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from app.auth.dependencies import require_staff
 from app.auth.sessions import SESSION_COOKIE
 from app.errors import install_error_handlers
+from app.main import app
+
+# The only /api operations reachable without a session. Adding to this set is a security decision:
+# say why in the PR.
+PUBLIC_API_OPERATIONS = {
+    ("POST", "/api/v1/auth/login"),
+    # Idempotent and must work after the session expired, so it can always clear the cookie.
+    ("POST", "/api/v1/auth/logout"),
+}
+
+
+def test_every_api_operation_rejects_requests_without_a_session(client):
+    # Protection is opt-in: a route must sit on the `protected` router in app.main or depend on
+    # require_staff itself. A route added straight to `app`, the usual FastAPI pattern, would serve
+    # lead data without a session, so this calls every operation in the real app with no cookie.
+    # It is black-box on purpose: the OpenAPI schema is FastAPI's public list of operations, while
+    # app.routes internals change between releases. Path parameters get a dummy value; require_staff
+    # runs before path or body validation, so a protected route answers 401 rather than 422.
+    open_operations = set()
+    for path, operations in app.openapi()["paths"].items():
+        if not path.startswith("/api/"):
+            continue
+        for method in operations:
+            response = client.request(method.upper(), re.sub(r"\{[^}]+\}", "x", path))
+            if response.status_code != 401:
+                open_operations.add((method.upper(), path))
+
+    assert open_operations == PUBLIC_API_OPERATIONS
 
 
 def protected_probe_app() -> FastAPI:
