@@ -16,10 +16,21 @@ x-airflow-common: &airflow-common
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_PORT: "5432"
+    # Connector package used by the DAGs (airflow/include/solnexus_ingest).
+    PYTHONPATH: /opt/airflow/include
+    # Warehouse connection for PostgresHook(postgres_conn_id="solnexus_db").
+    AIRFLOW_CONN_SOLNEXUS_DB: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    # Gmail ingestion (SNX-32). The token comes from the SNX-21 consent flow; see airflow/README.md.
+    GMAIL_TOKEN_FILE: /opt/airflow/secrets/gmail-token.json
+    GMAIL_LABEL_ID: ${GMAIL_LABEL_ID:-}
+    GMAIL_BACKFILL_QUERY: ${GMAIL_BACKFILL_QUERY:-newer_than:30d}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/include:/opt/airflow/include:ro
     - ./dbt:/opt/airflow/dbt
     - airflow_logs:/opt/airflow/logs
+    # OAuth files stay on the host and are mounted read-only; the image never contains them.
+    - ./.secrets:/opt/airflow/secrets:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
