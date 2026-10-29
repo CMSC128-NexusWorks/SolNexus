@@ -57,6 +57,19 @@ def test_cli_prompts_twice_and_creates_the_account(monkeypatch, run_sql, capsys)
     assert len(run_sql("SELECT 1 FROM app.staff_users")) == 1
 
 
+def test_cli_rejects_an_email_without_a_domain_cleanly(monkeypatch, run_sql, capsys):
+    answers = iter(["a long enough password", "a long enough password"])
+    monkeypatch.setattr(staff_account.getpass, "getpass", lambda prompt="": next(answers))
+
+    exit_code = staff_account.main(["staff.one"])
+
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "full address" in err and "nothing changed" in err
+    assert "INSERT" not in err
+    assert run_sql("SELECT 1 FROM app.staff_users") == []
+
+
 def test_cli_refuses_mismatched_passwords(monkeypatch, run_sql, capsys):
     answers = iter(["a long enough password", "a different password"])
     monkeypatch.setattr(staff_account.getpass, "getpass", lambda prompt="": next(answers))
