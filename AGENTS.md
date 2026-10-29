@@ -35,4 +35,5 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 - Commits are atomic: one logical change per commit, so each can be reviewed and reverted on its own.
 - Commits follow Conventional Commits with the ticket as scope, e.g. `feat(snx-54): add app shell`.
 - PRs go into `main`, which is protected: one approval from someone other than the last pusher, no direct pushes.
+- Each PR gets one post in the Discord `pull-requests` forum, titled like the PR. Later news about that PR (review fixes, questions for the reviewer, merged) goes in as a reply in its post, which keeps the announcements channel for team-wide news.
 - Before opening a PR, run the checks for the area you changed. Frontend: `npm run typecheck && npm run lint && npm run test` in `frontend/`. Backend, dbt and Airflow have no automated checks yet.
