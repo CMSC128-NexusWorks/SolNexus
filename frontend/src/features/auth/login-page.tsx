@@ -21,7 +21,11 @@ export function LoginPage() {
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: Location } | null)?.from?.pathname ?? "/";
+  // Keep the query and hash too, so a filtered list or a lead's tab survives the trip through sign-in.
+  const fromLocation = (location.state as { from?: Location } | null)?.from;
+  const from = fromLocation
+    ? `${fromLocation.pathname}${fromLocation.search}${fromLocation.hash}`
+    : "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

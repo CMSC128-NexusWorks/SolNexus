@@ -36,15 +36,18 @@ describe("login page", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("returns staff to the page they originally asked for", async () => {
-    const { router } = renderApp("/leads/clinic-0001", { user: null });
+  it("returns staff to the page they originally asked for, query and hash included", async () => {
+    const { router } = renderApp("/leads/clinic-0001?tab=history#latest", { user: null });
     await screen.findByRole("heading", { name: "Sign in" });
 
     await userEvent.type(fields().email, MOCK_CREDENTIALS.email);
     await userEvent.type(fields().password, MOCK_CREDENTIALS.password);
     await userEvent.click(fields().submit);
 
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/leads/clinic-0001"));
+    await vi.waitFor(() => {
+      const { pathname, search, hash } = router.state.location;
+      expect(`${pathname}${search}${hash}`).toBe("/leads/clinic-0001?tab=history#latest");
+    });
   });
 
   it("shows one generic error for wrong credentials, without saying which field was wrong", async () => {
