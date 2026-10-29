@@ -2,7 +2,14 @@ import asyncio
 import hashlib
 import json
 
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+
+from app.auth.dependencies import require_staff
 from app.auth.sessions import SESSION_COOKIE
+from app.db import Db
+from app.errors import ApiError, install_error_handlers
 from app.main import app
 
 INVALID_CREDENTIALS = {
@@ -206,14 +213,36 @@ def test_activity_extends_the_idle_window(signed_in, run_sql):
     assert row.refreshed
 
 
-def test_recent_activity_does_not_rewrite_the_session_row(signed_in, run_sql):
-    run_sql("UPDATE app.staff_sessions SET last_seen_at = now() - interval '1 minute'")
-    [before] = run_sql("SELECT last_seen_at FROM app.staff_sessions")
+def test_every_request_restarts_the_idle_window(signed_in, run_sql):
+    # No refresh throttle: a request 4 minutes after the last one still counts, so the session ends
+    # exactly 8 hours after the latest request.
+    run_sql("UPDATE app.staff_sessions SET last_seen_at = now() - interval '4 minutes'")
 
     signed_in.get("/api/v1/auth/session")
 
-    [after] = run_sql("SELECT last_seen_at FROM app.staff_sessions")
-    assert after.last_seen_at == before.last_seen_at
+    [row] = run_sql("SELECT now() - last_seen_at < interval '1 minute' AS refreshed FROM app.staff_sessions")
+    assert row.refreshed
+
+
+def test_a_request_that_fails_still_counts_as_activity(signed_in, run_sql):
+    probe = FastAPI()
+    install_error_handlers(probe)
+
+    @probe.get("/api/v1/missing", dependencies=[Depends(require_staff)])
+    def missing(conn: Db):
+        # Writes in the request transaction are rolled back by this error; the refresh must not be.
+        conn.execute(text("SELECT 1"))
+        raise ApiError(404, "not_found", "No such lead")
+
+    run_sql("UPDATE app.staff_sessions SET last_seen_at = now() - interval '7 hours'")
+    token = signed_in.cookies[SESSION_COOKIE]
+
+    with TestClient(probe, base_url="https://testserver") as client:
+        response = client.get("/api/v1/missing", headers={"Cookie": f"{SESSION_COOKIE}={token}"})
+
+    assert response.status_code == 404
+    [row] = run_sql("SELECT now() - last_seen_at < interval '1 minute' AS refreshed FROM app.staff_sessions")
+    assert row.refreshed
 
 
 def test_deactivating_an_account_ends_its_sessions(signed_in, staff, run_sql):

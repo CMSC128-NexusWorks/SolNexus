@@ -16,7 +16,7 @@ The cookie holds a random 256-bit token. The database stores only its SHA-256 ha
 |---|---|
 | Idle timeout | 8 hours without an API request |
 | Absolute timeout | 7 days after sign-in, however active |
-| Idle window refresh | At most once every 5 minutes, so reads don't write on every request |
+| Idle window refresh | Every authenticated request, in its own transaction, so a request that fails (404, 409) still counts as activity |
 | Wrong password, unknown email, deactivated account | Same `401 invalid_credentials` response |
 | Password length | At least 12 characters |
 | Password reset | Signs the account out everywhere |
