@@ -30,6 +30,7 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 - Five developers: JM Briz, Luis Borbolla, Seth Caballero, JP Salomeo, Dan Guevara. Nobody has a fixed dev area. JP Salomeo is Scrum Master; JM Briz is Product Owner and sets backlog priority.
 - Work is tracked in Jira project **SNX**. Every branch, commit and PR names its ticket.
 - Branch names: `<type>/snx-<number>-short-name`, where type is `feat`, `fix`, `docs` or `chore`.
+- Commits are atomic: one logical change per commit, so each can be reviewed and reverted on its own.
 - Commits follow Conventional Commits with the ticket as scope, e.g. `feat(snx-54): add app shell`.
 - PRs go into `main`, which is protected: one approval from someone other than the last pusher, no direct pushes.
 - Before opening a PR, run the checks for the area you changed. Frontend: `npm run typecheck && npm run lint && npm run test` in `frontend/`. Backend, dbt and Airflow have no automated checks yet.

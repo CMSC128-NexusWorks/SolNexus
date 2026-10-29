@@ -179,6 +179,7 @@ See the [frontend README](frontend/README.md) for scripts and conventions.
 ## Contributing
 
 - Work is tracked in Jira project **SNX**. Pick up a ticket, then branch from `main` as `<type>/snx-<number>-short-name` (`feat`, `fix`, `docs` or `chore`).
+- Keep commits atomic: one logical change per commit, so each can be reviewed and reverted on its own.
 - Write commits as [Conventional Commits](https://www.conventionalcommits.org/) with the ticket as scope, e.g. `feat(snx-54): add app shell`.
 - Run the checks for the area you changed before opening a PR. Frontend: `npm run typecheck && npm run lint && npm run test`.
 - Open a PR into `main`. It needs one approval from someone other than the last pusher.
