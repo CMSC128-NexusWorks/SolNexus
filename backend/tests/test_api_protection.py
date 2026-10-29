@@ -95,6 +95,27 @@ def test_validation_errors_use_the_contract_error_shape(client):
     assert {detail["field"] for detail in body["error"]["details"]} == {"email", "password"}
 
 
+def test_unexpected_errors_return_a_contract_500_the_browser_can_read(client, monkeypatch):
+    # Simulates the database failing mid-request, e.g. during the session lookup.
+    def database_down(*_args, **_kwargs):
+        raise RuntimeError("connection to server failed: SELECT ... FROM app.staff_sessions")
+
+    monkeypatch.setattr("app.auth.dependencies.find_session_user", database_down)
+
+    response = client.get(
+        "/api/v1/auth/session",
+        headers={"Cookie": f"{SESSION_COOKIE}=some-token", "Origin": "http://localhost:5173"},
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": {"code": "internal_error", "message": "Something went wrong on the server", "details": []}
+    }
+    # Without CORS headers the browser would hide the 500 and report a network error.
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "staff_sessions" not in response.text
+
+
 def test_unknown_routes_use_the_contract_error_shape(client):
     response = client.get("/api/v1/does-not-exist")
 
