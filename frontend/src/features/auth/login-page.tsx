@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { Navigate, useLocation, useNavigate, type Location } from "react-router";
+import { Navigate, useLocation, type Location } from "react-router";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,9 @@ import { MOCK_CREDENTIALS } from "@/mocks/credentials";
 
 import { useAuth } from "./auth-provider";
 
-interface MissingFields {
-  email?: string;
-  password?: string;
-}
+type FieldName = "email" | "password";
+/** Every message the form can show: one per field, plus `form` for the alert above the fields. */
+type FormErrors = Partial<Record<FieldName | "form", string>>;
 
 /** Copy for a sign-in that failed for a reason other than wrong credentials. */
 function signInFailureMessage(error: unknown) {
@@ -29,10 +28,43 @@ function signInFailureMessage(error: unknown) {
   return "Something went wrong signing in. Try again.";
 }
 
+interface LoginFieldProps {
+  name: FieldName;
+  label: string;
+  type: "email" | "password";
+  autoComplete: string;
+  placeholder?: string;
+  value: string;
+  error?: string;
+  onChange: (value: string) => void;
+}
+
+/** One labelled input with its error message wired up for screen readers. */
+function LoginField({ name, label, error, onChange, ...input }: LoginFieldProps) {
+  const errorId = `${name}-error`;
+  return (
+    <Field data-invalid={!!error || undefined}>
+      <FieldLabel htmlFor={name}>{label}</FieldLabel>
+      <Input
+        id={name}
+        name={name}
+        {...input}
+        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={!!error || undefined}
+        aria-describedby={error ? errorId : undefined}
+      />
+      <FieldError id={errorId}>{error}</FieldError>
+    </Field>
+  );
+}
+
+function focusField(form: HTMLFormElement | null, name: FieldName) {
+  (form?.elements.namedItem(name) as HTMLInputElement | null)?.focus();
+}
+
 /** Sign-in screen from wireframe 01 (FR-10). There is no sign-up: the team creates accounts. */
 export function LoginPage() {
   const { user, isChecking, signIn } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   // Keep the query and hash too, so a filtered list or a lead's tab survives the trip through sign-in.
   const fromLocation = (location.state as { from?: Location } | null)?.from;
@@ -42,11 +74,9 @@ export function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [missing, setMissing] = useState<MissingFields>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [pending, setPending] = useState(false);
-  const emailRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Wait for the session check like RequireAuth does, so a signed-in user opening /login sees a
   // spinner and then the redirect, not the form flashing first.
@@ -57,36 +87,35 @@ export function LoginPage() {
       </div>
     );
   }
+  // The only redirect: a successful signIn sets the user, and this re-render sends them on.
   if (user) return <Navigate to={from} replace />;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedEmail = email.trim();
-    const nextMissing: MissingFields = {
+    const missing: FormErrors = {
       email: trimmedEmail ? undefined : "Enter your email.",
       password: password ? undefined : "Enter your password.",
     };
-    setMissing(nextMissing);
-    setFormError(null);
-    if (nextMissing.email || nextMissing.password) {
-      (nextMissing.email ? emailRef : passwordRef).current?.focus();
+    setErrors(missing);
+    if (missing.email || missing.password) {
+      focusField(formRef.current, missing.email ? "email" : "password");
       return;
     }
 
     setPending(true);
     try {
       await signIn({ email: trimmedEmail, password });
-      navigate(from, { replace: true });
     } catch (error) {
       if (error instanceof ApiError && error.isUnauthorized) {
         // The API answers the same for an unknown email, a wrong password or a deactivated
         // account, so the form can't and shouldn't point at a field.
-        setFormError("Email or password is incorrect.");
+        setErrors({ form: "Email or password is incorrect." });
         setPassword("");
-        passwordRef.current?.focus();
+        focusField(formRef.current, "password");
       } else {
         // The credentials may be fine in every case below, so keep them for a retry.
-        setFormError(signInFailureMessage(error));
+        setErrors({ form: signInFailureMessage(error) });
       }
     } finally {
       setPending(false);
@@ -117,42 +146,32 @@ export function LoginPage() {
         )}
 
         {/* noValidate: show our own messages instead of the browser's, which vary by browser. */}
-        <form noValidate onSubmit={handleSubmit}>
+        <form ref={formRef} noValidate onSubmit={handleSubmit}>
           <FieldGroup>
-            {formError && (
+            {errors.form && (
               <Alert variant="destructive">
-                <AlertDescription>{formError}</AlertDescription>
+                <AlertDescription>{errors.form}</AlertDescription>
               </Alert>
             )}
-            <Field data-invalid={!!missing.email || undefined}>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
-              <Input
-                ref={emailRef}
-                id="email"
-                type="email"
-                autoComplete="username"
-                placeholder="name@example.test"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                aria-invalid={!!missing.email || undefined}
-                aria-describedby={missing.email ? "email-error" : undefined}
-              />
-              <FieldError id="email-error">{missing.email}</FieldError>
-            </Field>
-            <Field data-invalid={!!missing.password || undefined}>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
-              <Input
-                ref={passwordRef}
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                aria-invalid={!!missing.password || undefined}
-                aria-describedby={missing.password ? "password-error" : undefined}
-              />
-              <FieldError id="password-error">{missing.password}</FieldError>
-            </Field>
+            <LoginField
+              name="email"
+              label="Email"
+              type="email"
+              autoComplete="username"
+              placeholder="name@example.test"
+              value={email}
+              error={errors.email}
+              onChange={setEmail}
+            />
+            <LoginField
+              name="password"
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              error={errors.password}
+              onChange={setPassword}
+            />
             <Button type="submit" size="lg" disabled={pending}>
               {/* aria-hidden: the label already says "Signing in…"; the spinner's own "Loading" would repeat it. */}
               {pending && <Spinner data-icon="inline-start" aria-hidden />}
