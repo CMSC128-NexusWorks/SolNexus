@@ -105,9 +105,14 @@ services:
       SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
     volumes:
       - ./airflow:/opt/airflow/project:ro
-    entrypoint: ["bash", "-c"]
+    # Arguments after the service name are appended and reach pytest as "$$@" (e.g. -k sync).
     # The project mount is read-only, so pytest's cache is disabled rather than written into it.
-    command: ["pip install --quiet --disable-pip-version-check -r requirements-dev.txt && python -m pytest -p no:cacheprovider \"$$@\"", "--"]
+    entrypoint:
+      - bash
+      - -c
+      - pip install --quiet --disable-pip-version-check -r requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
 
   web:
     build:
