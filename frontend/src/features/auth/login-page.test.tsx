@@ -128,6 +128,19 @@ describe("login page", () => {
     expect(loginCalls).toBe(0);
   });
 
+  it("clears a field's error as soon as staff type into it", async () => {
+    await renderLogin();
+    await userEvent.click(fields().submit);
+    expect(await screen.findByText("Enter your email.")).toBeInTheDocument();
+
+    await userEvent.type(fields().email, "s");
+
+    expect(screen.queryByText("Enter your email.")).toBeNull();
+    expect(fields().email).not.toHaveAttribute("aria-invalid");
+    // The other field's message stays until that field is fixed.
+    expect(screen.getByText("Enter your password.")).toBeInTheDocument();
+  });
+
   it("submits with the Enter key", async () => {
     const { router } = await renderLogin();
 

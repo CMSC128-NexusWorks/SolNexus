@@ -78,6 +78,15 @@ export function LoginPage() {
   const [pending, setPending] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Typing into a field clears that field's "Enter your …" message right away, instead of leaving it
+  // (and aria-invalid) up until the next submit.
+  function edit(name: FieldName, setValue: (value: string) => void) {
+    return (value: string) => {
+      setValue(value);
+      if (errors[name]) setErrors((current) => ({ ...current, [name]: undefined }));
+    };
+  }
+
   // Wait for the session check like RequireAuth does, so a signed-in user opening /login sees a
   // spinner and then the redirect, not the form flashing first.
   if (isChecking) {
@@ -161,7 +170,7 @@ export function LoginPage() {
               placeholder="name@example.test"
               value={email}
               error={errors.email}
-              onChange={setEmail}
+              onChange={edit("email", setEmail)}
             />
             <LoginField
               name="password"
@@ -170,7 +179,7 @@ export function LoginPage() {
               autoComplete="current-password"
               value={password}
               error={errors.password}
-              onChange={setPassword}
+              onChange={edit("password", setPassword)}
             />
             <Button type="submit" size="lg" disabled={pending}>
               {/* aria-hidden: the label already says "Signing in…"; the spinner's own "Loading" would repeat it. */}
