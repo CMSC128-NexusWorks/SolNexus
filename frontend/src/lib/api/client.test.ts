@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { MOCK_USER } from "@/mocks/data";
+import { setMockSession } from "@/mocks/handlers";
 
 import { login } from "./auth";
 import { ApiError } from "./client";
 import { getLeads } from "./leads";
 
 describe("apiFetch", () => {
+  beforeEach(() => setMockSession(MOCK_USER));
+
   it("passes query parameters through to the API", async () => {
     const page = await getLeads({ status: "awaiting_demo" });
 

@@ -6,6 +6,7 @@ import { routes } from "@/app/router";
 import type { StaffUser } from "@/lib/api/types";
 import { createQueryClient } from "@/lib/query-client";
 import { MOCK_USER } from "@/mocks/data";
+import { setMockSession } from "@/mocks/handlers";
 
 interface RenderAppOptions {
   /** Start already signed in (default) or signed out. */
@@ -14,7 +15,7 @@ interface RenderAppOptions {
 
 /** Renders the real app at `path` with fresh providers. Use it for page-level tests. */
 export function renderApp(path = "/", { user = MOCK_USER }: RenderAppOptions = {}) {
-  if (user) sessionStorage.setItem("solnexus.user", JSON.stringify(user));
+  setMockSession(user);
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const queryClient = createQueryClient();
   queryClient.setDefaultOptions({ queries: { retry: false } });

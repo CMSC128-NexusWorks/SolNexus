@@ -1,6 +1,13 @@
 import { delay, http, HttpResponse } from "msw";
 
-import type { ApiErrorBody, HistoryPage, LeadRow, LeadsPage, StatusCode } from "@/lib/api/types";
+import type {
+  ApiErrorBody,
+  HistoryPage,
+  LeadRow,
+  LeadsPage,
+  StaffUser,
+  StatusCode,
+} from "@/lib/api/types";
 
 import { MOCK_CREDENTIALS } from "./credentials";
 import { businessDate, MOCK_HISTORY, MOCK_LEADS, MOCK_USER } from "./data";
@@ -11,6 +18,23 @@ const api = (path: string) => `*/api/v1${path}`;
 function error(status: number, code: string, message: string) {
   return HttpResponse.json<ApiErrorBody>({ error: { code, message, details: [] } }, { status });
 }
+
+// Stands in for the server-side session behind the HttpOnly cookie. Kept per tab so a reload in
+// mock mode stays signed in, like the real cookie.
+const MOCK_SESSION_KEY = "solnexus.mock-session";
+
+/** Start or end the mock API's session. Tests use it to begin signed in or signed out. */
+export function setMockSession(user: StaffUser | null) {
+  if (user) sessionStorage.setItem(MOCK_SESSION_KEY, JSON.stringify(user));
+  else sessionStorage.removeItem(MOCK_SESSION_KEY);
+}
+
+function mockSessionUser(): StaffUser | null {
+  const raw = sessionStorage.getItem(MOCK_SESSION_KEY);
+  return raw ? (JSON.parse(raw) as StaffUser) : null;
+}
+
+const unauthorized = () => error(401, "unauthorized", "Sign in required");
 
 function page(items: LeadRow[]): LeadsPage {
   const now = new Date();
@@ -39,13 +63,24 @@ export const handlers = [
     if (body.email !== MOCK_CREDENTIALS.email || body.password !== MOCK_CREDENTIALS.password) {
       return error(401, "invalid_credentials", "Invalid email or password");
     }
+    setMockSession(MOCK_USER);
     return HttpResponse.json(MOCK_USER);
   }),
 
-  http.post(api("/auth/logout"), () => new HttpResponse(null, { status: 204 })),
+  // Matches the real API: logout needs no live session and always succeeds.
+  http.post(api("/auth/logout"), () => {
+    setMockSession(null);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get(api("/auth/session"), () => {
+    const user = mockSessionUser();
+    return user ? HttpResponse.json(user) : unauthorized();
+  }),
 
   http.get(api("/leads/due"), async () => {
     await delay(300);
+    if (!mockSessionUser()) return unauthorized();
     return HttpResponse.json(page(dueRows()));
   }),
 
@@ -53,6 +88,7 @@ export const handlers = [
     api("/leads/:clinicId/history"),
     async ({ params }) => {
       await delay(300);
+      if (!mockSessionUser()) return unauthorized();
       const { clinicId } = params;
       if (!MOCK_LEADS.some((lead) => lead.clinic_id === clinicId)) {
         return error(404, "not_found", "Lead not found");
@@ -67,6 +103,7 @@ export const handlers = [
 
   http.get(api("/leads"), async ({ request }) => {
     await delay(300);
+    if (!mockSessionUser()) return unauthorized();
     const params = new URL(request.url).searchParams;
     const status = params.get("status") as StatusCode | null;
     const q = params.get("q")?.trim().toLowerCase();
