@@ -46,6 +46,9 @@ services:
   api:
     build:
       context: ./backend
+      args:
+        # Local dev image includes test tools for `docker compose run --rm api pytest`.
+        INSTALL_DEV: "true"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       API_HOST: ${API_HOST}

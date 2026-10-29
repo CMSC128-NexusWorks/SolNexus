@@ -6,7 +6,6 @@ sqlalchemy>=2.0.0,<3.0.0
 psycopg[binary]>=3.2.0,<4.0.0
 alembic>=1.14.0,<2.0.0
 argon2-cffi>=23.1.0,<26.0.0
-
-# Tests (run inside the api container: docker compose run --rm api pytest)
-pytest>=8.3.0,<10.0.0
-httpx2>=2.16.0,<3.0.0
+# FastAPI alone allows Starlette 0.46+, whose TestClient needs httpx rather than the httpx2 in
+# requirements-dev.txt. 1.10 is the version tested.
+starlette>=1.10.0,<2.0.0
