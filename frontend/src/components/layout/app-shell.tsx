@@ -1,4 +1,5 @@
 import { Link, Outlet, useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,13 @@ export function AppShell() {
   const initials = user?.email.slice(0, 2).toUpperCase() ?? "?";
 
   async function handleSignOut() {
-    await signOut();
+    try {
+      await signOut();
+    } catch {
+      // The session is still live on the server, so stay on the page and say so.
+      toast.error("Couldn't sign out. Check your connection and try again.");
+      return;
+    }
     navigate("/login", { replace: true });
   }
 

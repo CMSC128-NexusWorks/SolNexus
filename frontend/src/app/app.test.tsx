@@ -65,4 +65,22 @@ describe("staff session", () => {
     expect(router.state.location.pathname).toBe("/login");
     await expect(getSession()).rejects.toMatchObject({ status: 401 });
   });
+
+  it("keeps staff signed in and says so when sign-out fails", async () => {
+    server.use(
+      http.post("*/api/v1/auth/logout", () =>
+        HttpResponse.json(
+          { error: { code: "internal_error", message: "Something went wrong", details: [] } },
+          { status: 503 },
+        ),
+      ),
+    );
+    const { router } = renderApp("/");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+
+    expect(await screen.findByText(/Couldn't sign out/)).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/");
+    expect(screen.getByText(MOCK_USER.email)).toBeInTheDocument();
+  });
 });

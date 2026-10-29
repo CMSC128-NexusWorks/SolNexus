@@ -11,6 +11,7 @@ interface AuthContextValue {
   /** True until the API has answered whether a session exists. */
   isChecking: boolean;
   signIn: (credentials: LoginRequest) => Promise<StaffUser>;
+  /** Rejects, leaving the user signed in, when the API could not end the session. */
   signOut: () => Promise<void>;
 }
 
@@ -39,12 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
+  // Only forget the user once the API has revoked the session. If logout fails (network error, 5xx),
+  // the server session is still live, so showing "signed out" would be a lie: a reload would sign
+  // the user straight back in, which matters on a shared machine. The error goes to the caller.
   const signOut = useCallback(async () => {
     try {
       await authApi.logout();
-    } finally {
-      clearSignedInData(queryClient);
+    } catch (error) {
+      // A 401 means there was no session to end, which is the outcome sign-out wants.
+      if (!(error instanceof ApiError && error.isUnauthorized)) throw error;
     }
+    clearSignedInData(queryClient);
   }, [queryClient]);
 
   const value = useMemo(
