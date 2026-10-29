@@ -66,6 +66,29 @@ describe("staff session", () => {
     await expect(getSession()).rejects.toMatchObject({ status: 401 });
   });
 
+  it("says the API is unreachable, not signed out, when the session check fails", async () => {
+    let apiDown = true;
+    server.use(
+      http.get("*/api/v1/auth/session", () =>
+        apiDown
+          ? HttpResponse.json(
+              { error: { code: "internal_error", message: "Something went wrong", details: [] } },
+              { status: 503 },
+            )
+          : undefined,
+      ),
+    );
+    const { router } = renderApp("/");
+
+    expect(await screen.findByText("Can't reach SolNexus right now")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/");
+
+    apiDown = false;
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText(MOCK_USER.email)).toBeInTheDocument();
+  });
+
   it("keeps staff signed in and says so when sign-out fails", async () => {
     server.use(
       http.post("*/api/v1/auth/logout", () =>

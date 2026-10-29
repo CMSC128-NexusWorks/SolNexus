@@ -10,6 +10,13 @@ interface AuthContextValue {
   user: StaffUser | null;
   /** True until the API has answered whether a session exists. */
   isChecking: boolean;
+  /**
+   * True when the session check failed for a reason other than "signed out" (network error, 5xx
+   * after retries). The session may still be valid, so screens must not treat this as signed out.
+   */
+  isUnavailable: boolean;
+  /** Ask the API again after isUnavailable. */
+  recheckSession: () => void;
   signIn: (credentials: LoginRequest) => Promise<StaffUser>;
   /** Rejects, leaving the user signed in, when the API could not end the session. */
   signOut: () => Promise<void>;
@@ -53,9 +60,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSignedInData(queryClient);
   }, [queryClient]);
 
+  const { refetch } = session;
+  const recheckSession = useCallback(() => void refetch(), [refetch]);
+  // A failed background refetch keeps the last answer (session.data), so only an error with no
+  // answer at all counts as unavailable.
+  const isUnavailable = session.isError && session.data === undefined;
+
   const value = useMemo(
-    () => ({ user: session.data ?? null, isChecking: session.isPending, signIn, signOut }),
-    [session.data, session.isPending, signIn, signOut],
+    () => ({
+      user: session.data ?? null,
+      isChecking: session.isPending || (isUnavailable && session.isFetching),
+      isUnavailable,
+      recheckSession,
+      signIn,
+      signOut,
+    }),
+    [
+      session.data,
+      session.isPending,
+      session.isFetching,
+      isUnavailable,
+      recheckSession,
+      signIn,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
