@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import * as authApi from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import type { LoginRequest, StaffUser } from "@/lib/api/types";
-import { SESSION_QUERY_KEY } from "@/lib/query-client";
+import { clearSignedInData, SESSION_QUERY_KEY } from "@/lib/query-client";
 
 interface AuthContextValue {
   user: StaffUser | null;
@@ -43,12 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      queryClient.setQueryData(SESSION_QUERY_KEY, null);
-      // Drop every cached lead too, so nothing private stays in memory after sign-out. Not clear():
-      // that would also remove the session query this provider is subscribed to.
-      queryClient.removeQueries({
-        predicate: (query) => query.queryKey[0] !== SESSION_QUERY_KEY[0],
-      });
+      clearSignedInData(queryClient);
     }
   }, [queryClient]);
 
