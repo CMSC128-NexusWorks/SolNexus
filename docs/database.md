@@ -77,6 +77,7 @@ Append-only tables reject `UPDATE`, `DELETE` and `TRUNCATE` with a trigger. Ever
 
 - `record_type = 'clinic'` comes from `app.clinics`; `record_type = 'inquiry'` comes from `app.lead_inquiries` where `state = 'open'`, with `clinic_name` null and `clinic_name_state = 'unknown'`.
 - Operational fields come from `app` unchanged. `last_interaction_at` and `interaction_count` are derived from linked `silver.interactions`.
+- Every silver row is a snapshot as of the last successful dbt run (`published_at`). A mapping revocation or correction made after that run still counts toward the old clinic's `last_interaction_at` and `interaction_count` until the next run. Clinic history must apply the read-time link check in [the data/API contract](contracts/phase1-data-api-v1.md); whether the API also recomputes these two columns at read time, or shows them as of `published_at`, is open for SNX-30.
 - Clinics with no messages still appear.
 
 dbt tests on these models should check uniqueness of the keys above and relationships to their `app` and `bronze` sources.

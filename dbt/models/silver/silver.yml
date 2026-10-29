@@ -71,6 +71,8 @@ models:
     description: >
       One row per confirmed clinic or open inquiry, unique on (record_type, lead_id).
       Operational fields come from app unchanged; activity columns count only linked interactions.
+      Activity columns are a snapshot as of this run: a link revoked after it still counts until
+      the next run (see docs/database.md, Silver contract).
     columns:
       - name: lead_id
         description: The clinic_id or inquiry_id, depending on record_type.
