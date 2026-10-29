@@ -103,7 +103,7 @@ Sessions are server-side: they expire after 8 hours without an API request or 7 
 | Method/path | Request | Success |
 |---|---|---|
 | `POST /api/v1/auth/login` | Email/password over HTTPS | `200` session cookie (HttpOnly, Secure, SameSite) plus staff summary; invalid credentials `401` |
-| `POST /api/v1/auth/logout` | Session | `204`; invalidate server session |
+| `POST /api/v1/auth/logout` | Session cookie if present; none required | Always `204` and clears the cookie; revokes the session if the cookie names one. Safe to repeat, and works after expiry |
 | `GET /api/v1/auth/session` | Session | `200` staff summary (same shape as login); no or expired session `401` |
 | `POST /api/v1/clinics` | Required `clinic_name`; optional FR-20 contact/status/date/discovery fields | `201` clinic with stable `clinic_id` and `version` |
 | `PATCH /api/v1/clinics/{clinic_id}` | Changed operational fields plus `version`; confirmed-name corrections require reason | `200` updated clinic; stale version `409` |

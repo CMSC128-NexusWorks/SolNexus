@@ -31,8 +31,14 @@ def login(credentials: LoginRequest, response: Response, conn: Db) -> StaffUser:
 
 
 @router.post("/logout", status_code=204)
-def logout(response: Response, conn: Db, _: CurrentStaff, session_token: SessionToken = None) -> None:
-    revoke_session(conn, session_token)
+def logout(response: Response, conn: Db, session_token: SessionToken = None) -> None:
+    """Idempotent: always 204 and always clears the cookie, even when the session already expired.
+
+    It deliberately skips require_staff. Requiring a live session meant an expired one got a 401 and
+    never had its cookie cleared. Revoking an unknown or already-revoked token changes nothing.
+    """
+    if session_token:
+        revoke_session(conn, session_token)
     response.delete_cookie(SESSION_COOKIE, **_COOKIE_OPTIONS)
 
 

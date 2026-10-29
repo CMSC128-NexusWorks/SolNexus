@@ -153,11 +153,25 @@ def test_logout_ends_the_session_on_the_server(signed_in):
     assert replay.status_code == 401
 
 
-def test_logout_without_session_is_401(client):
+def test_logout_without_a_session_still_clears_the_cookie(client):
     response = client.post("/api/v1/auth/logout")
 
-    assert response.status_code == 401
-    assert response.json() == UNAUTHORIZED
+    assert response.status_code == 204
+    assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+def test_logout_after_the_session_expired_still_clears_the_cookie(signed_in, run_sql):
+    run_sql("UPDATE app.staff_sessions SET last_seen_at = now() - interval '8 hours 1 second'")
+
+    response = signed_in.post("/api/v1/auth/logout")
+
+    assert response.status_code == 204
+    assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+def test_logout_twice_is_harmless(signed_in):
+    assert signed_in.post("/api/v1/auth/logout").status_code == 204
+    assert signed_in.post("/api/v1/auth/logout").status_code == 204
 
 
 # Expiry: 8 hours idle, 7 days absolute

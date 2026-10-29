@@ -6,9 +6,9 @@ How the two SolTech staff accounts sign in and how the API protects lead data (F
 
 1. Staff sign in with email and password at `POST /api/v1/auth/login`.
 2. The API checks the password against an Argon2 hash in `app.staff_users`, creates a row in `app.staff_sessions`, and returns a session cookie.
-3. The browser sends the cookie with every API request. Every endpoint except login and `/health` looks the session up and returns `401` if it is missing, expired, revoked, or belongs to a deactivated account.
+3. The browser sends the cookie with every API request. Every endpoint except login, logout and `/health` looks the session up and returns `401` if it is missing, expired, revoked, or belongs to a deactivated account.
 4. On load, the dashboard calls `GET /api/v1/auth/session` to learn who is signed in, because JavaScript cannot read the cookie. Any `401` afterwards sends the user back to sign-in.
-5. `POST /api/v1/auth/logout` revokes the session row, so a copied cookie stops working too.
+5. `POST /api/v1/auth/logout` revokes the session row, so a copied cookie stops working too. It needs no live session and always returns `204` with a cookie-clearing header, so signing out after the session expired still clears the browser's cookie.
 
 The cookie holds a random 256-bit token. The database stores only its SHA-256 hash, so a database leak does not leak usable sessions.
 

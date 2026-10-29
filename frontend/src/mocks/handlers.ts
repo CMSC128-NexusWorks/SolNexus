@@ -67,8 +67,8 @@ export const handlers = [
     return HttpResponse.json(MOCK_USER);
   }),
 
+  // Matches the real API: logout needs no live session and always succeeds.
   http.post(api("/auth/logout"), () => {
-    if (!mockSessionUser()) return unauthorized();
     setMockSession(null);
     return new HttpResponse(null, { status: 204 });
   }),
