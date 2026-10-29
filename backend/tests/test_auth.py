@@ -1,6 +1,9 @@
+import asyncio
 import hashlib
+import json
 
 from app.auth.sessions import SESSION_COOKIE
+from app.main import app
 
 INVALID_CREDENTIALS = {
     "error": {"code": "invalid_credentials", "message": "Invalid email or password", "details": []}
@@ -67,6 +70,38 @@ def test_seeded_placeholder_hash_never_matches(client, run_sql):
 
     assert response.status_code == 401
     assert response.json() == INVALID_CREDENTIALS
+
+
+def test_login_commits_the_session_before_the_response_starts(staff, run_sql):
+    # TestClient waits for the whole ASGI call, so it can't see this ordering. Drive the app directly
+    # and look at the database, from another connection, the moment the response starts.
+    body = json.dumps({"email": staff["email"], "password": staff["password"]}).encode()
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "https",
+        "path": "/api/v1/auth/login",
+        "raw_path": b"/api/v1/auth/login",
+        "query_string": b"",
+        "headers": [(b"host", b"testserver"), (b"content-type", b"application/json")],
+        "client": ("testclient", 50000),
+        "server": ("testserver", 443),
+    }
+    seen = {}
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message):
+        if message["type"] == "http.response.start":
+            seen["status"] = message["status"]
+            seen["sessions_committed"] = len(run_sql("SELECT 1 FROM app.staff_sessions"))
+
+    asyncio.run(app(scope, receive, send))
+
+    assert seen == {"status": 200, "sessions_committed": 1}
 
 
 def test_database_stores_only_a_hash_of_the_session_token(client, staff, run_sql):

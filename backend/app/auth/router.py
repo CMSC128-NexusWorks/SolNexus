@@ -1,19 +1,17 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
-from sqlalchemy import Connection
 
 from app.auth.dependencies import SessionToken, require_staff
 from app.auth.models import LoginRequest, StaffUser
 from app.auth.sessions import ABSOLUTE_TIMEOUT, SESSION_COOKIE, create_session, revoke_session
 from app.auth.staff import authenticate
 from app.core.config import settings
-from app.db import get_db
+from app.db import Db
 from app.errors import ApiError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-Db = Annotated[Connection, Depends(get_db)]
 CurrentStaff = Annotated[StaffUser, Depends(require_staff)]
 
 # Path=/api keeps the cookie off frontend requests. SameSite=Lax stops other sites from sending it on
