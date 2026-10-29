@@ -71,7 +71,7 @@ Append-only tables reject `UPDATE`, `DELETE` and `TRUNCATE` with a trigger. Ever
 `silver.interactions`: one row per `bronze.raw_messages` row, unique on `raw_message_id`.
 
 - `clinic_id` is set only when the message's `app.message_resolutions` row is `linked` **and** an active `app.clinic_source_identities` row for the message's exact `(source_channel, source_account_id, external_participant_id)` points to the same clinic. Otherwise it is null and the row stays available for review.
-- Parsed status or next-action values are suggestions with a `parser_version`; they never change `app` rows.
+- Parsed status or next-action values are suggestions with a `parser_version`; they never change `app` rows. `topic`, `derived_status_code` and `parser_version` exist but stay null until the baseline rules are approved and ingestion fills `parsed_payload`.
 
 `silver.leads`: one row per confirmed clinic or open inquiry, unique on `(record_type, lead_id)`.
 

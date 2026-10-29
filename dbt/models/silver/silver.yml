@@ -54,6 +54,16 @@ models:
               arguments:
                 to: source('app', 'clinic_source_identities')
                 field: mapping_id
+      - name: topic
+        description: Parser suggestion for the message topic. Null until baseline rules are approved.
+      - name: derived_status_code
+        description: Parser status suggestion. Never changes app.clinics or creates a status event.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['contacted', 'proposal_sent', 'awaiting_demo', 'follow_up_needed', 'closed']
+      - name: parser_version
+        description: Rule set that produced topic/derived_status_code; null when no parser ran.
 
   - name: leads
     description: >

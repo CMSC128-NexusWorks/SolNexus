@@ -67,5 +67,12 @@ select
     review_reason,
     is_linked,
     case when is_linked then resolved_clinic_id end as clinic_id,
-    case when is_linked then active_mapping_id end as mapping_id
+    case when is_linked then active_mapping_id end as mapping_id,
+    -- Baseline parser output: suggestions only, never written back to app.clinics.
+    -- Null until the rules get contract sign-off and ingestion fills parsed_payload with
+    -- message text; reserving the columns now keeps the API history shape stable.
+    -- parser_version names the rule set that produced a suggestion (null = no parser ran).
+    cast(null as text) as topic,
+    cast(null as text) as derived_status_code,
+    cast(null as text) as parser_version
 from joined
