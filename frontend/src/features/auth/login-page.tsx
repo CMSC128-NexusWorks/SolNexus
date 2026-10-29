@@ -16,6 +16,19 @@ interface MissingFields {
   password?: string;
 }
 
+/** Copy for a sign-in that failed for a reason other than wrong credentials. */
+function signInFailureMessage(error: unknown) {
+  // apiFetch throws ApiError for any HTTP response, so anything else means no response at all:
+  // offline, DNS, or CORS (fetch rejects with a TypeError).
+  if (!(error instanceof ApiError)) {
+    return "Couldn't reach SolNexus. Check your connection and try again.";
+  }
+  if (error.status >= 500) {
+    return "SolNexus is having trouble right now. Try again in a few minutes.";
+  }
+  return "Something went wrong signing in. Try again.";
+}
+
 /** Sign-in screen from wireframe 01 (FR-10). There is no sign-up: the team creates accounts. */
 export function LoginPage() {
   const { user, signIn } = useAuth();
@@ -63,8 +76,8 @@ export function LoginPage() {
         setPassword("");
         passwordRef.current?.focus();
       } else {
-        // Network failure or server error: the credentials may be fine, so keep them for a retry.
-        setFormError("Couldn't reach SolNexus. Check your connection and try again.");
+        // The credentials may be fine in every case below, so keep them for a retry.
+        setFormError(signInFailureMessage(error));
       }
     } finally {
       setPending(false);

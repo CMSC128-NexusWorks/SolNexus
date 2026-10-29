@@ -159,6 +159,28 @@ describe("login page", () => {
     expect(fields().password).toHaveValue(MOCK_CREDENTIALS.password);
   });
 
+  it.each([
+    [503, "SolNexus is having trouble right now. Try again in a few minutes."],
+    [422, "Something went wrong signing in. Try again."],
+  ])("explains a %i response without blaming the connection", async (status, message) => {
+    server.use(
+      http.post("*/api/v1/auth/login", () =>
+        HttpResponse.json(
+          { error: { code: "server_error", message: "Failed", details: [] } },
+          { status },
+        ),
+      ),
+    );
+    await renderLogin();
+
+    await userEvent.type(fields().email, MOCK_CREDENTIALS.email);
+    await userEvent.type(fields().password, MOCK_CREDENTIALS.password);
+    await userEvent.click(fields().submit);
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(fields().password).toHaveValue(MOCK_CREDENTIALS.password);
+  });
+
   it("never prints the mock password outside the dev server", async () => {
     vi.stubEnv("VITE_USE_MOCKS", "true");
     vi.stubEnv("DEV", false);
