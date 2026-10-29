@@ -16,6 +16,9 @@ clean-targets: ["target", "dbt_packages"]
 # dbt owns only silver. bronze and app are Alembic-owned sources (models/sources.yml).
 models:
   solnexus:
+    # Staging is inlined into silver as CTEs (ephemeral), so dbt creates no objects outside silver.
+    staging:
+      +materialized: ephemeral
     silver:
       +schema: silver
       +materialized: table
