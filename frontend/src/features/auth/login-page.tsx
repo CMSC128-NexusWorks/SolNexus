@@ -31,7 +31,7 @@ function signInFailureMessage(error: unknown) {
 
 /** Sign-in screen from wireframe 01 (FR-10). There is no sign-up: the team creates accounts. */
 export function LoginPage() {
-  const { user, signIn } = useAuth();
+  const { user, isChecking, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   // Keep the query and hash too, so a filtered list or a lead's tab survives the trip through sign-in.
@@ -48,6 +48,15 @@ export function LoginPage() {
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
+  // Wait for the session check like RequireAuth does, so a signed-in user opening /login sees a
+  // spinner and then the redirect, not the form flashing first.
+  if (isChecking) {
+    return (
+      <div className="flex min-h-svh items-center justify-center" aria-label="Checking sign-in">
+        <Spinner />
+      </div>
+    );
+  }
   if (user) return <Navigate to={from} replace />;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

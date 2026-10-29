@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SESSION_QUERY_KEY } from "@/lib/query-client";
 import { MOCK_CREDENTIALS } from "@/mocks/credentials";
+import { MOCK_USER } from "@/mocks/data";
 import { server } from "@/mocks/server";
 import { renderApp } from "@/test/render";
 
@@ -179,6 +180,24 @@ describe("login page", () => {
 
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(fields().password).toHaveValue(MOCK_CREDENTIALS.password);
+  });
+
+  it("shows a spinner, not the form, while checking an existing session", async () => {
+    let answerCheck!: () => void;
+    server.use(
+      http.get("*/api/v1/auth/session", async () => {
+        await new Promise<void>((resolve) => (answerCheck = resolve));
+        return HttpResponse.json(MOCK_USER);
+      }),
+    );
+    const { router } = renderApp("/login", { user: MOCK_USER });
+
+    expect(await screen.findByLabelText("Checking sign-in")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Email")).toBeNull();
+    await vi.waitFor(() => expect(answerCheck).toBeDefined());
+    answerCheck();
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/"));
   });
 
   it("never prints the mock password outside the dev server", async () => {
