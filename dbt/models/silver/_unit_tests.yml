@@ -19,8 +19,8 @@ unit_tests:
           select m.raw_message_id::uuid, 'gmail'::text as source_channel, m.account::text as source_account_id,
                  m.msg::text as source_message_id, null::text as source_thread_id,
                  m.participant::text as external_participant_id, 'inbound'::text as direction,
-                 null::text as source_sender_id, '2026-10-18 02:00:00+00'::timestamptz as source_event_at,
-                 '2026-10-18 02:05:00+00'::timestamptz as ingested_at, null::jsonb as parsed_payload
+                 '2026-10-18 02:00:00+00'::timestamptz as source_event_at,
+                 '2026-10-18 02:05:00+00'::timestamptz as ingested_at
           from (values
               ('30000000-0000-4000-8000-0000000000a1', 'test-mailbox',  'm-linked',     'a@example.test'),
               ('30000000-0000-4000-8000-0000000000a2', 'test-mailbox',  'm-revoked',    'b@example.test'),
@@ -33,7 +33,7 @@ unit_tests:
         format: sql
         rows: |
           select r.raw_message_id::uuid, r.status::text as resolution_status, r.clinic_id::uuid,
-                 r.reason::text as review_reason, null::timestamptz as resolved_at
+                 r.reason::text as review_reason
           from (values
               ('30000000-0000-4000-8000-0000000000a1', 'linked', '10000000-0000-4000-8000-0000000000c1', null),
               ('30000000-0000-4000-8000-0000000000a2', 'linked', '10000000-0000-4000-8000-0000000000c1', null),
@@ -46,7 +46,6 @@ unit_tests:
         rows: |
           select x.mapping_id::uuid, 'gmail'::text as source_channel, 'test-mailbox'::text as source_account_id,
                  x.participant::text as external_participant_id, x.clinic_id::uuid,
-                 '2026-10-18 00:00:00+00'::timestamptz as confirmed_at, x.revoked_at::timestamptz,
                  x.revoked_at is null as is_active
           from (values
               ('40000000-0000-4000-8000-0000000000b1', 'a@example.test', '10000000-0000-4000-8000-0000000000c1', null),
@@ -80,8 +79,7 @@ unit_tests:
                  null::text as calling_notes, null::text as contact_number, null::text as email,
                  null::text as region, null::text as province, null::text as municipality, null::text as address,
                  c.status_code::text, null::date as next_action_date, null::text as next_step,
-                 null::text as point_person, null::text as discovery_source, c.origin::text, 1 as version,
-                 '2026-10-01 00:00:00+00'::timestamptz as created_at, '2026-10-01 00:00:00+00'::timestamptz as updated_at
+                 null::text as point_person, null::text as discovery_source, c.origin::text, 1 as version
           from (values
               ('10000000-0000-4000-8000-0000000000c1', 'Harbor Clinic', 'contacted',     'import'),
               ('10000000-0000-4000-8000-0000000000c2', 'Harbor Clinic', 'proposal_sent', 'manual'),
@@ -90,18 +88,15 @@ unit_tests:
       - input: ref('stg_app__lead_inquiries')
         format: sql
         rows: |
-          select i.inquiry_id::uuid, 'gmail'::text as source_channel, 'test-mailbox'::text as source_account_id,
-                 i.participant::text as external_participant_id, i.origin_msg::uuid as origin_raw_message_id,
-                 i.name_state::text as clinic_name_state, null::text as contact_person, null::text as contact_number,
-                 i.participant::text as email, null::text as status_code, null::date as next_action_date,
-                 null::text as next_step, null::text as calling_notes, i.state::text,
-                 i.confirmed_clinic_id::uuid, 1 as version,
-                 '2026-10-01 00:00:00+00'::timestamptz as created_at, '2026-10-01 00:00:00+00'::timestamptz as updated_at
+          select i.inquiry_id::uuid, i.name_state::text as clinic_name_state, null::text as contact_person,
+                 null::text as contact_number, i.email::text, null::text as status_code,
+                 null::date as next_action_date, null::text as next_step, null::text as calling_notes,
+                 i.state::text, 1 as version
           from (values
-              ('70000000-0000-4000-8000-0000000000d1', 'new@example.test',   '30000000-0000-4000-8000-0000000000e1', 'unknown',   'open',   null),
-              -- confirmed into clinic c3, so it must appear only as that clinic
-              ('70000000-0000-4000-8000-0000000000d2', 'quiet@example.test', '30000000-0000-4000-8000-0000000000e2', 'confirmed', 'closed', '10000000-0000-4000-8000-0000000000c3')
-          ) as i(inquiry_id, participant, origin_msg, name_state, state, confirmed_clinic_id)
+              ('70000000-0000-4000-8000-0000000000d1', 'new@example.test',   'unknown',   'open'),
+              -- confirmed into clinic c3 (Quiet Clinic), so it must appear only as that clinic
+              ('70000000-0000-4000-8000-0000000000d2', 'quiet@example.test', 'confirmed', 'closed')
+          ) as i(inquiry_id, email, name_state, state)
       - input: ref('interactions')
         rows:
           - {clinic_id: '10000000-0000-4000-8000-0000000000c1', is_linked: true,  event_at: '2026-10-18 02:00:00+00', ingested_at: '2026-10-18 02:05:00+00'}

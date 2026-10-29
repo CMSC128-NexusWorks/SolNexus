@@ -5,8 +5,6 @@ select
     source_account_id,
     external_participant_id,
     clinic_id,
-    confirmed_at,
-    revoked_at,
     -- A partial unique index guarantees at most one active mapping per source key.
     revoked_at is null as is_active
 from {{ source('app', 'clinic_source_identities') }}

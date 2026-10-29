@@ -18,7 +18,5 @@ select
     point_person,
     discovery_source,
     origin,
-    version,
-    created_at,
-    updated_at
+    version
 from {{ source('app', 'clinics') }}

@@ -3,6 +3,5 @@ select
     raw_message_id,
     resolution_status,
     clinic_id,
-    review_reason,
-    resolved_at
+    review_reason
 from {{ source('app', 'message_resolutions') }}
