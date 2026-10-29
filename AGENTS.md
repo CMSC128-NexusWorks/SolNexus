@@ -8,6 +8,8 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 - **Scope and sprint targets:** `docs/implementation_roadmap.md`. Phase 1 is the semester deliverable; Phase 2 work starts only after Phase 1 is accepted.
 - **Requirement IDs (FR-xx, NFR-xx):** `docs/software_requirements.md`.
 - **Screens:** `docs/wireframes/`. They are low-fidelity: follow their structure and fields, not their visual styling.
+- **Schema changes, migrations, table ownership:** `docs/database.md`. Read it before touching `backend/migrations/` or writing to `bronze` or `app` tables.
+- **New API endpoints:** `docs/authentication.md`. Feature routers go on the `protected` router in `backend/app/main.py` so they require a signed-in staff member.
 - **Frontend work:** `frontend/README.md`.
 - **Local setup and ports:** `README.md`.
 
