@@ -1,0 +1,56 @@
+version: 2
+
+# Keys and rules come from docs/database.md "Silver contract" and phase1-data-api-v1.md.
+models:
+  - name: interactions
+    description: >
+      One row per bronze message. clinic_id is set only when the message's resolution is
+      'linked' and an active exact source-key mapping points to the same clinic.
+    columns:
+      - name: raw_message_id
+        description: Bronze message ID; traces every interaction to its raw evidence.
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: source('bronze', 'raw_messages')
+                field: raw_message_id
+      - name: channel
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['gmail']
+      - name: direction
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['inbound', 'outbound']
+      - name: event_at
+        description: Provider event time. Null when the provider gave none; never filled from ingested_at.
+      - name: resolution_status
+        description: "'linked', 'needs_review', or null while the message awaits the resolution job."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['linked', 'needs_review']
+      - name: is_linked
+        description: True only when both link checks pass. A 'linked' resolution with is_linked false is a stale link awaiting re-check.
+        tests:
+          - not_null
+      - name: clinic_id
+        description: Set only when is_linked; null rows stay available for staff review.
+        tests:
+          - relationships:
+              arguments:
+                to: source('app', 'clinics')
+                field: clinic_id
+      - name: mapping_id
+        description: The active source-identity mapping that confirmed the link.
+        tests:
+          - relationships:
+              arguments:
+                to: source('app', 'clinic_source_identities')
+                field: mapping_id
