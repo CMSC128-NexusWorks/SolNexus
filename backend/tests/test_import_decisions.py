@@ -189,6 +189,39 @@ def test_linking_fills_only_blank_untouched_fields_and_never_overwrites(signed_i
     assert result["state"] == "needs_review"
 
 
+def test_linking_adds_rows_to_an_open_review_instead_of_opening_a_second_one(signed_in, run_sql):
+    batch = imported(signed_in, xlsx(CONTRACT_SHEETS, title="first"))
+    decide(signed_in, batch, harborview_pair(batch), "create_clinic")
+    clinic = clinic_named(run_sql, "Harborview Clinic")
+    later = imported(signed_in, xlsx({LJS: ljs({"C": "Harborview Clinic", "D": "0917 000 0555"})}, title="second"))
+
+    result = decide(signed_in, later, later["rows"], "link_clinic", clinic_id=str(clinic.clinic_id)).json()
+
+    (review,) = result["field_reviews"]
+    assert review["field_name"] == "contact_number"
+    assert sorted(r["value"] for r in review["candidate_rows"]) == ["0917 000 0101", "0917 000 0199", "0917 000 0555"]
+    assert run_sql("SELECT count(*) FROM app.import_field_reviews")[0][0] == 1
+    assert result["state"] == "needs_review"
+
+
+def test_linking_never_reopens_a_field_staff_edited(signed_in, staff, run_sql):
+    imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One", "D": "0917 000 0101"})}))
+    clinic = clinic_named(run_sql, "Clinic One")
+    run_sql("UPDATE app.clinics SET contact_number = '0917 000 0999', version = version + 1 WHERE clinic_id = :id",
+            id=clinic.clinic_id)
+    run_sql(
+        """INSERT INTO app.clinic_field_events (clinic_id, field_name, old_value, new_value, changed_by)
+           VALUES (:id, 'contact_number', '"0917 000 0101"', '"0917 000 0999"', :staff)""",
+        id=clinic.clinic_id, staff=staff["user_id"],
+    )
+    batch = imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One Clinic", "D": "0917 000 0101"})}))
+
+    result = decide(signed_in, batch, batch["rows"], "link_clinic", clinic_id=str(clinic.clinic_id)).json()
+
+    assert result["field_reviews"] == [] and result["state"] == "completed"
+    assert clinic_named(run_sql, "Clinic One").contact_number == "0917 000 0999"
+
+
 def test_linking_to_an_unknown_clinic_is_refused(signed_in, run_sql):
     batch = imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One"}, {"C": "clinic one"})}))
 

@@ -55,7 +55,7 @@ There is no fuzzy score or threshold: the contract has approved none, and an exa
 ## Staff review
 
 - **Same clinic, new:** `create_clinic` with all rows of the group. Values one row supplies, or that the rows agree on, are filled. Values they disagree on stay empty and open a **field review** listing each row's value, so neither sheet wins. A disagreeing name must be chosen in `clinic_name`.
-- **An existing clinic:** `link_clinic` with its `clinic_id`. Existing values never change. A blank field is filled only when the rows agree and staff never edited or cleared it; otherwise a field review opens.
+- **An existing clinic:** `link_clinic` with its `clinic_id`. Existing values never change. Fields staff edited, cleared or settled in a resolved review keep their value and ignore the rows. A field with an open review gets the rows added to it. Otherwise a blank field is filled when the rows agree, and any disagreement opens a field review.
 - **Different clinics:** `create_clinic` for each row separately.
 - **Not a lead:** `reject`. The row's values are dropped from the ledger.
 

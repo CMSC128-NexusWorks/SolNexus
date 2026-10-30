@@ -6,10 +6,12 @@ Data contract rules this implements:
   one distinct value fills the field, several distinct values leave it unset and open an
   import_field_review naming every row that supplied one. A clinic name the rows disagree on must be
   chosen by staff (clinic_name in the request): the contract forbids creating a partly identified clinic.
-* link_clinic: the rows are an existing clinic. Existing values never change. A blank field is filled
-  only when the rows agree and staff never edited or cleared it (no clinic_field_events row) and no
-  import review already covers it; otherwise a disagreement opens a review. The name is never changed:
-  differently written names are why the rows needed review.
+* link_clinic: the rows are an existing clinic. Existing values never change. A field staff edited or
+  cleared (a clinic_field_events row), or settled in a resolved import review, is authoritative and the
+  rows' values for it are dropped. A field with an open import review gets the rows added to that review
+  rather than a second review. Otherwise a blank field is filled when the rows agree, and a disagreement
+  with the rows or the current value opens a review. The name is never changed: differently written names
+  are why the rows needed review.
 * reject: the rows are not imported; their values are dropped from the ledger and an identical row in a
   later upload is rejected again (service._apply_prior_imports).
 
@@ -118,7 +120,7 @@ def _create_clinic(conn, batch_id, decision: Decision, decided_by, rows) -> None
         if len(by_value) == 1:
             fields[field_name] = next(iter(by_value))
         else:
-            conflicts[field_name] = [row_id for row_ids in by_value.values() for row_id in row_ids]
+            conflicts[field_name] = _supplying_rows(by_value)
 
     clinic_id = uuid.uuid4()
     insert_clinics(conn, [(clinic_id, fields)], created_by=decided_by)
@@ -135,35 +137,52 @@ def _link_clinic(conn, batch_id, decision: Decision, decided_by, rows) -> None:
     ).first()
     if clinic is None:
         raise ApiError(422, "unknown_clinic", "The selected clinic does not exist")
-    # Fields staff edited or cleared, or that an import review already covers: never filled from a row.
-    touched = set(
+    # Fields whose value staff already decided: edited or cleared in the dashboard, or chosen in a resolved
+    # import review. Staff edits are authoritative, so the rows never fill or reopen these.
+    decided = set(
         conn.execute(
             text(
                 """
                 SELECT field_name FROM app.clinic_field_events WHERE clinic_id = :id
                 UNION
-                SELECT field_name FROM app.import_field_reviews WHERE clinic_id = :id
+                SELECT field_name FROM app.import_field_reviews WHERE clinic_id = :id AND state = 'resolved'
                 """
             ),
             {"id": decision.clinic_id},
         ).scalars()
+    )
+    # Open reviews take the rows as extra candidates, so one field never has two open reviews.
+    open_reviews = dict(
+        conn.execute(
+            text(
+                """
+                SELECT field_name, review_id FROM app.import_field_reviews
+                WHERE clinic_id = :id AND state = 'unresolved'
+                ORDER BY created_at, review_id
+                """
+            ),
+            {"id": decision.clinic_id},
+        ).all()
     )
 
     values = _values_by_field(rows)
     values.pop("clinic_name", None)
     fills: dict[str, str] = {}
     conflicts: dict[str, list[UUID]] = {}
+    joins: dict[UUID, list[UUID]] = {}
     for field_name, by_value in values.items():
         current = getattr(clinic, field_name)
-        if current is not None:
-            if set(by_value) != {current}:
-                conflicts[field_name] = [row_id for row_ids in by_value.values() for row_id in row_ids]
-        elif field_name in touched:
+        if field_name in open_reviews:
+            joins[open_reviews[field_name]] = _supplying_rows(by_value)
+        elif field_name in decided:
             continue
+        elif current is not None:
+            if set(by_value) != {current}:
+                conflicts[field_name] = _supplying_rows(by_value)
         elif len(by_value) == 1:
             fills[field_name] = next(iter(by_value))
         else:
-            conflicts[field_name] = [row_id for row_ids in by_value.values() for row_id in row_ids]
+            conflicts[field_name] = _supplying_rows(by_value)
 
     _accept_rows(conn, batch_id, decision, decided_by, decision.clinic_id, "staff_link")
     if fills:
@@ -174,6 +193,8 @@ def _link_clinic(conn, batch_id, decision: Decision, decided_by, rows) -> None:
         )
     for field_name, row_ids in conflicts.items():
         _open_field_review(conn, decision.clinic_id, field_name, row_ids)
+    for review_id, row_ids in joins.items():
+        _add_review_candidates(conn, review_id, row_ids)
     if "status_code" in fills:
         insert_status_baselines(
             conn, [(decision.clinic_id, row_id, fills) for row_id in values["status_code"][fills["status_code"]]]
@@ -214,6 +235,11 @@ def _accept_rows(conn, batch_id, decision: Decision, decided_by, clinic_id: UUID
     )
 
 
+def _supplying_rows(by_value: dict[str, list[UUID]]) -> list[UUID]:
+    """Every row that supplied any value for one field."""
+    return [row_id for row_ids in by_value.values() for row_id in row_ids]
+
+
 def _open_field_review(conn, clinic_id: UUID, field_name: str, row_ids: list[UUID]) -> None:
     """Keep conflicting values for staff, with no sheet winning: the clinic field stays as it is."""
     review_id = conn.execute(
@@ -225,7 +251,17 @@ def _open_field_review(conn, clinic_id: UUID, field_name: str, row_ids: list[UUI
         ),
         {"clinic_id": clinic_id, "field_name": field_name},
     ).scalar_one()
+    _add_review_candidates(conn, review_id, row_ids)
+
+
+def _add_review_candidates(conn, review_id: UUID, row_ids: list[UUID]) -> None:
+    """Attach rows to a review. Their batches then stay needs_review until the review is resolved."""
     conn.execute(
-        text("INSERT INTO app.import_field_review_candidates (review_id, import_row_id) VALUES (:review_id, :row_id)"),
+        text(
+            """
+            INSERT INTO app.import_field_review_candidates (review_id, import_row_id) VALUES (:review_id, :row_id)
+            ON CONFLICT DO NOTHING
+            """
+        ),
         [{"review_id": review_id, "row_id": row_id} for row_id in sorted(set(row_ids))],
     )
