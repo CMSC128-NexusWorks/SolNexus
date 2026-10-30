@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from airflow.models import DagBag
+from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.trigger import CronTriggerTimetable
 
 from solnexus_ingest.orchestration import GMAIL_BRONZE
@@ -37,3 +38,21 @@ def test_ingest_email_triggers_silver_and_records_failures(dagbag):
     assert task.outlets == [GMAIL_BRONZE]
     assert task.on_retry_callback and task.on_failure_callback
     assert task.retries == 2
+
+
+def test_silver_runs_after_ingestion_and_hourly_as_a_fallback(dagbag):
+    dag = dagbag.dags["transform_bronze_to_silver"]
+
+    assert isinstance(dag.timetable, DatasetOrTimeSchedule)
+    assert [uri for uri, _ in dag.timetable.dataset_condition.iter_datasets()] == [GMAIL_BRONZE.uri]
+    assert dag.max_active_runs == 1  # runs share the silver_build staging schema
+
+
+def test_silver_publishes_only_after_the_build(dagbag):
+    dag = dagbag.dags["transform_bronze_to_silver"]
+    build, publish = dag.get_task("build_silver"), dag.get_task("publish_silver")
+
+    assert publish.upstream_task_ids == {"build_silver"}
+    for task in (build, publish):
+        assert task.on_retry_callback and task.on_failure_callback
+        assert task.retries == 2
