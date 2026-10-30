@@ -127,3 +127,20 @@ def test_rejects_a_zip_with_a_corrupt_central_directory():
         read_workbook(corrupt)
 
     assert (error.value.code, error.value.status_code) == ("invalid_workbook", 422)
+
+
+def test_reads_past_a_stale_sheet_dimension():
+    # Some writers store a <dimension> smaller than the data; read-only openpyxl would clip to it.
+    buffer = io.BytesIO()
+    source_data = xlsx({LJS: {1: {"C": "Clinic One"}, 2: {"C": "Clinic Two", "E": "two@example.test"}}})
+    with zipfile.ZipFile(io.BytesIO(source_data)) as source, zipfile.ZipFile(buffer, "w") as copy:
+        for entry in source.infolist():
+            content = source.read(entry)
+            if entry.filename == "xl/worksheets/sheet1.xml":
+                assert b'<dimension ref="C1:E2" />' in content
+                content = content.replace(b'<dimension ref="C1:E2" />', b'<dimension ref="A1:A1" />')
+            copy.writestr(entry, content)
+
+    (sheet,) = read_workbook(buffer.getvalue())
+
+    assert [row.cells for row in sheet.rows] == [{"C": "Clinic One"}, {"C": "Clinic Two", "E": "two@example.test"}]

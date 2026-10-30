@@ -106,6 +106,9 @@ def read_workbook(data: bytes) -> list[Sheet]:
     try:
         for worksheet in workbook.worksheets:
             sheet = Sheet(name=worksheet.title)
+            # In read-only mode openpyxl clips rows and columns to the <dimension> the file declares, and
+            # some writers store a stale one, which would drop data silently. Read what is actually there.
+            worksheet.reset_dimensions()
             pending_blank: list[SheetRow] = []
             # values_only rows start at column A and row 1, with gaps filled by None, so the tuple index
             # is the column position and the enumeration count is the sheet row number.
