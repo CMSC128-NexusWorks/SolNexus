@@ -1,17 +1,14 @@
 """Create app.ingestion_checkpoints.
 
 Revision ID: 0016
-Revises: 0014
+Revises: 0015
 Create Date: 2026-10-29
-
-Numbered 0016 because SNX-27's open PR adds 0015. Whichever of the two merges second must set its
-down_revision to the other so Alembic keeps a single head.
 """
 
 from alembic import op
 
 revision = "0016"
-down_revision = "0014"
+down_revision = "0015"
 branch_labels = None
 depends_on = None
 
