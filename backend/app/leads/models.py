@@ -1,5 +1,6 @@
 """Strict FR-21 input: absent fields stay unchanged; null explicitly clears a value."""
 
+import re
 from datetime import date
 from typing import Literal
 from uuid import UUID
@@ -10,9 +11,14 @@ Status = Literal[
     "contacted", "proposal_sent", "awaiting_demo", "follow_up_needed", "closed"
 ]
 
+# Shared with the workbook importer (app.imports.adapters), so an imported or import-review value passes
+# exactly the rules a dashboard edit does.
+EMAIL_PATTERN = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+MAX_TEXT_LENGTH = 4000
+
 
 class RowEdit(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_max_length=4000)
+    model_config = ConfigDict(extra="forbid", str_max_length=MAX_TEXT_LENGTH)
     version: int = Field(ge=1)
     reason: str | None = None
     clinic_name: str | None = None
@@ -33,9 +39,7 @@ class RowEdit(BaseModel):
     @classmethod
     def valid_email(cls, value):
         if value is not None:
-            import re
-
-            if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
+            if not EMAIL_PATTERN.fullmatch(value):
                 raise ValueError("Enter a valid email address")
         return value
 
@@ -43,7 +47,7 @@ class RowEdit(BaseModel):
 class Confirmation(BaseModel):
     """Two distinct persisted messages are mandatory; initial contact alone cannot confirm."""
 
-    model_config = ConfigDict(extra="forbid", str_max_length=4000)
+    model_config = ConfigDict(extra="forbid", str_max_length=MAX_TEXT_LENGTH)
     version: int = Field(ge=1)
     clinic_name: str = Field(min_length=1, max_length=300)
     question_message_id: UUID

@@ -110,7 +110,7 @@ def _validated(field_name: str, value: str | None) -> str | None:
         raise _invalid(field_name, "unknown_status")
     if field_name == "email":
         value = value.lower()
-        if not EMAIL_PATTERN.match(value):
+        if not EMAIL_PATTERN.fullmatch(value):
             raise _invalid(field_name, "invalid_email")
     return value
 

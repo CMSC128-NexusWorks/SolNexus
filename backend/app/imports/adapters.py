@@ -25,21 +25,23 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import Literal
 
 from app.imports.workbook import CellValue, Sheet, SheetRow, WorkbookError
+from app.leads.models import EMAIL_PATTERN, MAX_TEXT_LENGTH
 
 LJS_SHEET = "Ljs Calling Sheet"
 JACKS_SHEET = "Jacks Calling Sheet"
 
-# Long enough for real notes, short enough that a pasted document cannot sit in a clinic field.
-MAX_FIELD_CHARS = 2_000
+# Field rules come from the dashboard row editor (app.leads.models), so a value the importer accepts is
+# one staff could also save, and a value staff can save is never rejected on import.
+MAX_FIELD_CHARS = MAX_TEXT_LENGTH
 
-# Proposed Phase 1 status vocabulary and its dashboard labels (frontend STATUS_LABELS). Jacks H maps only
-# on an exact, case-insensitive match to a code or a label; anything else stays null for staff review.
+# Dashboard labels for the Phase 1 status vocabulary (frontend STATUS_LABELS). The codes are
+# app.leads.models.Status; a test keeps the two in step. Jacks H maps only on an exact, case-insensitive
+# match to a code or a label; anything else stays null for staff review.
 STATUS_LABELS = {
     "contacted": "Contacted",
     "proposal_sent": "Proposal sent",
@@ -51,9 +53,6 @@ _APPROVED_STATUS_INPUTS = {
     **{code: code for code in STATUS_LABELS},
     **{label.casefold(): code for code, label in STATUS_LABELS.items()},
 }
-
-# Deliberately loose: it catches typos and two addresses in one cell, not every RFC 5322 corner case.
-EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s.]+$")
 
 StagedResult = Literal["valid", "rejected", "skipped"]
 
@@ -170,7 +169,7 @@ class _Adapter:
 
         if "email" in fields:
             fields["email"] = fields["email"].lower()
-            if not EMAIL_PATTERN.match(fields["email"]):
+            if not EMAIL_PATTERN.fullmatch(fields["email"]):
                 issues.append(RowIssue("invalid_email", "email"))
         if isinstance(row.cells.get(self._column_of("contact_number")), (int, float)):
             # Stored as a number, so Excel already dropped any leading zero. Kept as text, flagged for staff.

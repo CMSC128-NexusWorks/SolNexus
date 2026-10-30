@@ -1,7 +1,10 @@
+from typing import get_args
+
 import pytest
 
-from app.imports.adapters import JACKS_SHEET, LJS_SHEET, stage_workbook
+from app.imports.adapters import JACKS_SHEET, LJS_SHEET, MAX_FIELD_CHARS, STATUS_LABELS, stage_workbook
 from app.imports.workbook import WorkbookError, read_workbook
+from app.leads.models import RowEdit, Status
 from tests.workbooks import CONTRACT_SHEETS, JACKS, JACKS_HEADER, LJS, jacks, ljs, xlsx
 
 
@@ -140,7 +143,8 @@ def test_email_is_trimmed_and_lowercased():
 
 
 def test_overlong_value_rejects_the_row():
-    row = stage({LJS: ljs({"C": "Clinic One", "H": "x" * 2_001})})[0]
+    # The same limit as a dashboard edit, so staff could not save this value either.
+    row = stage({LJS: ljs({"C": "Clinic One", "H": "x" * (MAX_FIELD_CHARS + 1)})})[0]
 
     assert row.result == "rejected"
     assert "value_too_long" in codes(row)
@@ -209,3 +213,25 @@ def test_a_single_known_sheet_is_accepted():
     rows = stage({LJS: ljs({"C": "Clinic One"})})
 
     assert [row.result for row in rows] == ["valid"]
+
+
+def test_status_labels_cover_exactly_the_dashboard_status_vocabulary():
+    assert set(STATUS_LABELS) == set(get_args(Status))
+
+
+@pytest.mark.parametrize("email", ["front.desk@example.test", "not-an-email", "a@b", "a@example.test b@example.test"])
+def test_email_rule_matches_the_dashboard_row_editor(email):
+    row = stage({LJS: ljs({"C": "Clinic One", "E": email})})[0]
+    try:
+        RowEdit(version=1, email=email)
+        dashboard_accepts = True
+    except ValueError:
+        dashboard_accepts = False
+
+    assert (row.result == "valid") == dashboard_accepts
+
+
+def test_a_value_the_dashboard_accepts_is_not_too_long_to_import():
+    row = stage({LJS: ljs({"C": "Clinic One", "H": "x" * 2_500})})[0]
+
+    assert row.result == "valid"
