@@ -16,7 +16,7 @@ from airflow.exceptions import AirflowFailException
 from airflow.operators.python import get_current_context
 from airflow.timetables.trigger import CronTriggerTimetable
 
-from solnexus_ingest.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, WAREHOUSE_CONN_ID
+from solnexus_ingest.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, warehouse_conn
 from solnexus_ingest.runs import GMAIL_INGEST, airflow_failure_callbacks
 
 # Hourly is the data/API contract's proposed default, pending team approval and quota validation.
@@ -50,14 +50,12 @@ def ingest_email():
         # changed, and the silver build is cheap.
         outlets=[GMAIL_BRONZE],
         # Record 'retrying' / 'failed' in app.pipeline_runs, so the failure reaches the dashboard.
-        **airflow_failure_callbacks(GMAIL_INGEST, WAREHOUSE_CONN_ID),
+        **airflow_failure_callbacks(GMAIL_INGEST),
     )
     def sync_gmail() -> dict[str, int | str]:
         """Sync the mailbox and return per-run counts (no addresses or content, so safe in XCom)."""
         # Imported inside the task so the scheduler's frequent DAG-file parsing stays fast and does
         # not depend on Google/psycopg2 imports succeeding.
-        from airflow.providers.postgres.hooks.postgres import PostgresHook
-
         from solnexus_ingest.gmail.client import GmailAuthError, GmailClient, GmailPolicyError
         from solnexus_ingest.gmail.sync import SyncSettings, sync_mailbox
         from solnexus_ingest.runs import mark_running, mark_succeeded
@@ -75,7 +73,7 @@ def ingest_email():
             backfill_query=os.environ.get("GMAIL_BACKFILL_QUERY") or None,
         )
 
-        conn = PostgresHook(postgres_conn_id=WAREHOUSE_CONN_ID).get_conn()
+        conn = warehouse_conn()
         try:
             mark_running(conn, GMAIL_INGEST, context["dag"].dag_id, context["run_id"], context["ti"].try_number)
             client = GmailClient.from_token_file(token_file)

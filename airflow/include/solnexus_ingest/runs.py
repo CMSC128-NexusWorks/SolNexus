@@ -97,7 +97,7 @@ def mark_unfinished(
     conn.commit()
 
 
-def airflow_failure_callbacks(pipeline: str, conn_id: str) -> dict[str, Callable[[dict], None]]:
+def airflow_failure_callbacks(pipeline: str) -> dict[str, Callable[[dict], None]]:
     """on_retry_callback / on_failure_callback task arguments that record the run's state.
 
     The callbacks run after the task's exception, in the task's own process. They must never raise:
@@ -106,10 +106,9 @@ def airflow_failure_callbacks(pipeline: str, conn_id: str) -> dict[str, Callable
 
     def record(context: dict, will_retry: bool) -> None:
         try:
-            # Imported lazily so the DAG files parse without the Postgres provider loaded.
-            from airflow.providers.postgres.hooks.postgres import PostgresHook
+            from solnexus_ingest.orchestration import warehouse_conn
 
-            conn = PostgresHook(postgres_conn_id=conn_id).get_conn()
+            conn = warehouse_conn()
             try:
                 mark_unfinished(
                     conn,

@@ -21,20 +21,14 @@ from airflow.operators.python import get_current_context
 from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.trigger import CronTriggerTimetable
 
-from solnexus_ingest.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, WAREHOUSE_CONN_ID
+from solnexus_ingest.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, warehouse_conn
 from solnexus_ingest.runs import SILVER_PUBLISH, airflow_failure_callbacks
 
 DBT_PROJECT_DIR = os.environ.get("DBT_PROJECT_DIR") or "/opt/airflow/dbt"
 # Offset from ingest_email's :00, so the fallback does not start next to a dataset-triggered run.
 FALLBACK_SCHEDULE = os.environ.get("SILVER_REFRESH_SCHEDULE") or "30 * * * *"
 
-callbacks = airflow_failure_callbacks(SILVER_PUBLISH, WAREHOUSE_CONN_ID)
-
-
-def _warehouse_conn():
-    from airflow.providers.postgres.hooks.postgres import PostgresHook
-
-    return PostgresHook(postgres_conn_id=WAREHOUSE_CONN_ID).get_conn()
+callbacks = airflow_failure_callbacks(SILVER_PUBLISH)
 
 
 @dag(
@@ -66,7 +60,7 @@ def transform_bronze_to_silver():
         from solnexus_ingest.silver import DbtBuildError, reset_build_schema, run_dbt_build
 
         context = get_current_context()
-        conn = _warehouse_conn()
+        conn = warehouse_conn()
         try:
             mark_running(conn, SILVER_PUBLISH, context["dag"].dag_id, context["run_id"], context["ti"].try_number)
             reset_build_schema(conn)
@@ -88,7 +82,7 @@ def transform_bronze_to_silver():
         from solnexus_ingest.silver import publish
 
         context = get_current_context()
-        conn = _warehouse_conn()
+        conn = warehouse_conn()
         try:
             # Back to 'running' in case this task is a retry after a failed swap.
             mark_running(conn, SILVER_PUBLISH, context["dag"].dag_id, context["run_id"], context["ti"].try_number)
