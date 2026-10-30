@@ -125,7 +125,7 @@ def _schema_tables(cur, schema: str) -> set[str]:
     return {name for (name,) in cur.fetchall()}
 
 
-def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int]) -> dict[str, int]:
+def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int], attempt: int) -> dict[str, int]:
     """Swap BUILD_SCHEMA in as LIVE_SCHEMA and mark the silver run succeeded, in one transaction.
 
     Returns the counts recorded on the run: dbt node counts plus published row counts per table.
@@ -164,7 +164,8 @@ def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int])
                 sql.SQL("ALTER SCHEMA {} RENAME TO {}").format(sql.Identifier(BUILD_SCHEMA), sql.Identifier(LIVE_SCHEMA))
             )
             cur.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(PREVIOUS_SCHEMA)))
-            mark_succeeded(conn, SILVER_PUBLISH, airflow_run_id, counts)
+            # Sets 'succeeded' from whatever state an earlier publish try left ('retrying' included).
+            mark_succeeded(conn, SILVER_PUBLISH, airflow_run_id, counts, attempt)
         conn.commit()
     except BaseException:
         try:

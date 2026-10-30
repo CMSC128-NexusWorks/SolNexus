@@ -3,6 +3,9 @@
 One row per (pipeline, Airflow run_id). A task marks it 'running' when it starts. Task callbacks
 mark it 'retrying' or 'failed'. The last task marks it 'succeeded', in the same transaction as the
 work it reports: the checkpoint commit is already durable for Gmail, and the schema swap for silver.
+attempt is the try number of the task that last set the status: the try that succeeded, or the one
+whose failure is shown. Every write records it, so it never mixes one task's tries with another's.
+
 A 'succeeded' row is final: no later write moves it back. Otherwise an operator clearing a finished task,
 or a retry after a commit whose task then died, would rewrite a real publication as 'running' or
 'failed', and published_at would move backwards while the published data stayed live.
@@ -82,7 +85,9 @@ def mark_running(conn: Connection, pipeline: str, dag_id: str, airflow_run_id: s
     conn.commit()
 
 
-def mark_succeeded(conn: Connection, pipeline: str, airflow_run_id: str, counts: Mapping[str, Any]) -> None:
+def mark_succeeded(
+    conn: Connection, pipeline: str, airflow_run_id: str, counts: Mapping[str, Any], attempt: int
+) -> None:
     """Mark the run succeeded. Does NOT commit, so the caller can commit it with the work it reports.
 
     If the run already succeeded (a cleared rerun), the first success and its counts are kept.
@@ -91,10 +96,10 @@ def mark_succeeded(conn: Connection, pipeline: str, airflow_run_id: str, counts:
         cur.execute(
             """
             UPDATE app.pipeline_runs
-               SET status = 'succeeded', finished_at = now(), counts = %s, error_summary = NULL
+               SET status = 'succeeded', attempt = %s, finished_at = now(), counts = %s, error_summary = NULL
              WHERE pipeline = %s AND airflow_run_id = %s AND status <> 'succeeded'
             """,
-            (Json(dict(counts)), pipeline, airflow_run_id),
+            (attempt, Json(dict(counts)), pipeline, airflow_run_id),
         )
         if cur.rowcount == 0 and succeeded_counts(conn, pipeline, airflow_run_id) is None:
             # mark_running always runs first in the same DAG run, so a missing row is a wiring bug.
@@ -107,6 +112,7 @@ def mark_unfinished(
     dag_id: str,
     airflow_run_id: str,
     *,
+    attempt: int,
     will_retry: bool,
     error: BaseException | None,
 ) -> None:
@@ -119,14 +125,14 @@ def mark_unfinished(
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO app.pipeline_runs (pipeline, dag_id, airflow_run_id, status, finished_at, error_summary)
-            VALUES (%s, %s, %s, %s, CASE WHEN %s = 'failed' THEN now() END, %s)
+            INSERT INTO app.pipeline_runs (pipeline, dag_id, airflow_run_id, status, attempt, finished_at, error_summary)
+            VALUES (%s, %s, %s, %s, %s, CASE WHEN %s = 'failed' THEN now() END, %s)
             ON CONFLICT (pipeline, airflow_run_id) DO UPDATE
-               SET status = EXCLUDED.status, finished_at = EXCLUDED.finished_at,
+               SET status = EXCLUDED.status, attempt = EXCLUDED.attempt, finished_at = EXCLUDED.finished_at,
                    error_summary = EXCLUDED.error_summary
              WHERE app.pipeline_runs.status <> 'succeeded'
             """,
-            (pipeline, dag_id, airflow_run_id, status, status, summarize_error(error)),
+            (pipeline, dag_id, airflow_run_id, status, attempt, status, summarize_error(error)),
         )
     conn.commit()
 
@@ -149,6 +155,7 @@ def airflow_failure_callbacks(pipeline: str) -> dict[str, Callable[[dict], None]
                     pipeline,
                     context["dag"].dag_id,
                     context["run_id"],
+                    attempt=context["ti"].try_number,
                     will_retry=will_retry,
                     error=context.get("exception"),
                 )

@@ -82,15 +82,12 @@ def transform_bronze_to_silver():
     @task(execution_timeout=timedelta(minutes=5), **callbacks)
     def publish_silver(build_counts: dict[str, int]) -> dict[str, int]:
         """Swap silver_build in as silver and record the publication."""
-        from solnexus_ingest.runs import mark_running
         from solnexus_ingest.silver import publish
 
         context = get_current_context()
         conn = warehouse_conn()
         try:
-            # Back to 'running' in case this task is a retry after a failed swap.
-            mark_running(conn, SILVER_PUBLISH, context["dag"].dag_id, context["run_id"], context["ti"].try_number)
-            return publish(conn, context["run_id"], build_counts)
+            return publish(conn, context["run_id"], build_counts, context["ti"].try_number)
         finally:
             conn.close()
 

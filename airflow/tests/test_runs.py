@@ -78,11 +78,11 @@ def run_row(db, run_id):
 
 def test_retry_then_success_ends_as_one_succeeded_row(db, run_id):
     mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=1)
-    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, will_retry=True, error=TimeoutError("Gmail call timed out"))
+    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, attempt=1, will_retry=True, error=TimeoutError("Gmail call timed out"))
     assert run_row(db, run_id)[:3] == ("retrying", 1, False)
 
     mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=2)
-    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 3})
+    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 3}, attempt=2)
     db.commit()
 
     assert run_row(db, run_id) == ("succeeded", 2, True, {"inserted": 3}, None, DAG)
@@ -90,21 +90,31 @@ def test_retry_then_success_ends_as_one_succeeded_row(db, run_id):
 
 def test_final_failure_is_visible_with_its_summary(db, run_id):
     mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=3)
-    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, will_retry=False, error=RuntimeError("gave up after 5 retries"))
+    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, attempt=3, will_retry=False, error=RuntimeError("gave up after 5 retries"))
 
     assert run_row(db, run_id)[:3] == ("failed", 3, True)
     assert run_row(db, run_id)[4] == "RuntimeError: gave up after 5 retries"
 
 
-def test_failure_before_the_run_row_exists_is_still_recorded(db, run_id):
-    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, will_retry=False, error=FileNotFoundError("token missing"))
+def test_failure_before_the_run_row_exists_records_its_attempt(db, run_id):
+    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, attempt=3, will_retry=False, error=FileNotFoundError("token missing"))
 
-    assert run_row(db, run_id)[0] == "failed"
+    assert run_row(db, run_id)[:2] == ("failed", 3)
+
+
+def test_a_later_task_can_succeed_a_run_another_task_left_retrying(db, run_id):
+    # publish_silver try 2 succeeds after its try 1 left the row 'retrying'; no mark_running between.
+    mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=1)
+    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, attempt=1, will_retry=True, error=TimeoutError())
+    mark_succeeded(db, GMAIL_INGEST, run_id, {}, attempt=2)
+    db.commit()
+
+    assert run_row(db, run_id)[:2] == ("succeeded", 2)
 
 
 def test_success_is_not_visible_until_the_caller_commits(db, run_id):
     mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=1)
-    mark_succeeded(db, GMAIL_INGEST, run_id, {})
+    mark_succeeded(db, GMAIL_INGEST, run_id, {}, attempt=1)
     db.rollback()  # the work it reported did not commit, so neither does the success
 
     assert run_row(db, run_id)[0] == "running"
@@ -112,17 +122,17 @@ def test_success_is_not_visible_until_the_caller_commits(db, run_id):
 
 def test_success_without_a_running_row_is_a_wiring_error(db, run_id):
     with pytest.raises(RuntimeError, match="mark_running"):
-        mark_succeeded(db, GMAIL_INGEST, run_id, {})
+        mark_succeeded(db, GMAIL_INGEST, run_id, {}, attempt=1)
     db.rollback()
 
 
 def test_status_view_reports_the_latest_run_and_last_success(db, run_id):
     mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=1)
-    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 1})
+    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 1}, attempt=1)
     db.commit()
     later = f"{run_id}-later"
     mark_running(db, GMAIL_INGEST, DAG, later, attempt=1)
-    mark_unfinished(db, GMAIL_INGEST, DAG, later, will_retry=False, error=RuntimeError("boom"))
+    mark_unfinished(db, GMAIL_INGEST, DAG, later, attempt=1, will_retry=False, error=RuntimeError("boom"))
 
     with db.cursor() as cur:
         cur.execute(
@@ -138,13 +148,13 @@ def test_status_view_reports_the_latest_run_and_last_success(db, run_id):
 
 def test_a_succeeded_run_is_never_moved_back(db, run_id):
     mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=1)
-    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 3})
+    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 3}, attempt=1)
     db.commit()
 
     # An operator clears the finished task, or its retry runs after the commit.
     mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=2)
-    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, will_retry=False, error=RuntimeError("boom"))
-    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 0})
+    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, attempt=2, will_retry=False, error=RuntimeError("boom"))
+    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 0}, attempt=2)
     db.commit()
 
     assert run_row(db, run_id)[:5] == ("succeeded", 1, True, {"inserted": 3}, None)

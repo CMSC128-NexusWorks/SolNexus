@@ -69,7 +69,7 @@ def live_silver(db):
 def test_complete_build_replaces_live_silver_and_marks_success(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new")
 
-    counts = publish(db, run_id, {"success": 2, "pass": 5})
+    counts = publish(db, run_id, {"success": 2, "pass": 5}, attempt=1)
 
     assert live_marker(db) == "new"
     assert counts == {"dbt_success": 2, "dbt_pass": 5, "interactions_rows": 1, "leads_rows": 1}
@@ -81,7 +81,7 @@ def test_incomplete_build_keeps_old_silver_and_does_not_mark_fresh(db, live_silv
     make_schema(db, BUILD_SCHEMA, "new", tables=("interactions",))
 
     with pytest.raises(RuntimeError, match="missing"):
-        publish(db, run_id, {})
+        publish(db, run_id, {}, attempt=1)
 
     assert live_marker(db) == "old"
     assert run_status(db, run_id)[0] == "running"
@@ -91,7 +91,7 @@ def test_first_publication_works_without_a_live_schema(db, run_id):
     execute(db, "DROP SCHEMA IF EXISTS silver CASCADE")
     make_schema(db, BUILD_SCHEMA, "first")
 
-    publish(db, run_id, {})
+    publish(db, run_id, {}, attempt=1)
 
     assert live_marker(db) == "first"
 
@@ -141,14 +141,14 @@ class _DeadConnection:
 
 def test_publish_reraises_the_original_error_when_rollback_also_fails():
     with pytest.raises(psycopg2.OperationalError, match="server closed"):
-        publish(_DeadConnection(), "test-run", {})
+        publish(_DeadConnection(), "test-run", {}, attempt=1)
 
 
 def test_a_rerun_after_publication_swaps_nothing(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new")
-    first = publish(db, run_id, {"pass": 5})
+    first = publish(db, run_id, {"pass": 5}, attempt=1)
     make_schema(db, BUILD_SCHEMA, "someone-elses-build")
 
-    assert publish(db, run_id, {"pass": 1}) == first
+    assert publish(db, run_id, {"pass": 1}, attempt=1) == first
     assert live_marker(db) == "new"
     assert run_status(db, run_id) == ("succeeded", first)

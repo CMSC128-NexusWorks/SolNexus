@@ -80,7 +80,7 @@ def ingest_email():
             counts = sync_mailbox(client, conn, settings, job_run_id=context["run_id"])
             # sync_mailbox has already committed the pages and checkpoint. If this update fails, the task
             # retries, finds nothing new and records zero counts: an under-count, never a duplicate.
-            mark_succeeded(conn, GMAIL_INGEST, context["run_id"], counts)
+            mark_succeeded(conn, GMAIL_INGEST, context["run_id"], counts, context["ti"].try_number)
             conn.commit()
             return counts
         except (GmailAuthError, GmailPolicyError) as exc:
