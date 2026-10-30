@@ -20,7 +20,7 @@ import os
 import subprocess
 import tempfile
 from collections import Counter
-from dataclasses import dataclass, field
+from collections.abc import Sequence
 from pathlib import Path
 
 from psycopg2 import sql
@@ -40,14 +40,19 @@ REQUIRED_TABLES = ("interactions", "leads")
 SWAP_LOCK_TIMEOUT = "30s"
 
 
-@dataclass
 class DbtBuildError(Exception):
-    """dbt build did not pass. Holds node IDs only, never compiled SQL or row values."""
+    """dbt build did not pass. Holds node IDs only, never compiled SQL or row values.
 
-    returncode: int
-    failed_nodes: list[str] = field(default_factory=list)
-    # True when only data tests failed. Retrying rebuilds the same data, so it cannot help.
-    tests_only: bool = False
+    A plain Exception subclass, not a dataclass: the fields are passed to Exception.__init__ so args
+    round-trips through pickle and copy (DbtBuildError(*args)), and the exception stays hashable.
+    """
+
+    def __init__(self, returncode: int, failed_nodes: Sequence[str] = (), tests_only: bool = False) -> None:
+        super().__init__(returncode, list(failed_nodes), tests_only)
+        self.returncode = returncode
+        self.failed_nodes = list(failed_nodes)
+        # True when only data tests failed. Retrying rebuilds the same data, so it cannot help.
+        self.tests_only = tests_only
 
     def __str__(self) -> str:
         if not self.failed_nodes:

@@ -7,6 +7,8 @@ for the end-to-end check.
 
 from __future__ import annotations
 
+import copy
+import pickle
 import uuid
 
 import pytest
@@ -115,3 +117,13 @@ def test_run_results_are_counted_by_status():
     results = [{"status": "success"}, {"status": "pass"}, {"status": "pass"}, {"status": "fail"}]
 
     assert summarize_run_results(results) == {"success": 1, "pass": 2, "fail": 1}
+
+
+def test_build_error_survives_pickle_copy_and_hashing():
+    error = DbtBuildError(returncode=1, failed_nodes=["test.solnexus.t0"], tests_only=True)
+
+    for clone in (pickle.loads(pickle.dumps(error)), copy.copy(error)):
+        assert (clone.returncode, clone.failed_nodes, clone.tests_only) == (1, ["test.solnexus.t0"], True)
+        assert str(clone) == str(error)
+    assert hash(error)
+
