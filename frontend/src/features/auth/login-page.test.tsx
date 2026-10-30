@@ -8,6 +8,7 @@ import { MOCK_CREDENTIALS } from "@/mocks/credentials";
 import { MOCK_USER } from "@/mocks/data";
 import { server } from "@/mocks/server";
 import { renderApp } from "@/test/render";
+import { setMockSession } from "@/mocks/handlers";
 
 function fields() {
   return {
@@ -155,6 +156,7 @@ describe("login page", () => {
     server.use(
       http.post("*/api/v1/auth/login", async () => {
         await new Promise<void>((resolve) => (release = resolve));
+        setMockSession(MOCK_USER);
         return HttpResponse.json({ user_id: "u-1", email: MOCK_CREDENTIALS.email });
       }),
     );

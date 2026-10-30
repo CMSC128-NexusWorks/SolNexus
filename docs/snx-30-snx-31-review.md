@@ -24,7 +24,7 @@ Rebuilt on main after merged PR #21. The replacement history separates contract,
 ## Verification
 
 * Backend: 55 PostgreSQL-backed/auth/error regression tests passed, including a fresh main-to-0022 migration chain.
-* Frontend: 40 tests passed; TypeScript, ESLint and Vite production build passed.
+* Frontend: 40 tests passed; TypeScript, ESLint, Prettier formatting and Vite production build passed.
 * Existing SNX-33 run-status and atomic-silver-publication suites: 32 tests passed against a separate disposable PostgreSQL database.
 * Real browser/API: login, due exclusions, validation/save, filtered return, shadcn question/reply confirmation, pipeline reads and desktop/mobile rendering passed using only synthetic fixtures.
 * Mock browser: the visible selector demonstrated loading, empty due, no results, API failure, expired session/recovery, failed/stale pipeline and validation.

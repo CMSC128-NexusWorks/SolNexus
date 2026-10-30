@@ -34,6 +34,7 @@ Frontend checks, from `frontend/`:
 npm ci
 npm run typecheck
 npm run lint
+npm run format:check
 npm run test
 npm run build
 ```
