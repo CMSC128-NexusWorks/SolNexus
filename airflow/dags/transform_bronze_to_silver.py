@@ -57,7 +57,7 @@ def transform_bronze_to_silver():
     def build_silver() -> dict[str, int]:
         """Run dbt build into silver_build; return dbt node counts by status."""
         from solnexus_ingest.runs import mark_running, succeeded_counts
-        from solnexus_ingest.silver import DbtBuildError, reset_build_schema, run_dbt_build
+        from solnexus_ingest.silver import DbtBuildError, build, run_dbt_build
 
         context = get_current_context()
         conn = warehouse_conn()
@@ -67,27 +67,28 @@ def transform_bronze_to_silver():
                 # no publish may swap in, so skip (publish_silver is skipped with it).
                 raise AirflowSkipException("this run already published silver")
             mark_running(conn, SILVER_PUBLISH, context["dag"].dag_id, context["run_id"], context["ti"].try_number)
-            reset_build_schema(conn)
-        finally:
-            conn.close()
-        try:
-            return run_dbt_build(DBT_PROJECT_DIR)
+            return build(conn, context["run_id"], lambda: run_dbt_build(DBT_PROJECT_DIR))
         except DbtBuildError as exc:
             if exc.tests_only:
                 # The data broke a silver contract test. Retrying rebuilds the same data, so fail now
                 # and leave the run visibly failed for an operator (airflow/README.md).
                 raise AirflowFailException(str(exc)) from exc
             raise
+        finally:
+            conn.close()
 
     @task(execution_timeout=timedelta(minutes=5), **callbacks)
     def publish_silver(build_counts: dict[str, int]) -> dict[str, int]:
         """Swap silver_build in as silver and record the publication."""
-        from solnexus_ingest.silver import publish
+        from solnexus_ingest.silver import StaleBuildError, publish
 
         context = get_current_context()
         conn = warehouse_conn()
         try:
             return publish(conn, context["run_id"], build_counts, context["ti"].try_number)
+        except StaleBuildError as exc:
+            # silver_build is someone else's build; only rerunning build_silver can fix that.
+            raise AirflowFailException(str(exc)) from exc
         finally:
             conn.close()
 

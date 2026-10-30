@@ -18,8 +18,11 @@ from solnexus_ingest.runs import SILVER_PUBLISH, mark_running
 from solnexus_ingest.silver import (
     BUILD_SCHEMA,
     DbtBuildError,
+    StaleBuildError,
+    build,
     publish,
     reset_build_schema,
+    stamp_build,
     summarize_run_results,
 )
 
@@ -68,6 +71,7 @@ def live_silver(db):
 
 def test_complete_build_replaces_live_silver_and_marks_success(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new")
+    stamp_build(db, run_id)
 
     counts = publish(db, run_id, {"success": 2, "pass": 5}, attempt=1)
 
@@ -77,19 +81,71 @@ def test_complete_build_replaces_live_silver_and_marks_success(db, live_silver, 
     assert execute(db, "SELECT count(*) FROM pg_namespace WHERE nspname IN ('silver_build', 'silver_previous')")[0][0] == 0
 
 
-def test_incomplete_build_keeps_old_silver_and_does_not_mark_fresh(db, live_silver, run_id):
+def test_incomplete_build_cannot_be_stamped(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new", tables=("interactions",))
 
-    with pytest.raises(RuntimeError, match="missing"):
+    with pytest.raises(StaleBuildError, match="missing"):
+        stamp_build(db, run_id)
+    db.rollback()
+
+
+def test_unstamped_build_keeps_old_silver_and_does_not_mark_fresh(db, live_silver, run_id):
+    make_schema(db, BUILD_SCHEMA, "manual-or-failed")
+
+    with pytest.raises(StaleBuildError, match="not this run"):
         publish(db, run_id, {}, attempt=1)
 
     assert live_marker(db) == "old"
     assert run_status(db, run_id)[0] == "running"
 
 
+def test_another_runs_build_is_not_published(db, live_silver, run_id):
+    # Run A's publish retried late, after run B rebuilt silver_build.
+    make_schema(db, BUILD_SCHEMA, "run-b")
+    stamp_build(db, "some-other-run")
+
+    with pytest.raises(StaleBuildError, match="not this run"):
+        publish(db, run_id, {}, attempt=2)
+
+    assert live_marker(db) == "old"
+
+
+def test_tables_replaced_after_the_stamp_are_not_published(db, live_silver, run_id):
+    make_schema(db, BUILD_SCHEMA, "passed")
+    stamp_build(db, run_id)
+    # A later dbt build into silver_build replaces the tables (new OIDs) but keeps the schema comment.
+    execute(db, f"DROP TABLE {BUILD_SCHEMA}.leads")
+    execute(db, f"CREATE TABLE {BUILD_SCHEMA}.leads AS SELECT 'failed-tests'::text AS built_by")
+
+    with pytest.raises(StaleBuildError, match="changed"):
+        publish(db, run_id, {}, attempt=1)
+
+    assert live_marker(db) == "old"
+
+
+def test_failed_build_is_dropped_and_its_error_kept(db, run_id):
+    def failing_dbt():
+        make_schema(db, BUILD_SCHEMA, "half-built")
+        raise DbtBuildError(returncode=1, failed_nodes=["test.solnexus.t0"], tests_only=True)
+
+    with pytest.raises(DbtBuildError):
+        build(db, run_id, failing_dbt)
+
+    assert execute(db, "SELECT count(*) FROM pg_namespace WHERE nspname = %s", (BUILD_SCHEMA,))[0][0] == 0
+
+
+def test_passing_build_is_stamped_for_its_run(db, live_silver, run_id):
+    counts = build(db, run_id, lambda: make_schema(db, BUILD_SCHEMA, "built") or {"pass": 3})
+
+    assert counts == {"pass": 3}
+    publish(db, run_id, counts, attempt=1)
+    assert live_marker(db) == "built"
+
+
 def test_first_publication_works_without_a_live_schema(db, run_id):
     execute(db, "DROP SCHEMA IF EXISTS silver CASCADE")
     make_schema(db, BUILD_SCHEMA, "first")
+    stamp_build(db, run_id)
 
     publish(db, run_id, {}, attempt=1)
 
@@ -146,6 +202,7 @@ def test_publish_reraises_the_original_error_when_rollback_also_fails():
 
 def test_a_rerun_after_publication_swaps_nothing(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new")
+    stamp_build(db, run_id)
     first = publish(db, run_id, {"pass": 5}, attempt=1)
     make_schema(db, BUILD_SCHEMA, "someone-elses-build")
 

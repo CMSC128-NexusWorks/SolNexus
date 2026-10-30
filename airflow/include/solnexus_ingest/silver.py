@@ -8,6 +8,12 @@ commit in one transaction. So a failed build or swap leaves the previous silver,
 published_at, exactly as they were (data/API contract: "a failed run must not claim a fresh
 publication").
 
+Only this run's passing build is published. silver_build is shared by every run, so a build that
+passed is stamped with a schema comment naming its Airflow run and the OIDs of its tables. publish()
+refuses a build whose stamp names another run or whose tables changed since (a later failed build, or
+a manual `dbt build` into silver_build, replaces the tables and so changes their OIDs). A failed build
+drops silver_build at once, so its tables never wait around to be swapped in.
+
 dbt owns only the silver tables (dbt_project.yml). Nothing outside silver may depend on them, because
 the swap drops the previous schema with CASCADE.
 """
@@ -20,7 +26,7 @@ import os
 import subprocess
 import tempfile
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import psycopg2
@@ -61,6 +67,10 @@ class DbtBuildError(Exception):
         shown = ", ".join(self.failed_nodes[:5])
         more = f" (+{len(self.failed_nodes) - 5} more)" if len(self.failed_nodes) > 5 else ""
         return f"dbt build failed on {len(self.failed_nodes)} node(s): {shown}{more}"
+
+
+class StaleBuildError(RuntimeError):
+    """silver_build is not a build this run produced and passed. Retrying publish cannot change that."""
 
 
 def reset_build_schema(conn: Connection) -> None:
@@ -120,16 +130,72 @@ def run_dbt_build(project_dir: str, timeout_seconds: int = 1200) -> dict[str, in
     return dict(counts)
 
 
-def _schema_tables(cur, schema: str) -> set[str]:
-    cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = %s", (schema,))
-    return {name for (name,) in cur.fetchall()}
+def _table_oids(cur, schema: str) -> dict[str, int]:
+    """OIDs of the REQUIRED_TABLES present in schema. dbt replaces a table with a new one (new OID)."""
+    cur.execute(
+        """
+        SELECT c.relname, c.oid::bigint
+        FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace
+        WHERE n.nspname = %s AND c.relname = ANY(%s) AND c.relkind IN ('r', 'p')
+        """,
+        (schema, list(REQUIRED_TABLES)),
+    )
+    return dict(cur.fetchall())
+
+
+def _build_stamp(cur) -> dict | None:
+    cur.execute(
+        "SELECT obj_description(oid, 'pg_namespace') FROM pg_namespace WHERE nspname = %s", (BUILD_SCHEMA,)
+    )
+    row = cur.fetchone()
+    if not row or not row[0]:
+        return None
+    try:
+        return json.loads(row[0])
+    except ValueError:
+        return None
+
+
+def stamp_build(conn: Connection, airflow_run_id: str) -> None:
+    """Mark silver_build as this run's passing build (see the module docstring). Commits."""
+    with conn.cursor() as cur:
+        oids = _table_oids(cur, BUILD_SCHEMA)
+        missing = set(REQUIRED_TABLES) - oids.keys()
+        if missing:
+            raise StaleBuildError(f"{BUILD_SCHEMA} is missing {sorted(missing)} after a passing build")
+        stamp = json.dumps({"airflow_run_id": airflow_run_id, "tables": oids}, sort_keys=True)
+        cur.execute(sql.SQL("COMMENT ON SCHEMA {} IS {}").format(sql.Identifier(BUILD_SCHEMA), sql.Literal(stamp)))
+    conn.commit()
+
+
+def build(conn: Connection, airflow_run_id: str, run_dbt: Callable[[], dict[str, int]]) -> dict[str, int]:
+    """Rebuild silver_build from scratch with run_dbt and stamp it if it passed.
+
+    run_dbt is normally `lambda: run_dbt_build(project_dir)`; tests pass a fake. On any failure the
+    partial build is dropped before the error propagates, so it can never be published.
+    """
+    reset_build_schema(conn)
+    try:
+        counts = run_dbt()
+        stamp_build(conn, airflow_run_id)
+    except BaseException:
+        try:
+            conn.rollback()
+            reset_build_schema(conn)
+        except psycopg2.Error:
+            # Database gone: the next build resets the schema first, and the missing stamp stops any
+            # publish of these tables meanwhile. Keep the original error.
+            log.warning("could not drop the failed build; it stays unstamped and unpublishable")
+        raise
+    return counts
 
 
 def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int], attempt: int) -> dict[str, int]:
     """Swap BUILD_SCHEMA in as LIVE_SCHEMA and mark the silver run succeeded, in one transaction.
 
     Returns the counts recorded on the run: dbt node counts plus published row counts per table.
-    Raises (and rolls back, leaving the live silver untouched) if the build schema is incomplete.
+    Raises StaleBuildError (and rolls back, leaving the live silver untouched) unless silver_build
+    carries this run's stamp and its tables are still the ones stamped.
     If this run already published (a cleared rerun, or a retry after a commit whose task then died),
     returns the recorded counts and swaps nothing: silver_build is not this run's build any more.
     """
@@ -141,9 +207,11 @@ def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int],
             return already
         with conn.cursor() as cur:
             cur.execute("SET LOCAL lock_timeout = %s", (SWAP_LOCK_TIMEOUT,))
-            missing = set(REQUIRED_TABLES) - _schema_tables(cur, BUILD_SCHEMA)
-            if missing:
-                raise RuntimeError(f"{BUILD_SCHEMA} is missing {sorted(missing)}; not publishing")
+            stamp = _build_stamp(cur)
+            if stamp is None or stamp.get("airflow_run_id") != airflow_run_id:
+                raise StaleBuildError(f"{BUILD_SCHEMA} is not this run's passing build; rerun build_silver")
+            if stamp.get("tables") != _table_oids(cur, BUILD_SCHEMA):
+                raise StaleBuildError(f"{BUILD_SCHEMA} changed after this run's build passed; rerun build_silver")
 
             counts = {f"dbt_{status}": n for status, n in build_counts.items()}
             for table in REQUIRED_TABLES:
