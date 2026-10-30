@@ -14,7 +14,7 @@ The `ingest_email` DAG copies the connected Gmail mailbox into `bronze.raw_messa
 
 1. Read the mailbox profile: its address (used as `source_account_id`) and its current `historyId`.
 2. **No checkpoint:** list messages matching `GMAIL_BACKFILL_QUERY`. **Checkpoint:** list only messages added since that `historyId`.
-3. For each page, fetch every message (`format=raw`), skip drafts, spam, trash and chats, and store the page in one transaction.
+3. For each page, skip IDs that bronze already holds, fetch the rest (`format=raw`), skip drafts, spam, trash and chats, and store the page in one transaction.
 4. The last page's transaction also saves the new checkpoint. If a run fails midway, the next run starts from the old checkpoint. Pages that were already stored are recognised and skipped.
 
 `raw_payload_bytes` holds the message's RFC 822 bytes, which Gmail never changes. If a stored message comes back with different bytes, the first copy is kept and the new copy goes to `bronze.raw_message_discrepancies`.
@@ -31,7 +31,7 @@ The `ingest_email` DAG copies the connected Gmail mailbox into `bronze.raw_messa
    docker compose run --rm airflow-scheduler airflow dags test ingest_email
    ```
 
-The task's return value (shown in XCom and the log) contains counts only: `mode`, `pages`, `inserted`, `duplicate`, `discrepancy`, `quarantined`, `inquiries_opened`, `skipped_by_label`, `deleted_before_fetch`.
+The task's return value (shown in XCom and the log) contains counts only: `mode`, `pages`, `inserted`, `already_stored`, `duplicate`, `discrepancy`, `quarantined`, `inquiries_opened`, `skipped_by_label`, `deleted_before_fetch`.
 
 | Setting (`.env`) | Default | Meaning |
 |---|---|---|
@@ -48,7 +48,7 @@ The task's return value (shown in XCom and the log) contains counts only: `mode`
 | Task fails at once with `Gmail refused the request (403 domainPolicy …)` | A Workspace admin policy blocks the app | An admin must allow the app. Retrying won't help |
 | Log shows `Gmail call failed (403 rateLimitExceeded); retry …` | Per-user quota throttling | Nothing to do. The client backs off and retries up to 5 times (1 s growing to a 32 s cap, plus jitter) |
 | Task fails with `gave up after 5 retries` | Throttling or an outage that lasted longer than the backoff | Airflow retries the task twice, 5 minutes apart. After that, rerun later. Pages already committed are kept |
-| Log shows `Stored Gmail historyId expired; running a full resync` and the summary has `mode: full_resync` | The checkpoint is older than Gmail's history retention (about a week) | Nothing to do. The run lists `GMAIL_BACKFILL_QUERY` again, and bronze skips messages it already has. Widen the query if the DAG was paused longer than its window |
+| Log shows `Stored Gmail historyId expired; running a full resync` and the summary has `mode: full_resync` | The checkpoint is older than Gmail's history retention (about a week) | Nothing to do. The run lists `GMAIL_BACKFILL_QUERY` again, and only messages bronze doesn't have yet are downloaded. Widen the query if the DAG was paused longer than its window |
 | `quarantined` > 0 in the summary | A message couldn't be parsed, or Postgres rejected it. The run skipped it so the checkpoint could move on | Check `reason` in `bronze.quarantined_messages`. After fixing the parser, delete the account's row in `app.ingestion_checkpoints` to force a full resync. The message is then stored normally, and the quarantine row stays as history. Many quarantined messages at once usually means a parser bug, not bad mail |
 | `discrepancy` > 0 in the summary | A message came back with different bytes | Compare the row in `bronze.raw_message_discrepancies` with its `raw_messages` row. The first copy stays the evidence |
 

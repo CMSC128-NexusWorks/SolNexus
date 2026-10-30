@@ -159,6 +159,27 @@ def save_checkpoint(cur: Cursor, checkpoint: Checkpoint) -> None:
     )
 
 
+def stored_message_ids(conn: Connection, source_channel: str, source_account_id: str, message_ids: list[str]) -> set[str]:
+    """Which of these source message IDs bronze already holds for this account.
+
+    Lets a connector skip downloading messages it has stored before (resyncs, retried pages).
+    Quarantined messages are deliberately not included, so a later resync retries them.
+    """
+    if not message_ids:
+        return set()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT source_message_id FROM bronze.raw_messages
+            WHERE source_channel = %s AND source_account_id = %s AND source_message_id = ANY(%s)
+            """,
+            (source_channel, source_account_id, message_ids),
+        )
+        found = {row[0] for row in cur.fetchall()}
+    conn.commit()  # end the read-only transaction; the page is written in its own transaction
+    return found
+
+
 def load_checkpoint(conn: Connection, source_channel: str, source_account_id: str) -> str | None:
     with conn.cursor() as cur:
         cur.execute(

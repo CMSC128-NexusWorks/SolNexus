@@ -8,6 +8,11 @@ Cursor: Gmail's historyId, stored in app.ingestion_checkpoints.
 * Checkpoint too old (Gmail drops history after about a week): fall back to a full sync. Replays are
   no-ops in bronze, so re-listing already stored mail is safe, only slower.
 
+Messages already in bronze are not downloaded again: each page's IDs are checked against bronze
+first, so a resync costs one cheap query per page instead of a full download per stored message.
+Gmail's RFC 822 bytes never change, so skipping the re-download loses no evidence; the replay
+discrepancy check still applies to every message that is fetched.
+
 The checkpoint is written in the same transaction as the LAST page of a run. If a run dies midway,
 the pages it committed stay (bronze dedupes them next time) and the next run restarts from the old
 cursor, so no page is ever skipped.
@@ -32,7 +37,7 @@ from solnexus_ingest.gmail.parsing import (
     parse_gmail_message,
     should_ingest,
 )
-from solnexus_ingest.store import Checkpoint, load_checkpoint, store_page
+from solnexus_ingest.store import Checkpoint, load_checkpoint, store_page, stored_message_ids
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +81,7 @@ def sync_mailbox(
 SUMMARY_COUNTS = (
     "pages",
     "inserted",
+    "already_stored",
     "duplicate",
     "discrepancy",
     "quarantined",
@@ -90,9 +96,11 @@ def _run(
 ) -> dict[str, int | str]:
     counts: Counter[str] = Counter(dict.fromkeys(SUMMARY_COUNTS, 0))
     for message_ids, is_last, cursor in pages:
-        envelopes = list(_fetch(client, account, message_ids, counts))
+        known = stored_message_ids(conn, SOURCE_CHANNEL, account, message_ids)
+        counts["already_stored"] += len(known)
+        items = list(_fetch(client, account, [m for m in message_ids if m not in known], counts))
         checkpoint = Checkpoint(SOURCE_CHANNEL, account, cursor) if is_last else None
-        counts.update(store_page(conn, envelopes, job_run_id, checkpoint))
+        counts.update(store_page(conn, items, job_run_id, checkpoint))
         counts["pages"] += 1
     summary: dict[str, int | str] = {"mode": mode, **counts}
     log.info("Gmail sync finished: %s", summary)

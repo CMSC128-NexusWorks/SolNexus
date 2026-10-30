@@ -28,6 +28,7 @@ class FakeMailbox:
         self.fail_on_list_call: int | None = None
         self.history_expired = False
         self.list_calls = 0
+        self.fetched: list[str] = []
         self.queries: list[tuple] = []
 
     def add(self, message: dict) -> None:
@@ -51,6 +52,7 @@ class FakeMailbox:
         return page, next_token, str(self.history_id)
 
     def get_raw_message(self, message_id):
+        self.fetched.append(message_id)
         return self.messages.get(message_id)
 
     def _page(self, ids, page_token):
@@ -127,7 +129,8 @@ def test_failure_mid_run_keeps_committed_pages_and_old_checkpoint(db, parties, m
     summary = sync_mailbox(mailbox, db, SyncSettings(), RUN)
 
     assert stored_ids(db, parties.mailbox) == ["m1", "m2", "m3"]
-    assert (summary["inserted"], summary["duplicate"]) == (1, 2)
+    assert (summary["inserted"], summary["already_stored"]) == (1, 2)
+    assert mailbox.fetched[-1:] == ["m3"]  # the two committed messages were not downloaded again
     assert load_checkpoint(db, "gmail", parties.mailbox) == "103"
 
 
@@ -139,7 +142,8 @@ def test_expired_cursor_falls_back_to_full_resync_without_duplicates(db, parties
     summary = sync_mailbox(mailbox, db, SyncSettings(), RUN)
 
     assert summary["mode"] == "full_resync"
-    assert (summary["inserted"], summary["duplicate"]) == (1, 3)
+    assert (summary["inserted"], summary["already_stored"], summary["duplicate"]) == (1, 3, 0)
+    assert mailbox.fetched[-1:] == ["m4"]  # the resync downloaded only the new message
     assert load_checkpoint(db, "gmail", parties.mailbox) == "104"
 
 
