@@ -45,10 +45,14 @@ CONTRACT_SHEETS = {
 }
 
 
-def xlsx(sheets: dict[str, dict[int, dict[str, object]]]) -> bytes:
-    """Return workbook bytes with one worksheet per key, in the given order. Rows are {row: {column: value}}."""
+def xlsx(sheets: dict[str, dict[int, dict[str, object]]], title: str | None = None) -> bytes:
+    """Return workbook bytes with one worksheet per key, in the given order. Rows are {row: {column: value}}.
+
+    A different title changes the file bytes (and hash) without changing any row, like re-saving in Excel.
+    """
     workbook = Workbook()
     workbook.remove(workbook.active)
+    workbook.properties.title = title
     for name, rows in sheets.items():
         worksheet = workbook.create_sheet(name)
         for row_number, cells in rows.items():

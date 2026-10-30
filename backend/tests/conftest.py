@@ -48,6 +48,16 @@ def migrated_database():
 def clean_staff_tables():
     # DELETE, not TRUNCATE ... CASCADE: a cascade would reach append-only tables whose triggers reject it.
     with engine.begin() as conn:
+        # Import tests leave clinics, ledger rows and append-only status events behind. Candidate lookup
+        # compares new rows with every existing clinic, so leftovers would turn the next test's rows into
+        # needs_review. replica mode skips user triggers (the append-only guards) and foreign-key checks
+        # for this transaction only; the test database role is a superuser, as the setting requires.
+        conn.execute(text("SET LOCAL session_replication_role = replica"))
+        for table in (
+            "clinic_status_events", "clinic_field_events", "import_field_review_candidates",
+            "import_field_reviews", "import_rows", "import_row_decisions", "import_batches", "clinics",
+        ):
+            conn.execute(text(f"DELETE FROM app.{table}"))
         conn.execute(text("DELETE FROM app.staff_sessions"))
         conn.execute(text("DELETE FROM app.staff_users"))
 
