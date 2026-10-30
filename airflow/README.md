@@ -1,6 +1,13 @@
-# Airflow and the Gmail connector
+# Airflow: Gmail ingestion and silver publication
 
-The `ingest_email` DAG copies the connected Gmail mailbox into `bronze.raw_messages` (SNX-32). It opens an unknown-name inquiry for each inbound first contact, and it never links a message to a clinic without a staff-confirmed source identity. The connector code is in [include/solnexus_ingest](include/solnexus_ingest). The DAG only wires it to Airflow. Scheduling belongs to SNX-33, so for now the DAG runs only when you trigger it.
+Two DAGs run the Phase 1 pipeline (SNX-33):
+
+| DAG | Schedule (Asia/Manila) | Does |
+|---|---|---|
+| `ingest_email` | Hourly at :00 (`GMAIL_SYNC_SCHEDULE`) | Copies the connected Gmail mailbox into `bronze.raw_messages` (SNX-32). It opens an unknown-name inquiry for each inbound first contact, and it never links a message to a clinic without a staff-confirmed source identity |
+| `transform_bronze_to_silver` | After every successful `ingest_email` run, plus hourly at :30 (`SILVER_REFRESH_SCHEDULE`) | `build_silver` runs `dbt build` into `silver_build`. `publish_silver` swaps it in as `silver` and records the publication |
+
+Each DAG allows one active run at a time. The hourly silver run keeps spreadsheet imports and staff edits flowing into silver while Gmail is down. Both schedules are the contract's proposed defaults and still need team approval. The connector code is in [include/solnexus_ingest](include/solnexus_ingest). The DAGs only wire it to Airflow.
 
 | Module | Job |
 |---|---|
@@ -9,6 +16,9 @@ The `ingest_email` DAG copies the connected Gmail mailbox into `bronze.raw_messa
 | `gmail/sync.py` | Full or incremental listing, page by page, with the checkpoint saved after the last page |
 | `store.py` | Bronze insert with replay protection, initial resolution, inquiry, checkpoint, all in one transaction per page |
 | `resolution.py` | Identity-contract rules for `linked` / `needs_review` and when to open an inquiry |
+| `runs.py` | Run status in `app.pipeline_runs`: `running` at task start, `retrying` / `failed` from task callbacks, `succeeded` with the work |
+| `silver.py` | `dbt build` into `silver_build`, then the atomic schema swap and publication record |
+| `orchestration.py` | Names the DAGs share: warehouse connection, the `GMAIL_BRONZE` dataset, the schedule timezone |
 
 ## How a run works
 
@@ -25,10 +35,18 @@ The `ingest_email` DAG copies the connected Gmail mailbox into `bronze.raw_messa
 
 1. Authorize the test mailbox once with the SNX-21 probe ([backend/spikes/README.md](../backend/spikes/README.md)). That creates `.secrets/gmail-token.json`.
 2. Apply migrations: `docker compose run --rm --no-deps api alembic upgrade head`.
-3. Start Airflow (`docker compose up -d`), unpause `ingest_email` in the UI at `localhost:8080`, and trigger it. You can also run it once without the scheduler:
+3. Start Airflow (`docker compose up -d`). New DAGs start **paused** (`DAGS_ARE_PAUSED_AT_CREATION`), so nothing runs until you choose to start it. Unpause both DAGs in the UI at `localhost:8080`, or:
+
+   ```bash
+   docker compose exec airflow-scheduler airflow dags unpause ingest_email
+   docker compose exec airflow-scheduler airflow dags unpause transform_bronze_to_silver
+   ```
+
+   To run each DAG once without the scheduler:
 
    ```bash
    docker compose run --rm airflow-scheduler airflow dags test ingest_email
+   docker compose run --rm airflow-scheduler airflow dags test transform_bronze_to_silver
    ```
 
 The task's return value (shown in XCom and the log) contains counts only: `mode`, `pages`, `inserted`, `already_stored`, `duplicate`, `discrepancy`, `quarantined`, `inquiries_opened`, `skipped_by_label`, `deleted_before_fetch`.
@@ -39,6 +57,18 @@ The task's return value (shown in XCom and the log) contains counts only: `mode`
 | `GMAIL_BACKFILL_QUERY` | `newer_than:30d` | Gmail search that limits the first sync and any recovery resync |
 
 **Choosing what to ingest is still an open decision.** With `GMAIL_LABEL_ID` empty, every sender becomes a "Clinic name unknown" inquiry, including newsletters and notifications. Until the team agrees on a selection rule, for example a Gmail filter that applies a "SolNexus" label, run against a mailbox that holds only synthetic lead conversations.
+
+## Run status and freshness
+
+Every run writes one row to `app.pipeline_runs`. The dashboard-facing summary is the `app.pipeline_status` view:
+
+```sql
+SELECT pipeline, last_run_status, last_run_error_summary, last_succeeded_at FROM app.pipeline_status;
+```
+
+`last_succeeded_at` for `silver_publish` is the `published_at` the API shows. It changes only when a complete, fully tested build has been swapped in, so a failed run never makes data look fresh. `counts` holds the Gmail summary above, or dbt node counts and published row counts for silver. `error_summary` holds an exception class and its first line only. Full tracebacks stay in the Airflow task log.
+
+If a worker is killed mid-task, so that no callback runs, the row can stay `running` or `retrying`. The next run writes its own row, and the view always reports the latest run.
 
 ## Failures and recovery
 
@@ -52,8 +82,14 @@ The task's return value (shown in XCom and the log) contains counts only: `mode`
 | Log shows `Stored Gmail historyId expired; running a full resync` and the summary has `mode: full_resync` | The checkpoint is older than Gmail's history retention (about a week) | Nothing to do. The run lists `GMAIL_BACKFILL_QUERY` again, and only messages bronze doesn't have yet are downloaded. Widen the query if the DAG was paused longer than its window |
 | `quarantined` > 0 in the summary | A message couldn't be parsed, or Postgres rejected it. The run skipped it so the checkpoint could move on | Check `reason` in `bronze.quarantined_messages`. After fixing the parser, delete the account's row in `app.ingestion_checkpoints` to force a full resync. The message is then stored normally, and the quarantine row stays as history. Many quarantined messages at once usually means a parser bug, not bad mail |
 | `discrepancy` > 0 in the summary | A message came back with different bytes | Compare the row in `bronze.raw_message_discrepancies` with its `raw_messages` row. The first copy stays the evidence |
+| `build_silver` fails at once with `dbt build failed on N node(s): test.…` | A dbt data test failed, so the new silver would break a contract | Not retried, because rebuilding the same data cannot help. The previous silver and `published_at` stay live. Run `docker compose run --rm airflow-scheduler bash -c "cd /opt/airflow/dbt && dbt build --vars '{silver_schema: silver_build}'"` to inspect it, fix the data or model, then clear the task in the UI. A leftover `silver_build` schema is harmless, because the next run drops it first |
+| `build_silver` fails with `dbt build exited with code …` or a model `error` | Database unreachable, or a SQL or compile error | Retried twice (2 then 4 minutes). If retries run out, check the task log for the dbt output |
+| `publish_silver` fails with `LockNotAvailable` | A long API read held silver for more than 30 s during the swap | Retried automatically. Nothing changed, because the swap rolled back |
+| `app.pipeline_status` shows `silver_publish` succeeded long ago | `transform_bronze_to_silver` is paused, or every run fails | Unpause it, or read `last_run_error_summary` and the task log |
 
-Log lines and errors include status codes, Google's reason and counts. They never include tokens, addresses or message content.
+Log lines and errors include status codes, Google's reason, dbt node IDs and counts. They never include tokens, addresses or message content.
+
+**Rerunning safely.** You can clear and rerun any task. `sync_gmail` resumes from the committed checkpoint, and bronze ignores replays. `build_silver` starts from an empty `silver_build`. `publish_silver` either swaps in a complete build or changes nothing. To rebuild silver from scratch, trigger `transform_bronze_to_silver`. Bronze and `app` are never modified by it.
 
 ## Tests
 
