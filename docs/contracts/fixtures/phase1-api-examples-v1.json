@@ -23,9 +23,9 @@
   },
   "first_contact_inquiry": {
     "initial_message": {"source_channel": "gmail", "source_account_id": "test-mailbox", "external_participant_id": "newlead@example.test", "source_message_id": "inbound-unknown-1", "message_clinic_id": null},
-    "dashboard_row": {"lead_id": "70000000-0000-4000-8000-000000000001", "record_type": "inquiry", "clinic_name": null, "clinic_name_state": "unknown", "display_clinic_name": "Clinic name unknown", "next_action": "request_clinic_name", "action_label": "Email to ask", "version": 1},
-    "confirm_request": {"version": 1, "clinic_name": "Meadow Clinic", "outbound_question_message_id": "ask-clinic-name-1", "inbound_reply_message_id": "reply-clinic-name-1", "create_clinic": true, "source_identity_confirmation_reason": "confirmed_from_lead_reply"},
-    "confirm_response": {"inquiry_id": "70000000-0000-4000-8000-000000000001", "state": "closed", "clinic_id": "10000000-0000-4000-8000-000000000005", "clinic_name": "Meadow Clinic", "clinic_name_state": "confirmed", "version": 2},
+    "dashboard_row": {"lead_id": "70000000-0000-4000-8000-000000000001", "record_type": "inquiry", "clinic_name": null, "clinic_name_state": "unknown", "next_action": "request_clinic_name", "version": 1, "clinic_id": null, "status_code": null, "next_action_date": null, "latest_topic": null},
+    "confirm_request": {"version": 1, "clinic_name": "Meadow Clinic", "question_message_id": "30000000-0000-4000-8000-000000000010", "reply_message_id": "30000000-0000-4000-8000-000000000011", "confirm_source_mapping": true, "reason": "Staff reviewed the persisted question and subsequent reply"},
+    "confirm_response": {"lead_id": "10000000-0000-4000-8000-000000000005", "record_type": "clinic", "clinic_id": "10000000-0000-4000-8000-000000000005", "clinic_name": "Meadow Clinic", "clinic_name_state": "confirmed", "version": 1, "pending_projection": true, "status_code": null, "next_action_date": null, "reevaluation_job_id": "90000000-0000-4000-8000-000000000001"},
     "invalid_initial_name_write": {"error": {"code": "confirmation_evidence_required", "message": "Clinic name requires staff-reviewed reply evidence", "details": []}}
   },
   "import": {

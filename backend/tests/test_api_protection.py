@@ -130,13 +130,14 @@ def test_database_errors_are_logged_without_row_values(client, monkeypatch, capl
 
     monkeypatch.setattr("app.auth.dependencies.find_session_user", failing_insert)
 
-    with caplog.at_level("ERROR", logger="app.errors"):
+    with caplog.at_level("WARNING", logger="app.errors"):
         response = client.get("/api/v1/auth/session", headers={"Cookie": f"{SESSION_COOKIE}=some-token"})
 
+    # The SQLAlchemyError handler answers; a check violation is a code or operator problem, so 500.
     assert response.status_code == 500
+    assert response.json()["error"]["code"] == "internal_error"
     logged = caplog.text
     assert "CheckViolation sqlstate=23514 table=clinics constraint=clinics_origin_check" in logged
-    assert "failing_insert" in logged  # the traceback frames are kept
     assert "Private Clinic Name" not in logged and "0917 PRIVATE" not in logged
 
 

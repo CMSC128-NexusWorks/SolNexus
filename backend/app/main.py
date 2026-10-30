@@ -6,6 +6,7 @@ from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.errors import install_error_handlers
 from app.imports.router import router as imports_router
+from app.leads.router import router as leads_router
 
 app = FastAPI(title="SolNexus API")
 install_error_handlers(app)
@@ -36,4 +37,5 @@ app.include_router(auth_router, prefix="/api/v1")
 # a session.
 protected = APIRouter(prefix="/api/v1", dependencies=[Depends(require_staff)])
 protected.include_router(imports_router)
+protected.include_router(leads_router)
 app.include_router(protected)

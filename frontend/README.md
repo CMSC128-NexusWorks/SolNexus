@@ -13,9 +13,9 @@ npm install
 VITE_USE_MOCKS=true npm run dev
 ```
 
-`VITE_USE_MOCKS=true` serves the API from `src/mocks/` so you can build screens before the backend endpoints exist. Sign in with the mock account shown on the login page (`staff@example.test` / `example-only`).
+`VITE_USE_MOCKS=true` serves synthetic API data from `src/mocks/`. The development sign-in page shows the synthetic credentials. Set `VITE_USE_MOCKS=false` and `VITE_API_URL=http://localhost:8000` to use the authenticated backend; restart Vite after changing environment variables. See [SNX-30/SNX-31 handoff](../docs/snx-30-snx-31-handoff.md) for migrations, staff account setup and verification.
 
-Without mocks the dashboard talks to the real API: create a staff account first (see [docs/authentication.md](../docs/authentication.md#creating-staff-accounts)).
+In mock mode, **Mock scenario** selects loading, empty due, no search results (enter a search), API failure, expired session, failed/stale pipeline, and field validation. It remains accessible on sign-in for recovery and is absent with mocks disabled. Pipeline warnings use `/pipeline/status`; `published_at` belongs to Airflow's last successful swap. The UI exposes search and a single status filter, with no advanced date-filter control. A row's suggested interaction topic and operational next step have separate columns.
 
 > After pulling changes to `package.json`, Docker keeps old packages in the `web_node_modules` volume. Run `docker compose run --rm web npm install` to refresh it.
 

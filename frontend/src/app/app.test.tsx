@@ -22,8 +22,10 @@ describe("app routing", () => {
     expect(
       await screen.findByRole("heading", { name: "Clinics to call today" }),
     ).toBeInTheDocument();
-    expect(await screen.findByText("3 due rows loaded from the API")).toBeInTheDocument();
-    expect(await screen.findByText("7 leads loaded from the API")).toBeInTheDocument();
+    expect(
+      (await screen.findAllByRole("link", { name: "Harborview Clinic" })).length,
+    ).toBeGreaterThan(0);
+    expect(await screen.findByRole("heading", { name: "Needs clinic name" })).toBeInTheDocument();
   });
 
   it("shows the sync status in the top bar", async () => {

@@ -1,14 +1,14 @@
 """Create app.import_row_decisions and record how each import row matched a clinic.
 
-Revision ID: 0021
-Revises: 0020
+Revision ID: 0023
+Revises: 0022
 Create Date: 2026-10-30
 """
 
 from alembic import op
 
-revision = "0021"
-down_revision = "0020"
+revision = "0023"
+down_revision = "0022"
 branch_labels = None
 depends_on = None
 
