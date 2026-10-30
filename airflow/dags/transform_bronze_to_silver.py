@@ -16,7 +16,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from airflow.decorators import dag, task
-from airflow.exceptions import AirflowFailException
+from airflow.exceptions import AirflowFailException, AirflowSkipException
 from airflow.operators.python import get_current_context
 from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.trigger import CronTriggerTimetable
@@ -56,12 +56,16 @@ def transform_bronze_to_silver():
     @task(execution_timeout=timedelta(minutes=30), **callbacks)
     def build_silver() -> dict[str, int]:
         """Run dbt build into silver_build; return dbt node counts by status."""
-        from solnexus_ingest.runs import mark_running
+        from solnexus_ingest.runs import mark_running, succeeded_counts
         from solnexus_ingest.silver import DbtBuildError, reset_build_schema, run_dbt_build
 
         context = get_current_context()
         conn = warehouse_conn()
         try:
+            if succeeded_counts(conn, SILVER_PUBLISH, context["run_id"]) is not None:
+                # A cleared task on a run that already published: rebuilding would leave a build that
+                # no publish may swap in, so skip (publish_silver is skipped with it).
+                raise AirflowSkipException("this run already published silver")
             mark_running(conn, SILVER_PUBLISH, context["dag"].dag_id, context["run_id"], context["ti"].try_number)
             reset_build_schema(conn)
         finally:

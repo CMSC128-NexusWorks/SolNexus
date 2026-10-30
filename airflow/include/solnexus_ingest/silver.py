@@ -27,7 +27,7 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import connection as Connection
 
-from solnexus_ingest.runs import SILVER_PUBLISH, mark_succeeded
+from solnexus_ingest.runs import SILVER_PUBLISH, mark_succeeded, succeeded_counts
 
 log = logging.getLogger(__name__)
 
@@ -130,8 +130,15 @@ def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int])
 
     Returns the counts recorded on the run: dbt node counts plus published row counts per table.
     Raises (and rolls back, leaving the live silver untouched) if the build schema is incomplete.
+    If this run already published (a cleared rerun, or a retry after a commit whose task then died),
+    returns the recorded counts and swaps nothing: silver_build is not this run's build any more.
     """
     try:
+        already = succeeded_counts(conn, SILVER_PUBLISH, airflow_run_id)
+        if already is not None:
+            conn.rollback()
+            log.info("this run already published silver; nothing to do")
+            return already
         with conn.cursor() as cur:
             cur.execute("SET LOCAL lock_timeout = %s", (SWAP_LOCK_TIMEOUT,))
             missing = set(REQUIRED_TABLES) - _schema_tables(cur, BUILD_SCHEMA)

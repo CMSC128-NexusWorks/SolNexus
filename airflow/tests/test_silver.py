@@ -142,3 +142,13 @@ class _DeadConnection:
 def test_publish_reraises_the_original_error_when_rollback_also_fails():
     with pytest.raises(psycopg2.OperationalError, match="server closed"):
         publish(_DeadConnection(), "test-run", {})
+
+
+def test_a_rerun_after_publication_swaps_nothing(db, live_silver, run_id):
+    make_schema(db, BUILD_SCHEMA, "new")
+    first = publish(db, run_id, {"pass": 5})
+    make_schema(db, BUILD_SCHEMA, "someone-elses-build")
+
+    assert publish(db, run_id, {"pass": 1}) == first
+    assert live_marker(db) == "new"
+    assert run_status(db, run_id) == ("succeeded", first)

@@ -13,6 +13,7 @@ from solnexus_ingest.runs import (
     mark_running,
     mark_succeeded,
     mark_unfinished,
+    succeeded_counts,
     summarize_error,
 )
 
@@ -133,3 +134,18 @@ def test_status_view_reports_the_latest_run_and_last_success(db, run_id):
     # The shared test database also holds other tests' runs, so only check what this test controls.
     assert status == "failed"
     assert has_success
+
+
+def test_a_succeeded_run_is_never_moved_back(db, run_id):
+    mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=1)
+    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 3})
+    db.commit()
+
+    # An operator clears the finished task, or its retry runs after the commit.
+    mark_running(db, GMAIL_INGEST, DAG, run_id, attempt=2)
+    mark_unfinished(db, GMAIL_INGEST, DAG, run_id, will_retry=False, error=RuntimeError("boom"))
+    mark_succeeded(db, GMAIL_INGEST, run_id, {"inserted": 0})
+    db.commit()
+
+    assert run_row(db, run_id)[:5] == ("succeeded", 1, True, {"inserted": 3}, None)
+    assert succeeded_counts(db, GMAIL_INGEST, run_id) == {"inserted": 3}

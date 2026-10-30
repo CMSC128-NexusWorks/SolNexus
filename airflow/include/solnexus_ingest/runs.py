@@ -3,6 +3,9 @@
 One row per (pipeline, Airflow run_id). A task marks it 'running' when it starts. Task callbacks
 mark it 'retrying' or 'failed'. The last task marks it 'succeeded', in the same transaction as the
 work it reports: the checkpoint commit is already durable for Gmail, and the schema swap for silver.
+A 'succeeded' row is final: no later write moves it back. Otherwise an operator clearing a finished task,
+or a retry after a commit whose task then died, would rewrite a real publication as 'running' or
+'failed', and published_at would move backwards while the published data stayed live.
 Airflow's UI stays the operator's detailed view. This table is the small, stable summary the API
 reads for the dashboard (app.pipeline_status).
 
@@ -52,8 +55,19 @@ def summarize_error(exc: BaseException | None) -> str | None:
     return summary[:ERROR_SUMMARY_MAX]
 
 
+def succeeded_counts(conn: Connection, pipeline: str, airflow_run_id: str) -> dict[str, Any] | None:
+    """The recorded counts if this run already succeeded, else None. Does not commit."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT counts FROM app.pipeline_runs WHERE pipeline = %s AND airflow_run_id = %s AND status = 'succeeded'",
+            (pipeline, airflow_run_id),
+        )
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
 def mark_running(conn: Connection, pipeline: str, dag_id: str, airflow_run_id: str, attempt: int) -> None:
-    """Create the run row, or reset it for a retry or a cleared rerun. Commits."""
+    """Create the run row, or reset it for a retry. Leaves a succeeded row as it is. Commits."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -61,6 +75,7 @@ def mark_running(conn: Connection, pipeline: str, dag_id: str, airflow_run_id: s
             VALUES (%s, %s, %s, 'running', %s)
             ON CONFLICT (pipeline, airflow_run_id) DO UPDATE
                SET status = 'running', attempt = EXCLUDED.attempt, finished_at = NULL, error_summary = NULL
+             WHERE app.pipeline_runs.status <> 'succeeded'
             """,
             (pipeline, dag_id, airflow_run_id, attempt),
         )
@@ -68,17 +83,20 @@ def mark_running(conn: Connection, pipeline: str, dag_id: str, airflow_run_id: s
 
 
 def mark_succeeded(conn: Connection, pipeline: str, airflow_run_id: str, counts: Mapping[str, Any]) -> None:
-    """Mark the run succeeded. Does NOT commit, so the caller can commit it with the work it reports."""
+    """Mark the run succeeded. Does NOT commit, so the caller can commit it with the work it reports.
+
+    If the run already succeeded (a cleared rerun), the first success and its counts are kept.
+    """
     with conn.cursor() as cur:
         cur.execute(
             """
             UPDATE app.pipeline_runs
                SET status = 'succeeded', finished_at = now(), counts = %s, error_summary = NULL
-             WHERE pipeline = %s AND airflow_run_id = %s
+             WHERE pipeline = %s AND airflow_run_id = %s AND status <> 'succeeded'
             """,
             (Json(dict(counts)), pipeline, airflow_run_id),
         )
-        if cur.rowcount != 1:
+        if cur.rowcount == 0 and succeeded_counts(conn, pipeline, airflow_run_id) is None:
             # mark_running always runs first in the same DAG run, so a missing row is a wiring bug.
             raise RuntimeError(f"no {pipeline} run row for this Airflow run; was mark_running called?")
 
@@ -92,7 +110,7 @@ def mark_unfinished(
     will_retry: bool,
     error: BaseException | None,
 ) -> None:
-    """Mark the run 'retrying' or 'failed' with a safe error summary. Commits.
+    """Mark the run 'retrying' or 'failed' with a safe error summary. Leaves a succeeded row. Commits.
 
     Upserts in case the failure happened before mark_running could write the row, e.g. the token file
     was missing or the warehouse was briefly unreachable at task start.
@@ -106,6 +124,7 @@ def mark_unfinished(
             ON CONFLICT (pipeline, airflow_run_id) DO UPDATE
                SET status = EXCLUDED.status, finished_at = EXCLUDED.finished_at,
                    error_summary = EXCLUDED.error_summary
+             WHERE app.pipeline_runs.status <> 'succeeded'
             """,
             (pipeline, dag_id, airflow_run_id, status, status, summarize_error(error)),
         )
