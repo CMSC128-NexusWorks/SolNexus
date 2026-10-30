@@ -197,6 +197,10 @@ export interface FieldReview {
   field_name: string;
   state: "unresolved" | "resolved";
   resolved_value: string | null;
+  /** The clinic's value now; it may be a dashboard edit made after the review opened. */
+  current_value: string | null;
+  /** Send back when resolving; the API answers 409 version_conflict if the clinic changed since. */
+  clinic_version: number | null;
   candidate_rows: { import_row_id: string; sheet: string; row: number; value: string | null }[];
 }
 
@@ -224,4 +228,6 @@ export interface FieldReviewResolution {
   /** A candidate value, a corrected value, or null to leave the field empty. */
   value: string | null;
   reason: string;
+  /** The review's clinic_version as loaded. */
+  clinic_version: number;
 }

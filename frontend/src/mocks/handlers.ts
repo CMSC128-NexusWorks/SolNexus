@@ -389,6 +389,8 @@ export const handlers = [
           field_name: "contact_number",
           state: "unresolved",
           resolved_value: null,
+          current_value: null,
+          clinic_version: 1,
           candidate_rows: rows.map((row) => ({
             import_row_id: row.import_row_id,
             sheet: row.sheet,
@@ -435,8 +437,16 @@ export const handlers = [
         );
       }
       const body = await request.json();
+      if (body.clinic_version !== review.clinic_version) {
+        return error(409, "version_conflict", "This row changed. Refresh it before retrying.");
+      }
+      const value = body.value?.trim() || null;
       review.state = "resolved";
-      review.resolved_value = body.value?.trim() || null;
+      review.resolved_value = value;
+      if (value !== review.current_value && review.clinic_version !== null) {
+        review.current_value = value;
+        review.clinic_version += 1;
+      }
       recountMockImport();
       return HttpResponse.json(review);
     },

@@ -11,7 +11,7 @@ All require a signed-in staff session.
 | `POST /api/v1/imports` | Multipart field `file`: the `.xlsx` workbook | `202` `{batch_id, state, replayed}` |
 | `GET /api/v1/imports/{batch_id}` | None | `200` counts, one result per attempted row, open and resolved field reviews |
 | `POST /api/v1/imports/{batch_id}/decisions` | `import_row_ids`, `action` (`create_clinic`, `link_clinic`, `reject`), `clinic_id` for `link_clinic`, optional `clinic_name` for `create_clinic`, `reason` | `200` updated batch |
-| `POST /api/v1/imports/field-reviews/{review_id}/resolve` | `value` (string or null), `reason` | `200` resolved review |
+| `POST /api/v1/imports/field-reviews/{review_id}/resolve` | `value` (string or null), `reason`, `clinic_version` as returned with the review | `200` resolved review |
 
 Examples generated from real responses are in [phase1-api-examples-v1.json](contracts/fixtures/phase1-api-examples-v1.json) under `import`. The upload is processed before the `202` returns, so the batch is already final. The poll endpoint exists for the result screen and for the contract's asynchronous shape.
 
@@ -26,6 +26,7 @@ Examples generated from real responses are in [phase1-api-examples-v1.json](cont
 | `clinic_name_conflict` | 422 | `create_clinic` over rows that spell the name differently; send `clinic_name` |
 | `rows_not_in_batch`, `unknown_clinic` | 422 | The decision names rows of another batch, or a clinic that does not exist |
 | `row_already_decided`, `review_already_resolved` | 409 | The other staff member got there first; reload the batch |
+| `version_conflict` | 409 | The clinic changed (for example, a dashboard edit) after the review was loaded; reload and decide again |
 
 ## What happens to each row
 
@@ -59,7 +60,7 @@ There is no fuzzy score or threshold: the contract has approved none, and an exa
 - **Different clinics:** `create_clinic` for each row separately.
 - **Not a lead:** `reject`. The row's values are dropped from the ledger.
 
-Resolving a field review sets the clinic field with the same audit trail as a dashboard edit (a `clinic_field_events` row, plus a `row_edit` status event for status). A batch stays `needs_review` while any of its rows awaits a decision or any field review over its rows is open. It then becomes `completed`.
+Resolving a field review is a dashboard row edit. The value passes the same rules as the row editor, and the clinic field changes with the same audit trail (a `clinic_field_events` row, plus a `row_edit` status event for status). Each review shows the clinic's `current_value` and `clinic_version`. Staff may have edited the field in the dashboard after the review opened, so the request sends that version back, and a newer edit makes it answer `409 version_conflict` instead of replacing it. Resolution does not read silver, so it works before the first silver publication. A batch stays `needs_review` while any of its rows awaits a decision or any field review over its rows is open. It then becomes `completed`.
 
 ## Operating it
 

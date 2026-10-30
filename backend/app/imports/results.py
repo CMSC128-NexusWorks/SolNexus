@@ -148,11 +148,13 @@ def _field_reviews(conn: Connection, condition: str, key: UUID) -> list[FieldRev
             f"""
             SELECT review.review_id, review.clinic_id, review.field_name, review.state,
                    review.resolved_value #>> '{{}}' AS resolved_value,
+                   to_jsonb(clinic) ->> review.field_name AS current_value, clinic.version AS clinic_version,
                    row.import_row_id, row.sheet_name, row.row_number,
                    row.normalized_fields ->> review.field_name AS value
             FROM app.import_field_reviews review
             JOIN app.import_field_review_candidates candidate USING (review_id)
             JOIN app.import_rows row ON row.import_row_id = candidate.import_row_id
+            LEFT JOIN app.clinics clinic ON clinic.clinic_id = review.clinic_id
             WHERE review.review_id IN (
                 SELECT batch_candidate.review_id
                 FROM app.import_field_review_candidates batch_candidate
@@ -174,6 +176,8 @@ def _field_reviews(conn: Connection, condition: str, key: UUID) -> list[FieldRev
                 field_name=record.field_name,
                 state=record.state,
                 resolved_value=record.resolved_value,
+                current_value=record.current_value,
+                clinic_version=record.clinic_version,
                 candidate_rows=[],
             ),
         )

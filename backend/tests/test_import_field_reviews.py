@@ -18,8 +18,10 @@ def import_and_confirm(client, sheets, refs):
     return decision.json()
 
 
-def resolve(client, review, value, reason="Called the clinic"):
-    return client.post(f"/api/v1/imports/field-reviews/{review['review_id']}/resolve", json={"value": value, "reason": reason})
+def resolve(client, review, value, reason="Called the clinic", clinic_version=None):
+    """Resolve with the clinic version the review reported, as the review screen will."""
+    body = {"value": value, "reason": reason, "clinic_version": clinic_version or review.get("clinic_version") or 1}
+    return client.post(f"/api/v1/imports/field-reviews/{review['review_id']}/resolve", json=body)
 
 
 def contract_review(client):
@@ -95,7 +97,8 @@ def test_a_resolved_value_must_pass_the_import_field_rules(signed_in):
 
     assert resolve(signed_in, reviews["status_code"], "Demo booked").status_code == 422
     assert resolve(signed_in, reviews["email"], "not an email").status_code == 422
-    assert resolve(signed_in, reviews["email"], "A@Example.TEST").json()["resolved_value"] == "a@example.test"
+    # Stored as entered, as a dashboard edit would store it.
+    assert resolve(signed_in, reviews["email"], "Front.Desk@Example.TEST").json()["resolved_value"] == "Front.Desk@Example.TEST"
 
 
 def test_a_reason_is_required(signed_in):
@@ -110,3 +113,49 @@ def test_unknown_review_is_not_found(signed_in):
     response = resolve(signed_in, {"review_id": "00000000-0000-4000-8000-000000000000"}, None)
 
     assert response.status_code == 404
+
+
+def test_a_review_shows_the_clinic_value_and_version_to_resolve_against(signed_in, run_sql):
+    _, review = contract_review(signed_in)
+
+    (clinic,) = run_sql("SELECT version FROM app.clinics WHERE clinic_id = :id", id=review["clinic_id"])
+    assert (review["current_value"], review["clinic_version"]) == (None, clinic.version)
+
+
+def test_a_dashboard_edit_after_the_review_opened_is_never_silently_replaced(signed_in, run_sql):
+    result, review = contract_review(signed_in)
+    # Staff A sets the phone in the dashboard after the import opened the review. This is what
+    # PATCH /clinics commits (its response reads silver, which this test does not build).
+    run_sql(
+        "UPDATE app.clinics SET contact_number = '0917 555 0100', version = version + 1 WHERE clinic_id = :id",
+        id=review["clinic_id"],
+    )
+    run_sql(
+        """INSERT INTO app.clinic_field_events (clinic_id, field_name, old_value, new_value, changed_by)
+           SELECT :id, 'contact_number', 'null', '"0917 555 0100"', user_id FROM app.staff_users LIMIT 1""",
+        id=review["clinic_id"],
+    )
+
+    # Staff B resolves from the review as they loaded it, before that edit.
+    stale = resolve(signed_in, review, "0917 000 0199")
+
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "version_conflict"
+    assert run_sql("SELECT contact_number FROM app.clinics WHERE clinic_id = :id", id=review["clinic_id"]) == [("0917 555 0100",)]
+    # After reloading, staff B sees the edit and decides knowingly.
+    (reloaded,) = signed_in.get(f"/api/v1/imports/{result['batch_id']}").json()["field_reviews"]
+    assert (reloaded["state"], reloaded["current_value"]) == ("unresolved", "0917 555 0100")
+    kept = resolve(signed_in, reloaded, "0917 555 0100", reason="Keep the number staff entered")
+    assert (kept.status_code, kept.json()["state"]) == (200, "resolved")
+    # Choosing the value already there writes no second audit row.
+    assert run_sql("SELECT count(*) FROM app.clinic_field_events WHERE clinic_id = :id", id=review["clinic_id"])[0][0] == 1
+
+
+def test_resolving_requires_the_clinic_version(signed_in):
+    _, review = contract_review(signed_in)
+
+    response = signed_in.post(
+        f"/api/v1/imports/field-reviews/{review['review_id']}/resolve", json={"value": None, "reason": "Checked"}
+    )
+
+    assert response.status_code == 422

@@ -281,6 +281,8 @@
           "field_name": "contact_number",
           "state": "unresolved",
           "resolved_value": null,
+          "current_value": null,
+          "clinic_version": 1,
           "candidate_rows": [
             {"import_row_id": "30000000-0000-4000-8000-000000000001", "sheet": "Jacks Calling Sheet", "row": 2, "value": "0917 000 0199"},
             {"import_row_id": "30000000-0000-4000-8000-000000000002", "sheet": "Ljs Calling Sheet", "row": 1, "value": "0917 000 0101"}
@@ -288,13 +290,15 @@
         }
       ]
     },
-    "resolve_field_review_request": {"path": "POST /api/v1/imports/field-reviews/{review_id}/resolve", "value": "0917 000 0101", "reason": "Clinic confirmed its main line"},
+    "resolve_field_review_request": {"path": "POST /api/v1/imports/field-reviews/{review_id}/resolve", "value": "0917 000 0101", "reason": "Clinic confirmed its main line", "clinic_version": 1},
     "resolve_field_review_response": {
       "review_id": "60000000-0000-4000-8000-000000000001",
       "clinic_id": "10000000-0000-4000-8000-000000000003",
       "field_name": "contact_number",
       "state": "resolved",
       "resolved_value": "0917 000 0101",
+      "current_value": "0917 000 0101",
+      "clinic_version": 2,
       "candidate_rows": [
         {"import_row_id": "30000000-0000-4000-8000-000000000001", "sheet": "Jacks Calling Sheet", "row": 2, "value": "0917 000 0199"},
         {"import_row_id": "30000000-0000-4000-8000-000000000002", "sheet": "Ljs Calling Sheet", "row": 1, "value": "0917 000 0101"}

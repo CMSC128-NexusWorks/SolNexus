@@ -77,6 +77,10 @@ class FieldReview(BaseModel):
     field_name: str
     state: Literal["unresolved", "resolved"]
     resolved_value: str | None
+    # The clinic's value now, which may be a dashboard edit made after the review opened, and the version
+    # to send back when resolving. A newer edit makes the resolution answer 409.
+    current_value: str | None
+    clinic_version: int | None
     candidate_rows: list[FieldReviewCandidate]
 
 
@@ -124,6 +128,8 @@ class FieldReviewResolution(BaseModel):
 
     value: str | None
     reason: str = Field(min_length=1, max_length=1000)
+    # The review's clinic_version as read; 409 version_conflict if the clinic changed since.
+    clinic_version: int = Field(ge=1)
 
     @model_validator(mode="after")
     def check_reason(self) -> "FieldReviewResolution":

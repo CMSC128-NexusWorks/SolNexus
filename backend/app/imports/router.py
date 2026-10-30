@@ -131,5 +131,5 @@ def decide_rows(batch_id: UUID, body: ImportDecisionRequest, user: CurrentStaff,
 @router.post("/field-reviews/{review_id}/resolve")
 def resolve_review(review_id: UUID, body: FieldReviewResolution, user: CurrentStaff, conn: Db) -> FieldReview:
     """Set the clinic field to the staff-chosen value (audited like a row edit) and close the review."""
-    resolve_field_review(conn, review_id, body.value, body.reason, user.user_id)
+    resolve_field_review(conn, review_id, body.value, body.reason, body.clinic_version, user.user_id)
     return load_field_review(conn, review_id)

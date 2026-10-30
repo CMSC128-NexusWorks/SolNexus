@@ -117,7 +117,7 @@ Sessions are server-side: they expire after 8 hours without an API request or 7 
 | `POST /api/v1/imports` | Multipart `.xlsx` legacy workbook with `Content-Length` | `202` batch ID/state; poll result endpoint; no length `411`; too large `413` |
 | `GET /api/v1/imports/{batch_id}` | Batch ID | `200` counts and row results with safe codes |
 | `POST /api/v1/imports/{batch_id}/decisions` | `needs_review` row IDs, `action` (`create_clinic`, `link_clinic`, `reject`), `clinic_id` for a link, optional staff-chosen `clinic_name`, `reason` | `200` updated batch; row already decided `409`; disagreeing names without `clinic_name` `422` |
-| `POST /api/v1/imports/field-reviews/{review_id}/resolve` | `value` (null leaves the field empty), `reason` | `200` resolved review; field updated with an audit event; already resolved `409` |
+| `POST /api/v1/imports/field-reviews/{review_id}/resolve` | `value` (null leaves the field empty), `reason`, `clinic_version` from the review | `200` resolved review; field updated as an audited row edit; already resolved or clinic changed since (`version_conflict`) `409` |
 | `GET /api/v1/leads` | `status`, `q`, `limit`, `cursor` | `200` All leads page including open inquiries and publication metadata |
 | `GET /api/v1/leads/due` | Optional business date for test/operator use; ordinary users get today | `200` due rows and publication metadata |
 | `GET /api/v1/leads/{clinic_id}/history` | `limit`, `cursor` | `200` linked interactions ordered by event time |
