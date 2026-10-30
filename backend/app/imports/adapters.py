@@ -8,9 +8,14 @@ The two sheets are equally authoritative but laid out differently, so each has i
   province, clinic, phone, email, address, municipality), H is the real status, I is next step. See the
   data contract's "Jacks layout evidence" for how this was established without reading row values.
 
-Only mapped columns become clinic fields. Columns whose meaning SolTech has not confirmed (Jacks J, K) and
-status text with no approved mapping are kept as restricted evidence on the import row, never copied into
+Only mapped columns become clinic fields. Jacks J and K, whose meaning nobody has inferred yet, and status
+text with no approved mapping are kept as restricted evidence on the import row, never copied into
 operational fields. A changed layout fails the whole upload instead of guessing.
+
+Unconfirmed mapping: Jacks A-C and E-G are mapped from data evidence, not from SolTech confirmation (data
+contract approval gate 1). jacks-v1 is therefore fit for development and dry runs only; a production import
+waits for that confirmation. If SolTech disagrees, add a jacks-v2 adapter rather than editing jacks-v1, so
+rows already read keep a fingerprint that names the mapping that produced them.
 
 Staging is per row and has no database access. Deciding which clinic a valid row belongs to happens later
 (candidates.py, service.py), so this module never sees other rows or existing clinics.
@@ -249,7 +254,8 @@ class JacksAdapterV1(_Adapter):
         "I": "next_step",
     }
     status_column = "H"
-    # Meanings not yet confirmed by SolTech (contact detail vs D; SolTech owner vs clinic contact).
+    # A-C and E-G above are inferred from the data and await SolTech confirmation (see module docstring).
+    # J and K: meanings not yet known (contact detail vs D; SolTech owner vs clinic contact).
     evidence_columns = {"J": "contact", "K": "point_person"}
     expected_header = {
         "A": "facility", "B": "name", "C": "email", "D": "status", "E": None, "F": None, "G": None,
