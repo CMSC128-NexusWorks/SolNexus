@@ -115,3 +115,15 @@ def test_rejects_an_xml_entity_expansion_payload():
         causes.append(type(exc).__name__)
         exc = exc.__cause__ or exc.__context__
     assert "EntitiesForbidden" in causes
+
+
+def test_rejects_a_zip_with_a_corrupt_central_directory():
+    # is_zipfile only finds the end-of-archive record, so this passes it and must still be a 422, not a 500.
+    data = xlsx({LJS: {1: {"C": "Clinic One"}}})
+    corrupt = data.replace(b"PK\x01\x02", b"PK\x01\x00", 1)
+    assert zipfile.is_zipfile(io.BytesIO(corrupt))
+
+    with pytest.raises(WorkbookError) as error:
+        read_workbook(corrupt)
+
+    assert (error.value.code, error.value.status_code) == ("invalid_workbook", 422)

@@ -19,7 +19,7 @@ Examples generated from real responses are in [phase1-api-examples-v1.json](cont
 |---|---|---|
 | `workbook_too_large` | 413 | Over 10 MiB, or the archive expands past 100 MiB or 1,000 entries |
 | `too_many_rows` | 422 | Over 10,000 populated rows across both sheets |
-| `invalid_workbook` | 422 | Not an `.xlsx` file, unreadable, macro-enabled, or contains XML entity declarations |
+| `invalid_workbook` | 422 | Not an `.xlsx` file, a corrupt archive, unreadable, macro-enabled, or contains XML entity declarations |
 | `unsupported_file_type` | 422 | File name does not end in `.xlsx` |
 | `unsupported_workbook_format` | 422 | Unknown sheet, changed Jacks header, or data in a column the adapter does not know. `details` names the sheet position or cell, never a value |
 | `clinic_name_conflict` | 422 | `create_clinic` over rows that spell the name differently; send `clinic_name` |

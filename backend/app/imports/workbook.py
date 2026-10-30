@@ -65,7 +65,13 @@ class Sheet:
 def _check_archive(data: bytes) -> None:
     if not zipfile.is_zipfile(io.BytesIO(data)):
         raise WorkbookError("invalid_workbook", "File is not an .xlsx workbook")
-    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, ValueError, OSError) as exc:
+        # is_zipfile only finds the end-of-archive record; a corrupt or truncated central directory still
+        # fails here, and that is a bad upload (422), not a server error.
+        raise WorkbookError("invalid_workbook", "File is not an .xlsx workbook") from exc
+    with archive:
         entries = archive.infolist()
         names = {entry.filename for entry in entries}
         if "xl/workbook.xml" not in names:

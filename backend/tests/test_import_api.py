@@ -320,3 +320,13 @@ def test_a_failed_import_rolls_back_and_leaves_a_failed_batch(signed_in, run_sql
     assert run_sql("SELECT state FROM app.import_batches") == [("failed",)]
     assert run_sql("SELECT count(*) FROM app.clinics")[0][0] == 0
     assert run_sql("SELECT count(*) FROM app.import_rows")[0][0] == 0
+
+
+def test_a_corrupt_archive_is_an_invalid_workbook_not_a_server_error(signed_in, run_sql):
+    corrupt = xlsx({LJS: ljs({"C": "Clinic One"})}).replace(b"PK\x01\x02", b"PK\x01\x00", 1)
+
+    response = upload(signed_in, corrupt)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_workbook"
+    assert run_sql("SELECT count(*) FROM app.import_batches")[0][0] == 0
