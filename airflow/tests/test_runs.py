@@ -19,15 +19,41 @@ from solnexus_ingest.runs import (
 DAG = "ingest_email"
 
 
-def test_summary_keeps_class_and_first_line_only():
-    # psycopg2 puts row values on the DETAIL line; they must not reach the dashboard.
-    exc = psycopg2.IntegrityError('duplicate key value violates unique constraint "x"\nDETAIL:  Key (email)=(a@example.test)')
+def test_postgres_errors_keep_only_class_sqlstate_and_constraint(db):
+    # Even the primary message quotes the rejected value; it must not reach the dashboard.
+    with pytest.raises(psycopg2.Error) as caught:
+        with db.cursor() as cur:
+            cur.execute("SELECT %s::uuid", ("lead-a@example.test",))
+    db.rollback()
 
-    assert summarize_error(exc) == 'IntegrityError: duplicate key value violates unique constraint "x"'
+    assert summarize_error(caught.value) == "InvalidTextRepresentation (SQLSTATE 22P02)"
+
+
+def test_postgres_constraint_errors_name_the_constraint(db):
+    with pytest.raises(psycopg2.Error) as caught:
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO app.pipeline_runs (pipeline, dag_id, airflow_run_id, status) VALUES ('nope', 'd', 'r', 'running')"
+            )
+    db.rollback()
+
+    assert summarize_error(caught.value) == "CheckViolation (SQLSTATE 23514, constraint pipeline_runs_pipeline_check)"
+
+
+def test_other_errors_keep_their_first_line_with_quoted_values_masked():
+    exc = PermissionError("[Errno 13] Permission denied: '/opt/airflow/secrets/gmail-token.json'\nmore")
+
+    assert summarize_error(exc) == "PermissionError: [Errno 13] Permission denied: <redacted>"
+    assert summarize_error(KeyError("lead-a@example.test")) == "KeyError: <redacted>"
+    # Connector messages carry no quotes, so they stay readable.
+    assert summarize_error(RuntimeError("gave up after 5 retries (403 rateLimitExceeded)")) == (
+        "RuntimeError: gave up after 5 retries (403 rateLimitExceeded)"
+    )
 
 
 def test_summary_handles_empty_and_long_messages():
     assert summarize_error(TimeoutError()) == "TimeoutError"
+    assert summarize_error(psycopg2.InterfaceError("connection already closed")) == "InterfaceError"
     assert len(summarize_error(RuntimeError("x" * 1000))) == ERROR_SUMMARY_MAX
     assert summarize_error(None) is None
 

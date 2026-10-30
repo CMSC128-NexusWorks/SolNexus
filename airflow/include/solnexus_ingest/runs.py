@@ -6,17 +6,22 @@ work it reports: the checkpoint commit is already durable for Gmail, and the sch
 Airflow's UI stays the operator's detailed view. This table is the small, stable summary the API
 reads for the dashboard (app.pipeline_status).
 
-Error summaries keep only the exception class and the first line of its message. Connector errors
-are written to be safe (status codes, Google reasons, counts). The first line also leaves out
-psycopg2's DETAIL line, which can quote row values. Full tracebacks stay in the Airflow task log.
+Error summaries reach the dashboard, so they must never carry record values. A PostgreSQL error is
+reduced to its class, SQLSTATE and constraint name: even its primary message can quote the rejected
+value (`invalid input syntax for type uuid: "..."`). Any other error keeps its class and first line,
+with quoted text masked, because messages like FileNotFoundError's or KeyError's quote their subject.
+Connector errors are written without quotes (status codes, Google reasons, dbt node IDs), so they stay
+readable. Full tracebacks stay in the Airflow task log.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
+import psycopg2
 from psycopg2.extensions import connection as Connection
 from psycopg2.extras import Json
 
@@ -26,14 +31,24 @@ GMAIL_INGEST = "gmail_ingest"
 SILVER_PUBLISH = "silver_publish"
 
 ERROR_SUMMARY_MAX = 300
+# A single- or double-quoted span, the usual way exception messages embed the value they choke on.
+_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
 
 
 def summarize_error(exc: BaseException | None) -> str | None:
-    """Exception class plus the first line of its message, truncated."""
+    """A dashboard-safe one-line summary: see the module docstring for what is kept."""
     if exc is None:
         return None
+    name = type(exc).__name__
+    if isinstance(exc, psycopg2.Error):
+        parts = [f"SQLSTATE {exc.pgcode}"] if exc.pgcode else []
+        constraint = getattr(exc.diag, "constraint_name", None)
+        if constraint:
+            parts.append(f"constraint {constraint}")
+        return f"{name} ({', '.join(parts)})" if parts else name
     first_line = (str(exc).strip().splitlines() or [""])[0]
-    summary = f"{type(exc).__name__}: {first_line}" if first_line else type(exc).__name__
+    first_line = _QUOTED.sub("<redacted>", first_line)
+    summary = f"{name}: {first_line}" if first_line else name
     return summary[:ERROR_SUMMARY_MAX]
 
 
