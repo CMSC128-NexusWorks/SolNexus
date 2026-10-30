@@ -1,62 +1,120 @@
-import { TicketPlaceholder } from "@/components/ticket-placeholder";
+import { useLeads, useDueLeads, useNeedsName } from "./queries";
+import { Input } from "@/components/ui/input";
+import { FieldSelect } from "./field-select";
+import { PipelineWarning } from "./pipeline-warning";
+import { useSearchParams } from "react-router";
+import { STATUS_LABELS, type StatusCode } from "@/lib/api/types";
+import { Button } from "@/components/ui/button";
+import { DataState } from "./data-state";
+import { LeadTable } from "./lead-table";
 
-import { useDueLeads, useLeads } from "./queries";
-
-const today = new Intl.DateTimeFormat("en-GB", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "Asia/Manila",
-});
-
-// Landing screen (wireframe 02). Due today sits above All leads with no clicks needed (NFR-04).
-export function DashboardPage() {
-  const due = useDueLeads();
-  const leads = useLeads();
-
+/** Independent cursors keep search from hiding urgent work in the other tables. */
+function LeadSection({
+  title,
+  mode,
+  q,
+  status,
+}: {
+  title: string;
+  mode: "all" | "due" | "needs-name";
+  q?: string;
+  status?: StatusCode;
+}) {
+  const all = useLeads({ q, status }, mode === "all");
+  const due = useDueLeads(mode === "due");
+  const needs = useNeedsName(mode === "needs-name");
+  const data = mode === "due" ? due : mode === "needs-name" ? needs : all;
+  const rows = [
+    ...new Map(data.data?.pages.flatMap((p) => p.items).map((r) => [r.lead_id, r])).values(),
+  ];
+  const heading = `heading-${mode}`;
   return (
-    <div className="flex flex-col gap-10">
-      <header className="flex flex-col gap-1">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          {today.format(new Date())}
+    <section aria-labelledby={heading} className="grid gap-3">
+      <h2 id={heading} className="text-lg font-semibold">
+        {title}
+      </h2>
+      <DataState pending={data.isPending} error={data.error} retry={() => void data.refetch()} />
+      {data.data && !data.error && (
+        <LeadTable
+          rows={rows}
+          empty={
+            mode === "due"
+              ? "No leads due today."
+              : mode === "needs-name"
+                ? "No inquiries need a clinic name."
+                : q || status
+                  ? "No search results. Try clearing the filters."
+                  : "No leads yet."
+          }
+        />
+      )}
+      {data.hasNextPage && (
+        <Button
+          variant="outline"
+          disabled={data.isFetchingNextPage}
+          onClick={() => void data.fetchNextPage()}
+        >
+          {data.isFetchingNextPage ? "Loading…" : `Load more ${title.toLowerCase()}`}
+        </Button>
+      )}
+    </section>
+  );
+}
+
+/** URL-owned filters survive detail navigation and refresh. */
+export function DashboardPage() {
+  const [params, setParams] = useSearchParams();
+  function change(key: string, value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
+  }
+  const status = params.get("status");
+  return (
+    <div className="flex flex-col gap-8">
+      <header>
+        <p className="text-sm text-muted-foreground">
+          {new Date().toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "full" })}
         </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Clinics to call today</h1>
+        <h1 className="text-3xl font-semibold">Clinics to call today</h1>
       </header>
-
-      <section aria-labelledby="due-today" className="flex flex-col gap-4">
-        <h2 id="due-today" className="text-lg font-semibold">
-          Due today
-        </h2>
-        {/* TODO(SNX-57): replace with the Due today table. Loading/empty/error states: SNX-60. */}
-        <TicketPlaceholder
-          ticket="SNX-57"
-          title="Due today table"
-          wireframe="02 · Dashboard — default view (FR-07 + FR-08).png"
-        >
-          <p className="text-sm text-muted-foreground">
-            {due.data
-              ? `${due.data.items.length} due rows loaded from the API`
-              : "Loading due rows…"}
-          </p>
-        </TicketPlaceholder>
-      </section>
-
-      <section aria-labelledby="all-leads" className="flex flex-col gap-4">
-        <h2 id="all-leads" className="text-lg font-semibold">
-          All clinics
-        </h2>
-        {/* TODO(SNX-57): replace with the All leads table. Search and status filter: SNX-58. */}
-        <TicketPlaceholder
-          ticket="SNX-57 · SNX-58"
-          title="All leads table with search and status filter"
-          wireframe="03 · All Leads — filtered (FR-09).png"
-        >
-          <p className="text-sm text-muted-foreground">
-            {leads.data ? `${leads.data.items.length} leads loaded from the API` : "Loading leads…"}
-          </p>
-        </TicketPlaceholder>
-      </section>
+      <PipelineWarning />
+      <LeadSection title="Due today" mode="due" />
+      <LeadSection title="Needs clinic name" mode="needs-name" />
+      <div className="grid gap-3 rounded border p-4 sm:grid-cols-3">
+        <label className="grid gap-1 text-sm">
+          Search clinic or contact
+          <Input
+            className="rounded border p-2"
+            type="search"
+            value={params.get("q") ?? ""}
+            onChange={(e) => change("q", e.target.value)}
+          />
+        </label>
+        <FieldSelect
+          label="Status"
+          value={status ?? ""}
+          onChange={(value) => change("status", value)}
+          options={[
+            { value: "", label: "All statuses" },
+            ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+          ]}
+        />
+        <Button variant="outline" className="self-end" onClick={() => setParams({})}>
+          Clear filters
+        </Button>
+      </div>
+      <LeadSection
+        title="All leads"
+        mode="all"
+        q={params.get("q") ?? undefined}
+        status={
+          status && Object.prototype.hasOwnProperty.call(STATUS_LABELS, status)
+            ? (status as StatusCode)
+            : undefined
+        }
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -11,10 +12,14 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     # Browsers accept Secure cookies on http://localhost, except Safari; set false only for that case.
     session_cookie_secure: bool = True
+    # Operational warning threshold only; this does not promise a connector refresh interval.
+    pipeline_stale_after_minutes: int = Field(default=120, ge=1)
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        return [
+            origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
+        ]
 
 
 settings = Settings()
