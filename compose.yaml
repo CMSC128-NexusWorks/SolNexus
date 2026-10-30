@@ -25,6 +25,10 @@ x-airflow-common: &airflow-common
     GMAIL_TOKEN_FILE: /opt/airflow/secrets/gmail-token.json
     GMAIL_LABEL_ID: ${GMAIL_LABEL_ID:-}
     GMAIL_BACKFILL_QUERY: ${GMAIL_BACKFILL_QUERY:-newer_than:30d}
+    # Schedules (SNX-33), cron in Asia/Manila. They take effect only once the DAGs are unpaused.
+    GMAIL_SYNC_SCHEDULE: ${GMAIL_SYNC_SCHEDULE:-0 * * * *}
+    SILVER_REFRESH_SCHEDULE: ${SILVER_REFRESH_SCHEDULE:-30 * * * *}
+    DBT_PROJECT_DIR: /opt/airflow/dbt
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/include:/opt/airflow/include:ro
