@@ -16,7 +16,8 @@ from starlette.datastructures import UploadFile
 from app.auth.router import CurrentStaff
 from app.db import Db, engine
 from app.errors import ApiError
-from app.imports.models import ImportAccepted, ImportResult
+from app.imports.decisions import Decision, decide
+from app.imports.models import ImportAccepted, ImportDecisionRequest, ImportResult
 from app.imports.results import load_result
 from app.imports.service import file_hash, record_failed_upload, stage_upload, write_import
 from app.imports.workbook import MAX_UPLOAD_BYTES, WorkbookError
@@ -100,3 +101,24 @@ def get_import(batch_id: UUID, conn: Db) -> ImportResult:
     if result is None:
         raise ApiError(404, "not_found", "Import batch not found")
     return result
+
+
+@router.post("/{batch_id}/decisions")
+def decide_rows(batch_id: UUID, body: ImportDecisionRequest, user: CurrentStaff, conn: Db) -> ImportResult:
+    """Resolve needs_review rows: create one clinic from them, link them to a clinic, or reject them.
+
+    Returns the updated batch. 409 row_already_decided when another staff member decided a row first.
+    """
+    decide(
+        conn,
+        batch_id,
+        Decision(
+            import_row_ids=body.import_row_ids,
+            action=body.action,
+            reason=body.reason,
+            clinic_id=body.clinic_id,
+            clinic_name=body.clinic_name,
+        ),
+        user.user_id,
+    )
+    return load_result(conn, batch_id)

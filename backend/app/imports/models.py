@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 BatchState = Literal["processing", "needs_review", "completed", "failed"]
 RowResult = Literal["accepted", "needs_review", "rejected", "skipped"]
@@ -83,3 +83,31 @@ class ImportResult(BaseModel):
     counts: ImportCounts
     rows: list[ImportRowResult]
     field_reviews: list[FieldReview]
+
+
+class ImportDecisionRequest(BaseModel):
+    """Staff decision on needs_review rows of one batch. Rows of one review group are meant to be decided
+    together: create_clinic over the whole group is how staff confirm they are the same new clinic."""
+
+    import_row_ids: list[UUID] = Field(min_length=1, max_length=100)
+    action: Literal["create_clinic", "link_clinic", "reject"]
+    # Required for link_clinic, not allowed otherwise.
+    clinic_id: UUID | None = None
+    # create_clinic only: the staff-chosen name, required when the rows spell it differently.
+    clinic_name: str | None = Field(default=None, max_length=2000)
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def check_action_fields(self) -> "ImportDecisionRequest":
+        self.reason = self.reason.strip()
+        if not self.reason:
+            raise ValueError("reason must not be blank")
+        if len(set(self.import_row_ids)) != len(self.import_row_ids):
+            raise ValueError("import_row_ids must not repeat")
+        if (self.action == "link_clinic") != (self.clinic_id is not None):
+            raise ValueError("clinic_id is required for link_clinic and not allowed otherwise")
+        if self.clinic_name is not None:
+            self.clinic_name = self.clinic_name.strip()
+            if self.action != "create_clinic" or not self.clinic_name:
+                raise ValueError("clinic_name must be a nonblank name and is only used by create_clinic")
+        return self
