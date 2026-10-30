@@ -170,3 +170,24 @@ def test_summary_contains_no_addresses(db, parties, mailbox):
     summary = sync_mailbox(mailbox, db, SyncSettings(), RUN)
 
     assert "example.test" not in repr(summary)
+
+
+def test_unparseable_message_is_quarantined_and_cursor_moves_on(db, parties, mailbox):
+    mailbox.add({"id": "broken-base64", "threadId": "t", "labelIds": ["INBOX"], "raw": "!!not base64!!"})
+    mailbox.add({"id": "no-raw-field", "threadId": "t", "labelIds": ["INBOX"]})
+
+    first = sync_mailbox(mailbox, db, SyncSettings(), RUN)
+    second = sync_mailbox(mailbox, db, SyncSettings(), RUN)
+
+    assert (first["quarantined"], first["inserted"]) == (2, 3)
+    assert load_checkpoint(db, "gmail", parties.mailbox) == "105"  # not stuck behind the bad messages
+    assert second["mode"] == "incremental" and second["quarantined"] == 0
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT source_message_id, reason FROM bronze.quarantined_messages WHERE source_account_id = %s ORDER BY 1",
+            (parties.mailbox,),
+        )
+        rows = cur.fetchall()
+    db.commit()
+    assert rows[0][0] == "broken-base64" and rows[0][1].startswith("parse_error:")
+    assert rows[1] == ("no-raw-field", "parse_error:KeyError")

@@ -53,6 +53,7 @@ Rules that follow from this:
 | Table | Holds | Change rule |
 |---|---|---|
 | `bronze.raw_messages` | One row per source message: exact payload bytes, source IDs, event and ingest times | Append-only. `INSERT ... ON CONFLICT DO NOTHING` on `raw_messages_source_key` |
+| `bronze.quarantined_messages` | Source messages a connector could not parse or store, with the reason and bytes when readable | Append-only; one row per source key |
 | `bronze.raw_message_discrepancies` | A replay whose payload bytes differ from the stored first copy | Append-only; one row per distinct differing payload |
 | `app.staff_users` | The SolTech dashboard accounts | Create or reset with `python -m app.staff_account`; deactivate with `is_active`; never delete |
 | `app.staff_sessions` | Sign-in sessions; only a hash of each cookie token | Insert on login; revoke with `revoked_at`. See [authentication](authentication.md) |

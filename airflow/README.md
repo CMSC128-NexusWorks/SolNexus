@@ -31,7 +31,7 @@ The `ingest_email` DAG copies the connected Gmail mailbox into `bronze.raw_messa
    docker compose run --rm airflow-scheduler airflow dags test ingest_email
    ```
 
-The task's return value (shown in XCom and the log) contains counts only: `mode`, `pages`, `inserted`, `duplicate`, `discrepancy`, `inquiries_opened`, `skipped_by_label`, `deleted_before_fetch`.
+The task's return value (shown in XCom and the log) contains counts only: `mode`, `pages`, `inserted`, `duplicate`, `discrepancy`, `quarantined`, `inquiries_opened`, `skipped_by_label`, `deleted_before_fetch`.
 
 | Setting (`.env`) | Default | Meaning |
 |---|---|---|
@@ -49,6 +49,7 @@ The task's return value (shown in XCom and the log) contains counts only: `mode`
 | Log shows `Gmail call failed (403 rateLimitExceeded); retry …` | Per-user quota throttling | Nothing to do. The client backs off and retries up to 5 times (1 s growing to a 32 s cap, plus jitter) |
 | Task fails with `gave up after 5 retries` | Throttling or an outage that lasted longer than the backoff | Airflow retries the task twice, 5 minutes apart. After that, rerun later. Pages already committed are kept |
 | Log shows `Stored Gmail historyId expired; running a full resync` and the summary has `mode: full_resync` | The checkpoint is older than Gmail's history retention (about a week) | Nothing to do. The run lists `GMAIL_BACKFILL_QUERY` again, and bronze skips messages it already has. Widen the query if the DAG was paused longer than its window |
+| `quarantined` > 0 in the summary | A message couldn't be parsed, or Postgres rejected it. The run skipped it so the checkpoint could move on | Check `reason` in `bronze.quarantined_messages`. After fixing the parser, delete the account's row in `app.ingestion_checkpoints` to force a full resync. The message is then stored normally, and the quarantine row stays as history. Many quarantined messages at once usually means a parser bug, not bad mail |
 | `discrepancy` > 0 in the summary | A message came back with different bytes | Compare the row in `bronze.raw_message_discrepancies` with its `raw_messages` row. The first copy stays the evidence |
 
 Log lines and errors include status codes, Google's reason and counts. They never include tokens, addresses or message content.

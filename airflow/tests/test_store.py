@@ -175,3 +175,23 @@ def test_checkpoint_is_saved_with_the_page_and_updated_later(db, parties):
     store_page(db, [], RUN, Checkpoint("gmail", parties.mailbox, "200"))
 
     assert load_checkpoint(db, "gmail", parties.mailbox) == "200"
+
+
+def test_message_postgres_rejects_is_quarantined_and_page_still_commits(db, parties):
+    good = parse_gmail_message(inbound("m-good", sender=parties.lead, mailbox=parties.mailbox), parties.mailbox)
+    rejected = parse_gmail_message(inbound("m-bad", sender=parties.lead, mailbox=parties.mailbox), parties.mailbox)
+    # jsonb cannot hold NUL characters, so PostgreSQL rejects this row with a DataError.
+    rejected = type(rejected)(**{**rejected.__dict__, "source_recipient_ids": ("bad\x00id@example.test",)})
+
+    counts = store_page(db, [rejected, good], RUN, Checkpoint("gmail", parties.mailbox, "500"))
+
+    assert (counts["quarantined"], counts["inserted"]) == (1, 1)
+    assert one(db, "SELECT count(*) FROM bronze.raw_messages WHERE source_account_id = %s", (parties.mailbox,))[0] == 1
+    reason, has_payload = one(
+        db,
+        "SELECT reason, payload_bytes IS NOT NULL FROM bronze.quarantined_messages WHERE source_account_id = %s",
+        (parties.mailbox,),
+    )
+    # psycopg2 reports the specific DataError subclass (here UntranslatableCharacter).
+    assert reason.startswith("db_rejected:") and has_payload
+    assert load_checkpoint(db, "gmail", parties.mailbox) == "500"

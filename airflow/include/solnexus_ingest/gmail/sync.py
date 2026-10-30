@@ -23,9 +23,15 @@ from dataclasses import dataclass
 
 from psycopg2.extensions import connection as Connection
 
-from solnexus_ingest.envelope import MessageEnvelope
+from solnexus_ingest.envelope import MessageEnvelope, QuarantinedMessage
 from solnexus_ingest.gmail.client import GmailClient, HistoryExpired
-from solnexus_ingest.gmail.parsing import SOURCE_CHANNEL, canonical_address, parse_gmail_message, should_ingest
+from solnexus_ingest.gmail.parsing import (
+    SOURCE_CHANNEL,
+    canonical_address,
+    decode_raw,
+    parse_gmail_message,
+    should_ingest,
+)
 from solnexus_ingest.store import Checkpoint, load_checkpoint, store_page
 
 log = logging.getLogger(__name__)
@@ -72,6 +78,7 @@ SUMMARY_COUNTS = (
     "inserted",
     "duplicate",
     "discrepancy",
+    "quarantined",
     "inquiries_opened",
     "skipped_by_label",
     "deleted_before_fetch",
@@ -112,8 +119,14 @@ def _history_pages(client: GmailClient, start_history_id: str, settings: SyncSet
             return
 
 
-def _fetch(client: GmailClient, account: str, message_ids: list[str], counts: Counter[str]) -> Iterator[MessageEnvelope]:
-    """Fetch and parse each listed message, counting the ones that are not stored and why."""
+def _fetch(
+    client: GmailClient, account: str, message_ids: list[str], counts: Counter[str]
+) -> Iterator[MessageEnvelope | QuarantinedMessage]:
+    """Fetch and parse each listed message, counting the ones that are not stored and why.
+
+    Gmail API errors propagate (the client already retried what is retryable). A message that fetched
+    fine but cannot be parsed becomes a QuarantinedMessage instead of failing the page.
+    """
     for message_id in message_ids:
         message = client.get_raw_message(message_id)
         if message is None:
@@ -121,4 +134,30 @@ def _fetch(client: GmailClient, account: str, message_ids: list[str], counts: Co
         elif not should_ingest(message.get("labelIds")):
             counts["skipped_by_label"] += 1
         else:
-            yield parse_gmail_message(message, account)
+            yield _parse_or_quarantine(message, account)
+
+
+def _parse_or_quarantine(message: dict, account: str) -> MessageEnvelope | QuarantinedMessage:
+    """Parse one message. Any parser exception quarantines it, so the cursor can move past it.
+
+    The catch is deliberately broad: malformed MIME can raise many exception types from the email
+    package. A parser bug would also land here, so a non-zero "quarantined" count needs checking.
+    """
+    try:
+        return parse_gmail_message(message, account)
+    except Exception as exc:  # noqa: BLE001 - see docstring
+        return QuarantinedMessage(
+            SOURCE_CHANNEL,
+            account,
+            message["id"],
+            f"parse_error:{type(exc).__name__}",
+            _raw_bytes_or_none(message),
+        )
+
+
+def _raw_bytes_or_none(message: dict) -> bytes | None:
+    """The message's RFC 822 bytes for the quarantine record, if they decode at all."""
+    try:
+        return decode_raw(message["raw"])
+    except Exception:  # noqa: BLE001 - evidence is best-effort; the quarantine row matters more
+        return None
