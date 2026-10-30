@@ -24,6 +24,10 @@ from app.errors import ApiError
 # Proposed operational limits from the data contract, to validate with SolTech before production.
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_POPULATED_ROWS = 10_000
+# Highest sheet row that may hold data. Blank rows between data rows are attempted rows (counted as
+# skipped, one ledger row each), so without this a cell in A1 and another in A1048576 would make a few-KB
+# upload stage and record a million blank rows. Twice the populated-row cap leaves room for spacing.
+MAX_SHEET_ROW = 2 * MAX_POPULATED_ROWS
 # The real workbook is under 1 MiB uncompressed; 100 MiB leaves ample room while bounding memory.
 MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 MAX_ZIP_ENTRIES = 1_000
@@ -109,7 +113,7 @@ def read_workbook(data: bytes) -> list[Sheet]:
             # In read-only mode openpyxl clips rows and columns to the <dimension> the file declares, and
             # some writers store a stale one, which would drop data silently. Read what is actually there.
             worksheet.reset_dimensions()
-            pending_blank: list[SheetRow] = []
+            last_populated = 0
             # values_only rows start at column A and row 1, with gaps filled by None, so the tuple index
             # is the column position and the enumeration count is the sheet row number.
             for number, values in enumerate(worksheet.iter_rows(values_only=True), start=1):
@@ -118,17 +122,23 @@ def read_workbook(data: bytes) -> list[Sheet]:
                     for index, value in enumerate(values, start=1)
                     if _is_populated(value)
                 }
-                row = SheetRow(number=number, cells=cells)
-                if row.is_blank:
-                    pending_blank.append(row)
+                if not cells:
+                    # Blank rows are not kept while scanning: trailing ones (often formatted far down a
+                    # sheet) are never attempted, and a gap is materialized below only once bounded.
                     continue
+                if number > MAX_SHEET_ROW:
+                    raise WorkbookError(
+                        "too_many_rows",
+                        f"Workbook has data below row {MAX_SHEET_ROW}; remove stray cells and upload again",
+                        details=[{"field": f"sheet {len(sheets) + 1}", "reason": "data_below_row_limit"}],
+                    )
                 populated_rows += 1
                 if populated_rows > MAX_POPULATED_ROWS:
                     raise WorkbookError("too_many_rows", f"Workbook has more than {MAX_POPULATED_ROWS} populated rows")
                 # Blank rows count only when a populated row follows them.
-                sheet.rows.extend(pending_blank)
-                pending_blank.clear()
-                sheet.rows.append(row)
+                sheet.rows.extend(SheetRow(number=blank, cells={}) for blank in range(last_populated + 1, number))
+                sheet.rows.append(SheetRow(number=number, cells=cells))
+                last_populated = number
             sheets.append(sheet)
     except WorkbookError:
         raise

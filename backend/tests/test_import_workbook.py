@@ -144,3 +144,32 @@ def test_reads_past_a_stale_sheet_dimension():
     (sheet,) = read_workbook(buffer.getvalue())
 
     assert [row.cells for row in sheet.rows] == [{"C": "Clinic One"}, {"C": "Clinic Two", "E": "two@example.test"}]
+
+
+def test_a_stray_cell_far_below_the_data_fails_fast_instead_of_staging_a_million_blank_rows():
+    # A few-KB file: A1 and the last row Excel allows. Each gap row would otherwise be staged and written
+    # to the ledger as skipped, all in one transaction.
+    data = xlsx({LJS: {1: {"C": "Clinic One"}, 1_048_576: {"C": "Clinic Two"}}})
+
+    with pytest.raises(WorkbookError) as error:
+        read_workbook(data)
+
+    assert error.value.code == "too_many_rows"
+    assert error.value.details == [{"field": "sheet 1", "reason": "data_below_row_limit"}]
+
+
+def test_data_up_to_the_row_limit_is_read_with_its_gap_rows(monkeypatch):
+    monkeypatch.setattr(workbook, "MAX_SHEET_ROW", 5)
+
+    (sheet,) = read_workbook(xlsx({LJS: {1: {"C": "Clinic One"}, 5: {"C": "Clinic Two"}}}))
+
+    assert [(row.number, row.is_blank) for row in sheet.rows] == [(1, False), (2, True), (3, True), (4, True), (5, False)]
+
+
+def test_data_past_the_row_limit_is_refused(monkeypatch):
+    monkeypatch.setattr(workbook, "MAX_SHEET_ROW", 5)
+
+    with pytest.raises(WorkbookError) as error:
+        read_workbook(xlsx({JACKS: {1: {"A": "Facility"}}, LJS: {1: {"C": "Clinic One"}, 6: {"C": "Clinic Two"}}}))
+
+    assert error.value.details == [{"field": "sheet 2", "reason": "data_below_row_limit"}]
