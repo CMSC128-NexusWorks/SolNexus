@@ -19,7 +19,7 @@ Examples generated from real responses are in [phase1-api-examples-v1.json](cont
 |---|---|---|
 | `length_required` | 411 | The upload has no `Content-Length` header (for example a chunked body), so its size cannot be bounded before it is read |
 | `workbook_too_large` | 413 | Over 10 MiB, or the archive expands past 100 MiB or 1,000 entries |
-| `too_many_rows` | 422 | Over 10,000 populated rows across both sheets |
+| `too_many_rows` | 422 | Over 10,000 populated rows across both sheets, or data below row 20,000 of a sheet (usually a stray cell far down; delete it and upload again) |
 | `invalid_workbook` | 422 | Not an `.xlsx` file, a corrupt archive, unreadable, macro-enabled, or contains XML entity declarations |
 | `unsupported_file_type` | 422 | File name does not end in `.xlsx` |
 | `unsupported_workbook_format` | 422 | Unknown sheet, changed Jacks header, or data in a column the adapter does not know. `details` names the sheet position or cell, never a value |
@@ -67,7 +67,7 @@ Resolving a field review is a dashboard row edit. The value passes the same rule
 - **Retry:** an upload is one transaction. If it fails, nothing is written except a `failed` batch row recording the attempt; upload the same file again. A failed batch is never treated as a replay.
 - **Concurrency:** uploads, decisions and review resolutions share one advisory lock (`IMPORT_LOCK_KEY`), so a double click or both staff uploading together import the file once.
 - **Privacy:** values never appear in error responses or logs. Unhandled database errors are logged as class, SQLSTATE, table and constraint only, because PostgreSQL's error detail repeats the failing row. `app.import_rows.normalized_fields` keeps values only for accepted and `needs_review` rows; the retention period is still an open approval.
-- **Limits:** 10 MiB and 10,000 populated rows are the contract's proposed limits. Uploads must declare a `Content-Length` (browsers do), which the server enforces as the body size; a request-size limit in front of the API in deployment is still good practice.
+- **Limits:** 10 MiB and 10,000 populated rows are the contract's proposed limits. Data must sit within the first 20,000 rows of a sheet, because the blank rows between data rows are recorded as skipped; this bounds the work for an upload with a stray cell far down a sheet. Uploads must declare a `Content-Length` (browsers do), which the server enforces as the body size; a request-size limit in front of the API in deployment is still good practice.
 
 ## Real workbook dry run (October 30, 2026)
 
