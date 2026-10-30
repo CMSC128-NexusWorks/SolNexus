@@ -222,6 +222,18 @@ def test_linking_never_reopens_a_field_staff_edited(signed_in, staff, run_sql):
     assert clinic_named(run_sql, "Clinic One").contact_number == "0917 000 0999"
 
 
+def test_contact_person_only_initializes_a_blank_and_never_opens_a_review(signed_in, run_sql):
+    imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One", "I": "Sam Example"})}))
+    clinic = clinic_named(run_sql, "Clinic One")
+    batch = imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One Clinic", "I": "Alex Example"})}))
+
+    result = decide(signed_in, batch, batch["rows"], "link_clinic", clinic_id=str(clinic.clinic_id)).json()
+
+    # Ljs I disagrees: one person_spoken_to review, none for the contact_person derived from it.
+    assert [review["field_name"] for review in result["field_reviews"]] == ["person_spoken_to"]
+    assert clinic_named(run_sql, "Clinic One").contact_person == "Sam Example"
+
+
 def test_linking_to_an_unknown_clinic_is_refused(signed_in, run_sql):
     batch = imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One"}, {"C": "clinic one"})}))
 

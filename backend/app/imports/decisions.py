@@ -12,6 +12,9 @@ Data contract rules this implements:
   rather than a second review. Otherwise a blank field is filled when the rows agree, and a disagreement
   with the rows or the current value opens a review. The name is never changed: differently written names
   are why the rows needed review.
+* contact_person is only initialized from Ljs I (person_spoken_to) while it is empty, per the contract.
+  It never opens a review of its own: a disagreement is already the person_spoken_to review, and it stays
+  as it is.
 * reject: the rows are not imported; their values are dropped from the ledger and an identical row in a
   later upload is rejected again (service._apply_prior_imports).
 
@@ -33,6 +36,9 @@ from app.errors import ApiError
 from app.imports.service import IMPORTED_FIELDS, insert_clinics, insert_status_baselines, lock_imports, refresh_batch
 
 Action = Literal["create_clinic", "link_clinic", "reject"]
+
+# Derived fields that may fill a blank but never open a field review (see the module docstring).
+INITIALIZE_ONLY_FIELDS = frozenset({"contact_person"})
 
 
 @dataclass(frozen=True)
@@ -119,7 +125,7 @@ def _create_clinic(conn, batch_id, decision: Decision, decided_by, rows) -> None
     for field_name, by_value in values.items():
         if len(by_value) == 1:
             fields[field_name] = next(iter(by_value))
-        else:
+        elif field_name not in INITIALIZE_ONLY_FIELDS:
             conflicts[field_name] = _supplying_rows(by_value)
 
     clinic_id = uuid.uuid4()
@@ -172,16 +178,16 @@ def _link_clinic(conn, batch_id, decision: Decision, decided_by, rows) -> None:
     joins: dict[UUID, list[UUID]] = {}
     for field_name, by_value in values.items():
         current = getattr(clinic, field_name)
-        if field_name in open_reviews:
+        if field_name in open_reviews and field_name not in INITIALIZE_ONLY_FIELDS:
             joins[open_reviews[field_name]] = _supplying_rows(by_value)
         elif field_name in decided:
             continue
         elif current is not None:
-            if set(by_value) != {current}:
+            if set(by_value) != {current} and field_name not in INITIALIZE_ONLY_FIELDS:
                 conflicts[field_name] = _supplying_rows(by_value)
         elif len(by_value) == 1:
             fills[field_name] = next(iter(by_value))
-        else:
+        elif field_name not in INITIALIZE_ONLY_FIELDS:
             conflicts[field_name] = _supplying_rows(by_value)
 
     _accept_rows(conn, batch_id, decision, decided_by, decision.clinic_id, "staff_link")
