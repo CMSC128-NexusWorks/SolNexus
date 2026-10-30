@@ -1,6 +1,8 @@
 name: solnexus
 version: "1.0.0"
 config-version: 2
+# Fail fast on an older dbt: silver.yml uses the generic-test "arguments:" block (dbt >= 1.10).
+require-dbt-version: [">=1.12.0", "<2.0.0"]
 profile: solnexus
 
 model-paths: ["models"]
@@ -16,6 +18,9 @@ clean-targets: ["target", "dbt_packages"]
 # dbt owns only silver. bronze and app are Alembic-owned sources (models/sources.yml).
 models:
   solnexus:
+    # Staging is inlined into silver as CTEs (ephemeral), so dbt creates no objects outside silver.
+    staging:
+      +materialized: ephemeral
     silver:
       +schema: silver
       +materialized: table
