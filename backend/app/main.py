@@ -5,6 +5,7 @@ from app.auth.dependencies import require_staff
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.errors import install_error_handlers
+from app.leads.router import router as leads_router
 
 app = FastAPI(title="SolNexus API")
 install_error_handlers(app)
@@ -34,4 +35,5 @@ app.include_router(auth_router, prefix="/api/v1")
 # tests/test_api_protection.py fails if any /api route other than login and logout answers without
 # a session.
 protected = APIRouter(prefix="/api/v1", dependencies=[Depends(require_staff)])
+protected.include_router(leads_router)
 app.include_router(protected)

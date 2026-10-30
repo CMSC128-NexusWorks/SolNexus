@@ -69,12 +69,16 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       API_HOST: ${API_HOST}
       API_PORT: ${API_PORT}
+      PIPELINE_STALE_AFTER_MINUTES: ${PIPELINE_STALE_AFTER_MINUTES:-120}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
+      # Read-only contract/model sources used by backend integration tests in the dev container.
+      - ./dbt:/dbt:ro
+      - ./docs/contracts/fixtures:/docs/contracts/fixtures:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
