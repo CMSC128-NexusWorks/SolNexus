@@ -14,6 +14,10 @@ refuses a build whose stamp names another run or whose tables changed since (a l
 a manual `dbt build` into silver_build, replaces the tables and so changes their OIDs). A failed build
 drops silver_build at once, so its tables never wait around to be swapped in.
 
+Builds and swaps also hold one PostgreSQL advisory lock (BUILD_LOCK_KEY), so two of them never touch
+silver_build at once, even when an operator runs `airflow dags test` beside the scheduler, which
+max_active_runs does not cover. Manual dbt runs must use another schema (airflow/README.md).
+
 dbt owns only the silver tables (dbt_project.yml). Nothing outside silver may depend on them, because
 the swap drops the previous schema with CASCADE.
 """
@@ -45,6 +49,9 @@ REQUIRED_TABLES = ("interactions", "leads")
 # Long enough for in-flight API reads to finish, short enough that a stuck reader fails the task
 # (which Airflow retries) instead of hanging it.
 SWAP_LOCK_TIMEOUT = "30s"
+# Advisory lock held by every build (whole session) and swap (its transaction). Any constant works as
+# long as nothing else in the database uses it; this one is "SNX3" in ASCII.
+BUILD_LOCK_KEY = 0x534E5833
 
 
 class DbtBuildError(Exception):
@@ -67,6 +74,10 @@ class DbtBuildError(Exception):
         shown = ", ".join(self.failed_nodes[:5])
         more = f" (+{len(self.failed_nodes) - 5} more)" if len(self.failed_nodes) > 5 else ""
         return f"dbt build failed on {len(self.failed_nodes)} node(s): {shown}{more}"
+
+
+class BuildInProgressError(RuntimeError):
+    """Another build or swap holds the build lock. Transient: the task's retry tries again."""
 
 
 class StaleBuildError(RuntimeError):
@@ -174,23 +185,45 @@ def build(conn: Connection, airflow_run_id: str, run_dbt: Callable[[], dict[str,
     run_dbt is normally `lambda: run_dbt_build(project_dir)`; tests pass a fake. On any failure the
     partial build is dropped before the error propagates, so it can never be published.
     """
-    reset_build_schema(conn)
+    with conn.cursor() as cur:
+        # Session-level, so it spans the commits below and the whole dbt run. Released at the end, or
+        # by PostgreSQL when the connection drops, so a crashed task cannot leave it held.
+        cur.execute("SELECT pg_try_advisory_lock(%s)", (BUILD_LOCK_KEY,))
+        acquired = cur.fetchone()[0]
+    conn.commit()
+    if not acquired:
+        raise BuildInProgressError("another silver build or publish is running; retrying later")
     try:
-        counts = run_dbt()
-        stamp_build(conn, airflow_run_id)
-    except BaseException:
+        reset_build_schema(conn)
         try:
-            conn.rollback()
-            reset_build_schema(conn)
+            counts = run_dbt()
+            stamp_build(conn, airflow_run_id)
+        except BaseException:
+            try:
+                conn.rollback()
+                reset_build_schema(conn)
+            except psycopg2.Error:
+                # Database gone: the next build resets the schema first, and the missing stamp stops any
+                # publish of these tables meanwhile. Keep the original error.
+                log.warning("could not drop the failed build; it stays unstamped and unpublishable")
+            raise
+        return counts
+    finally:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_unlock(%s)", (BUILD_LOCK_KEY,))
+            conn.commit()
         except psycopg2.Error:
-            # Database gone: the next build resets the schema first, and the missing stamp stops any
-            # publish of these tables meanwhile. Keep the original error.
-            log.warning("could not drop the failed build; it stays unstamped and unpublishable")
-        raise
-    return counts
+            pass  # the connection is gone, and its lock went with it
 
 
-def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int], attempt: int) -> dict[str, int]:
+def publish(
+    conn: Connection,
+    airflow_run_id: str,
+    build_counts: dict[str, int],
+    attempt: int,
+    lock_timeout: str = SWAP_LOCK_TIMEOUT,
+) -> dict[str, int]:
     """Swap BUILD_SCHEMA in as LIVE_SCHEMA and mark the silver run succeeded, in one transaction.
 
     Returns the counts recorded on the run: dbt node counts plus published row counts per table.
@@ -206,7 +239,9 @@ def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int],
             log.info("this run already published silver; nothing to do")
             return already
         with conn.cursor() as cur:
-            cur.execute("SET LOCAL lock_timeout = %s", (SWAP_LOCK_TIMEOUT,))
+            cur.execute("SET LOCAL lock_timeout = %s", (lock_timeout,))
+            # Waits for a running build to finish (then its stamp is checked), up to lock_timeout.
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (BUILD_LOCK_KEY,))
             stamp = _build_stamp(cur)
             if stamp is None or stamp.get("airflow_run_id") != airflow_run_id:
                 raise StaleBuildError(f"{BUILD_SCHEMA} is not this run's passing build; rerun build_silver")

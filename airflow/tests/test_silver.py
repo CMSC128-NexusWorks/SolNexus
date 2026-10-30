@@ -8,6 +8,7 @@ for the end-to-end check.
 from __future__ import annotations
 
 import copy
+import os
 import pickle
 import uuid
 
@@ -16,7 +17,9 @@ import pytest
 
 from solnexus_ingest.runs import SILVER_PUBLISH, mark_running
 from solnexus_ingest.silver import (
+    BUILD_LOCK_KEY,
     BUILD_SCHEMA,
+    BuildInProgressError,
     DbtBuildError,
     StaleBuildError,
     build,
@@ -209,3 +212,42 @@ def test_a_rerun_after_publication_swaps_nothing(db, live_silver, run_id):
     assert publish(db, run_id, {"pass": 1}, attempt=1) == first
     assert live_marker(db) == "new"
     assert run_status(db, run_id) == ("succeeded", first)
+
+
+@pytest.fixture
+def other_session_holding_the_build_lock(db):
+    other = psycopg2.connect(os.environ["SOLNEXUS_TEST_DATABASE_URL"])
+    with other.cursor() as cur:
+        cur.execute("SELECT pg_advisory_lock(%s)", (BUILD_LOCK_KEY,))
+    yield
+    other.close()  # releases the lock
+
+
+def test_build_refuses_to_start_while_another_holds_the_lock(db, run_id, other_session_holding_the_build_lock):
+    with pytest.raises(BuildInProgressError):
+        build(db, run_id, lambda: pytest.fail("dbt must not run"))
+
+
+def test_publish_waits_for_the_lock_and_then_gives_up_untouched(
+    db, live_silver, run_id, other_session_holding_the_build_lock
+):
+    make_schema(db, BUILD_SCHEMA, "new")
+    stamp_build(db, run_id)
+
+    with pytest.raises(psycopg2.errors.LockNotAvailable):
+        publish(db, run_id, {}, attempt=1, lock_timeout="100ms")
+
+    assert live_marker(db) == "old"
+
+
+def test_build_releases_the_lock_when_done(db, run_id):
+    build(db, run_id, lambda: make_schema(db, BUILD_SCHEMA, "built") or {})
+
+    other = psycopg2.connect(os.environ["SOLNEXUS_TEST_DATABASE_URL"])
+    try:
+        with other.cursor() as cur:
+            cur.execute("SELECT pg_try_advisory_lock(%s)", (BUILD_LOCK_KEY,))
+            assert cur.fetchone()[0] is True
+    finally:
+        other.close()
+    reset_build_schema(db)
