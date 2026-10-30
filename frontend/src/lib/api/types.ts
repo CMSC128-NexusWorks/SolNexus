@@ -100,3 +100,96 @@ export interface ApiErrorBody {
     details: { field?: string; reason?: string }[];
   };
 }
+
+// Legacy workbook import (FR-02, SNX-28): POST /imports, GET /imports/{batch_id},
+// POST /imports/{batch_id}/decisions, POST /imports/field-reviews/{review_id}/resolve.
+
+export type ImportBatchState = "processing" | "needs_review" | "completed" | "failed";
+
+export type ImportRowOutcome = "accepted" | "needs_review" | "rejected" | "skipped";
+
+/** Why an accepted row points at its clinic. */
+export type ImportMatchBasis = "new_clinic" | "prior_import" | "staff_new_clinic" | "staff_link";
+
+/** Why a row was paired with another row or clinic. Candidates only suggest; staff decide. */
+export type CandidateBasis =
+  "exact_name" | "similar_name" | "shared_email" | "shared_phone" | "prior_import";
+
+/** 202 response to an upload. */
+export interface ImportAccepted {
+  batch_id: string;
+  state: ImportBatchState;
+  /** True when this exact file was imported before; the earlier batch is returned unchanged. */
+  replayed: boolean;
+}
+
+export interface ImportCounts {
+  created_clinics: number;
+  accepted_rows: number;
+  needs_review_rows: number;
+  rejected_rows: number;
+  skipped_rows: number;
+}
+
+/** Another row of the same upload (import_row_id, sheet, row) or an existing clinic (clinic_id, clinic_name). */
+export interface ImportRowCandidate {
+  import_row_id: string | null;
+  sheet: string | null;
+  row: number | null;
+  clinic_id: string | null;
+  clinic_name: string | null;
+  basis: CandidateBasis[];
+}
+
+export interface ImportRowResult {
+  import_row_id: string;
+  sheet: string;
+  row: number;
+  result: ImportRowOutcome;
+  clinic_id: string | null;
+  match_basis: ImportMatchBasis | null;
+  /** Safe codes such as "missing_facility" or "invalid_email"; empty unless rejected. */
+  reasons: string[];
+  /** Safe codes such as "unmapped_status" or "numeric_contact_number". */
+  warnings: string[];
+  /** Rows sharing a review_group are decided together. */
+  review_group: string | null;
+  candidates: ImportRowCandidate[];
+  /** Only for needs_review rows: the values a decision would import. */
+  proposed_fields: Record<string, string> | null;
+}
+
+export interface FieldReview {
+  review_id: string;
+  clinic_id: string | null;
+  field_name: string;
+  state: "unresolved" | "resolved";
+  resolved_value: string | null;
+  candidate_rows: { import_row_id: string; sheet: string; row: number; value: string | null }[];
+}
+
+export interface ImportResult {
+  batch_id: string;
+  state: ImportBatchState;
+  original_filename: string;
+  uploaded_at: string;
+  counts: ImportCounts;
+  rows: ImportRowResult[];
+  field_reviews: FieldReview[];
+}
+
+export interface ImportDecisionRequest {
+  import_row_ids: string[];
+  action: "create_clinic" | "link_clinic" | "reject";
+  /** Required for link_clinic only. */
+  clinic_id?: string;
+  /** create_clinic only; required when the rows spell the clinic name differently. */
+  clinic_name?: string;
+  reason: string;
+}
+
+export interface FieldReviewResolution {
+  /** A candidate value, a corrected value, or null to leave the field empty. */
+  value: string | null;
+  reason: string;
+}

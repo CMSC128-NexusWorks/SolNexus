@@ -1,4 +1,4 @@
-import type { Interaction, LeadRow, StaffUser } from "@/lib/api/types";
+import type { ImportResult, Interaction, LeadRow, StaffUser } from "@/lib/api/types";
 
 // Synthetic data only: invented clinics, example.test emails, placeholder numbers.
 // Never paste real client rows here (see docs/implementation_roadmap.md).
@@ -167,4 +167,136 @@ export const MOCK_HISTORY: Record<string, Interaction[]> = {
       derived_status_code: null,
     },
   ],
+};
+
+const importRowId = (n: number) => `30000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+/**
+ * The contract's synthetic workbook right after upload: Harborview is on both sheets, so its two rows
+ * wait for a staff decision; rows without a facility are rejected.
+ */
+export const MOCK_IMPORT_RESULT: ImportResult = {
+  batch_id: "20000000-0000-4000-8000-000000000001",
+  state: "needs_review",
+  original_filename: "synthetic-lead-import-v1.xlsx",
+  uploaded_at: "2026-10-30T07:00:00Z",
+  counts: {
+    created_clinics: 2,
+    accepted_rows: 2,
+    needs_review_rows: 2,
+    rejected_rows: 2,
+    skipped_rows: 0,
+  },
+  rows: [
+    {
+      import_row_id: importRowId(1),
+      sheet: "Jacks Calling Sheet",
+      row: 2,
+      result: "needs_review",
+      clinic_id: null,
+      match_basis: null,
+      reasons: [],
+      warnings: ["unconfirmed_columns_held"],
+      review_group: importRowId(1),
+      candidates: [
+        {
+          import_row_id: importRowId(4),
+          sheet: "Ljs Calling Sheet",
+          row: 1,
+          clinic_id: null,
+          clinic_name: null,
+          basis: ["exact_name", "shared_email"],
+        },
+      ],
+      proposed_fields: {
+        clinic_name: "Harborview Clinic",
+        contact_number: "0917 000 0199",
+        email: "harborview@example.test",
+        status_code: "contacted",
+        next_step: "Call next week",
+      },
+    },
+    {
+      import_row_id: importRowId(2),
+      sheet: "Jacks Calling Sheet",
+      row: 3,
+      result: "rejected",
+      clinic_id: null,
+      match_basis: null,
+      reasons: ["missing_facility"],
+      warnings: [],
+      review_group: null,
+      candidates: [],
+      proposed_fields: null,
+    },
+    {
+      import_row_id: importRowId(3),
+      sheet: "Jacks Calling Sheet",
+      row: 4,
+      result: "accepted",
+      clinic_id: clinicId(3),
+      match_basis: "new_clinic",
+      reasons: [],
+      warnings: [],
+      review_group: null,
+      candidates: [],
+      proposed_fields: null,
+    },
+    {
+      import_row_id: importRowId(4),
+      sheet: "Ljs Calling Sheet",
+      row: 1,
+      result: "needs_review",
+      clinic_id: null,
+      match_basis: null,
+      reasons: [],
+      warnings: [],
+      review_group: importRowId(1),
+      candidates: [
+        {
+          import_row_id: importRowId(1),
+          sheet: "Jacks Calling Sheet",
+          row: 2,
+          clinic_id: null,
+          clinic_name: null,
+          basis: ["exact_name", "shared_email"],
+        },
+      ],
+      proposed_fields: {
+        clinic_name: "Harborview Clinic",
+        contact_number: "0917 000 0101",
+        email: "harborview@example.test",
+        calling_notes: "Asked for a follow-up email",
+        person_spoken_to: "Sam Example",
+        contact_person: "Sam Example",
+      },
+    },
+    {
+      import_row_id: importRowId(5),
+      sheet: "Ljs Calling Sheet",
+      row: 2,
+      result: "rejected",
+      clinic_id: null,
+      match_basis: null,
+      reasons: ["missing_facility"],
+      warnings: [],
+      review_group: null,
+      candidates: [],
+      proposed_fields: null,
+    },
+    {
+      import_row_id: importRowId(6),
+      sheet: "Ljs Calling Sheet",
+      row: 3,
+      result: "accepted",
+      clinic_id: clinicId(4),
+      match_basis: "new_clinic",
+      reasons: [],
+      warnings: [],
+      review_group: null,
+      candidates: [],
+      proposed_fields: null,
+    },
+  ],
+  field_reviews: [],
 };
