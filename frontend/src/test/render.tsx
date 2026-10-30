@@ -22,6 +22,7 @@ export function renderApp(path = "/", { user = MOCK_USER }: RenderAppOptions = {
 
   return {
     router,
+    queryClient,
     ...render(
       <AppProviders queryClient={queryClient}>
         <RouterProvider router={router} />

@@ -12,7 +12,7 @@ describe("app routing", () => {
   it("sends signed-out users to the login page", async () => {
     const { router } = renderApp("/", { user: null });
 
-    expect(await screen.findByText("Sign-in form")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/login");
   });
 
@@ -52,7 +52,7 @@ describe("staff session", () => {
     );
     const { router } = renderApp("/");
 
-    expect(await screen.findByText("Sign-in form")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/login");
   });
 
@@ -61,7 +61,7 @@ describe("staff session", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
 
-    expect(await screen.findByText("Sign-in form")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/login");
     await expect(getSession()).rejects.toMatchObject({ status: 401 });
   });

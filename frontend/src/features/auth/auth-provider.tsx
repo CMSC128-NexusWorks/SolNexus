@@ -41,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     async (credentials: LoginRequest) => {
       const signedIn = await authApi.login(credentials);
+      // A session check sent before the cookie existed can still be in flight. Its 401 resolves to
+      // null rather than throwing, so it would land after this and sign the user straight back out.
+      await queryClient.cancelQueries({ queryKey: SESSION_QUERY_KEY });
       queryClient.setQueryData(SESSION_QUERY_KEY, signedIn);
       return signedIn;
     },

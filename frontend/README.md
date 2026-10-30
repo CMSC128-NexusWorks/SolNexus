@@ -13,7 +13,9 @@ npm install
 VITE_USE_MOCKS=true npm run dev
 ```
 
-`VITE_USE_MOCKS=true` serves the API from `src/mocks/` so you can build screens before the backend endpoints exist. On the login placeholder, click **Continue with mock account**.
+`VITE_USE_MOCKS=true` serves the API from `src/mocks/` so you can build screens before the backend endpoints exist. Sign in with the mock account shown on the login page (`staff@example.test` / `example-only`).
+
+Without mocks the dashboard talks to the real API: create a staff account first (see [docs/authentication.md](../docs/authentication.md#creating-staff-accounts)).
 
 > After pulling changes to `package.json`, Docker keeps old packages in the `web_node_modules` volume. Run `docker compose run --rm web npm install` to refresh it.
 
