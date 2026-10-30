@@ -15,6 +15,7 @@ cursor, so no page is ever skipped.
 
 from __future__ import annotations
 
+import itertools
 import logging
 from collections import Counter
 from collections.abc import Iterator
@@ -56,7 +57,7 @@ def sync_mailbox(
             # Materialize the first page now so an expired cursor is detected before anything is stored.
             pages = _history_pages(client, cursor, settings)
             first = next(pages)
-            return _run(client, conn, account, _chain(first, pages), job_run_id, mode="incremental")
+            return _run(client, conn, account, itertools.chain([first], pages), job_run_id, mode="incremental")
         except HistoryExpired:
             log.warning("Stored Gmail historyId expired; running a full resync")
             return _run(client, conn, account, _full_pages(client, profile["historyId"], settings), job_run_id,
@@ -121,8 +122,3 @@ def _fetch(client: GmailClient, account: str, message_ids: list[str], counts: Co
             counts["skipped_by_label"] += 1
         else:
             yield parse_gmail_message(message, account)
-
-
-def _chain(first: tuple[list[str], bool, str], rest: PageSource) -> PageSource:
-    yield first
-    yield from rest
