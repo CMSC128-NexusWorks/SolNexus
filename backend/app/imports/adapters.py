@@ -48,7 +48,7 @@ _APPROVED_STATUS_INPUTS = {
 }
 
 # Deliberately loose: it catches typos and two addresses in one cell, not every RFC 5322 corner case.
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s.]+$")
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s.]+$")
 
 StagedResult = Literal["valid", "rejected", "skipped"]
 
@@ -165,7 +165,7 @@ class _Adapter:
 
         if "email" in fields:
             fields["email"] = fields["email"].lower()
-            if not _EMAIL.match(fields["email"]):
+            if not EMAIL_PATTERN.match(fields["email"]):
                 issues.append(RowIssue("invalid_email", "email"))
         if isinstance(row.cells.get(self._column_of("contact_number")), (int, float)):
             # Stored as a number, so Excel already dropped any leading zero. Kept as text, flagged for staff.

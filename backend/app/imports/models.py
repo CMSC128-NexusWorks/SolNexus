@@ -111,3 +111,18 @@ class ImportDecisionRequest(BaseModel):
             if self.action != "create_clinic" or not self.clinic_name:
                 raise ValueError("clinic_name must be a nonblank name and is only used by create_clinic")
         return self
+
+
+class FieldReviewResolution(BaseModel):
+    """The value staff choose for a field the workbook rows disagreed on: a candidate value, a corrected
+    value, or null to leave the field empty."""
+
+    value: str | None
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def check_reason(self) -> "FieldReviewResolution":
+        self.reason = self.reason.strip()
+        if not self.reason:
+            raise ValueError("reason must not be blank")
+        return self

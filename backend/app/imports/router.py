@@ -17,8 +17,9 @@ from app.auth.router import CurrentStaff
 from app.db import Db, engine
 from app.errors import ApiError
 from app.imports.decisions import Decision, decide
-from app.imports.models import ImportAccepted, ImportDecisionRequest, ImportResult
-from app.imports.results import load_result
+from app.imports.models import FieldReview, FieldReviewResolution, ImportAccepted, ImportDecisionRequest, ImportResult
+from app.imports.results import load_field_review, load_result
+from app.imports.reviews import resolve_field_review
 from app.imports.service import file_hash, record_failed_upload, stage_upload, write_import
 from app.imports.workbook import MAX_UPLOAD_BYTES, WorkbookError
 
@@ -122,3 +123,10 @@ def decide_rows(batch_id: UUID, body: ImportDecisionRequest, user: CurrentStaff,
         user.user_id,
     )
     return load_result(conn, batch_id)
+
+
+@router.post("/field-reviews/{review_id}/resolve")
+def resolve_review(review_id: UUID, body: FieldReviewResolution, user: CurrentStaff, conn: Db) -> FieldReview:
+    """Set the clinic field to the staff-chosen value (audited like a row edit) and close the review."""
+    resolve_field_review(conn, review_id, body.value, body.reason, user.user_id)
+    return load_field_review(conn, review_id)

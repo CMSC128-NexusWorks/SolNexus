@@ -69,7 +69,7 @@ def load_result(conn: Connection, batch_id: UUID) -> ImportResult | None:
             skipped_rows=batch.skipped_row_count,
         ),
         rows=[_row_result(row, refs, clinic_names) for row in rows],
-        field_reviews=_field_reviews(conn, batch_id),
+        field_reviews=_field_reviews(conn, "batch_row.batch_id = :key", batch_id),
     )
 
 
@@ -105,13 +105,19 @@ def _row_result(row, refs: dict, clinic_names: dict) -> ImportRowResult:
     )
 
 
-def _field_reviews(conn: Connection, batch_id: UUID) -> list[FieldReview]:
-    """Field reviews that involve any row of this batch, with every candidate row's value (from any batch)."""
+def load_field_review(conn: Connection, review_id: UUID) -> FieldReview | None:
+    reviews = _field_reviews(conn, "batch_candidate.review_id = :key", review_id)
+    return reviews[0] if reviews else None
+
+
+def _field_reviews(conn: Connection, condition: str, key: UUID) -> list[FieldReview]:
+    """Field reviews selected by condition (a fixed SQL fragment, never request text), with every
+    candidate row's value, whichever batch the row came from."""
     records = conn.execute(
         text(
-            """
+            f"""
             SELECT review.review_id, review.clinic_id, review.field_name, review.state,
-                   review.resolved_value #>> '{}' AS resolved_value,
+                   review.resolved_value #>> '{{}}' AS resolved_value,
                    row.import_row_id, row.sheet_name, row.row_number,
                    row.normalized_fields ->> review.field_name AS value
             FROM app.import_field_reviews review
@@ -121,12 +127,12 @@ def _field_reviews(conn: Connection, batch_id: UUID) -> list[FieldReview]:
                 SELECT batch_candidate.review_id
                 FROM app.import_field_review_candidates batch_candidate
                 JOIN app.import_rows batch_row ON batch_row.import_row_id = batch_candidate.import_row_id
-                WHERE batch_row.batch_id = :batch_id
+                WHERE {condition}
             )
             ORDER BY review.created_at, review.review_id, row.sheet_name, row.row_number
             """
         ),
-        {"batch_id": batch_id},
+        {"key": key},
     ).all()
     reviews: dict[UUID, FieldReview] = {}
     for record in records:
