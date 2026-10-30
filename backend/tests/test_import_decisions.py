@@ -124,6 +124,41 @@ def test_staff_can_create_separate_clinics_from_one_review_group(signed_in, run_
     assert {row.clinic_name for row in run_sql("SELECT clinic_name FROM app.clinics")} == {"Clinic One", "Clinic Two"}
 
 
+def test_a_group_decided_in_parts_shows_the_clinic_the_first_row_became(signed_in, run_sql):
+    batch = imported(signed_in, xlsx(CONTRACT_SHEETS))
+    ljs_row, jacks_row = harborview_pair(batch)
+
+    result = decide(signed_in, batch, [ljs_row], "create_clinic").json()
+
+    clinic = clinic_named(run_sql, "Harborview Clinic")
+    (candidate,) = refs(result)[(JACKS, 2)]["candidates"]
+    assert (candidate["import_row_id"], candidate["clinic_id"], candidate["clinic_name"]) == (
+        ljs_row["import_row_id"], str(clinic.clinic_id), "Harborview Clinic",
+    )
+    # Staff can now link the other row there instead of creating Harborview a second time.
+    linked = decide(signed_in, batch, [jacks_row], "link_clinic", clinic_id=str(clinic.clinic_id))
+    assert linked.status_code == 200
+    assert run_sql("SELECT count(*) FROM app.clinics WHERE clinic_name = 'Harborview Clinic'")[0][0] == 1
+
+
+def test_an_overlapping_upload_waits_for_rows_an_earlier_batch_still_holds(signed_in, run_sql):
+    pair = {LJS: ljs({"C": "Clinic One", "E": "one@example.test"}, {"C": "Clinic One", "E": "one@example.test"})}
+    first = imported(signed_in, xlsx(pair))
+    # A corrected workbook that drops the second row: alone, row 1 has no candidate in its own upload.
+    second = imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One", "E": "one@example.test"})}))
+
+    (row,) = second["rows"]
+    assert row["result"] == "needs_review"
+    assert run_sql("SELECT count(*) FROM app.clinics")[0][0] == 0
+    earlier = {(c["sheet"], c["row"], c["import_row_id"]) for c in row["candidates"]}
+    assert earlier == {(LJS, 1, first["rows"][0]["import_row_id"]), (LJS, 2, first["rows"][1]["import_row_id"])}
+
+    decide(signed_in, first, first["rows"], "create_clinic")
+    clinic = clinic_named(run_sql, "Clinic One")
+    again = signed_in.get(f"/api/v1/imports/{second['batch_id']}").json()
+    assert {c["clinic_id"] for c in again["rows"][0]["candidates"]} == {str(clinic.clinic_id)}
+
+
 # link_clinic
 
 

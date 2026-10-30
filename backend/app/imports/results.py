@@ -41,13 +41,33 @@ def load_result(conn: Connection, batch_id: UUID) -> ImportResult | None:
         ),
         {"batch_id": batch_id},
     ).all()
-    refs = {row.import_row_id: (row.sheet_name, row.row_number) for row in rows}
-    candidate_clinic_ids = {
-        candidate["clinic_id"]
+    # Candidate rows: sheet, row number and, once decided, the clinic each one now belongs to. Showing that
+    # clinic lets staff link the rest of a review group to it instead of creating the clinic a second time.
+    refs = {row.import_row_id: (row.sheet_name, row.row_number, row.clinic_id) for row in rows}
+    candidates = [
+        candidate
         for row in rows
+        if row.result == "needs_review"
         for entry in row.validation_errors
         for candidate in entry.get("candidates", [])
-        if "clinic_id" in candidate
+    ]
+    # A candidate can be a pending row of an earlier batch (service._apply_candidates).
+    other_row_ids = {UUID(c["import_row_id"]) for c in candidates if "import_row_id" in c} - set(refs)
+    if other_row_ids:
+        refs.update(
+            (other.import_row_id, (other.sheet_name, other.row_number, other.clinic_id))
+            for other in conn.execute(
+                text(
+                    "SELECT import_row_id, sheet_name, row_number, clinic_id FROM app.import_rows "
+                    "WHERE import_row_id = ANY(:ids)"
+                ),
+                {"ids": sorted(other_row_ids)},
+            ).all()
+        )
+    candidate_clinic_ids = {c["clinic_id"] for c in candidates if "clinic_id" in c} | {
+        str(refs[UUID(c["import_row_id"])][2])
+        for c in candidates
+        if "import_row_id" in c and refs.get(UUID(c["import_row_id"]), (None, None, None))[2] is not None
     }
     clinic_names = dict(
         conn.execute(
@@ -80,8 +100,18 @@ def _row_result(row, refs: dict, clinic_names: dict) -> ImportRowResult:
     for candidate in (review or {}).get("candidates", []):
         if "import_row_id" in candidate:
             other = UUID(candidate["import_row_id"])
-            sheet, number = refs.get(other, (None, None))
-            candidates.append(RowCandidate(import_row_id=other, sheet=sheet, row=number, basis=candidate["basis"]))
+            sheet, number, clinic_id = refs.get(other, (None, None, None))
+            candidates.append(
+                RowCandidate(
+                    import_row_id=other,
+                    sheet=sheet,
+                    row=number,
+                    # Set once staff accepted that row: the clinic it was created as or linked to.
+                    clinic_id=clinic_id,
+                    clinic_name=clinic_names.get(str(clinic_id)) if clinic_id is not None else None,
+                    basis=candidate["basis"],
+                )
+            )
         else:
             candidates.append(
                 RowCandidate(

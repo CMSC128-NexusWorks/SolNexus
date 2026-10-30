@@ -198,6 +198,23 @@ export const handlers = [
           })),
         });
       }
+      // Like the real API, a row still in review shows the clinic its decided candidate rows now belong to,
+      // so staff can link the rest of the group there instead of creating the clinic twice.
+      if (body.action !== "reject") {
+        const decided = new Set(rows.map((row) => row.import_row_id));
+        const clinicName =
+          body.action === "create_clinic"
+            ? (body.clinic_name ?? rows[0]?.proposed_fields?.clinic_name ?? null)
+            : null;
+        for (const row of mockImport.rows) {
+          for (const candidate of row.candidates) {
+            if (candidate.import_row_id && decided.has(candidate.import_row_id)) {
+              candidate.clinic_id = clinicId;
+              candidate.clinic_name = clinicName;
+            }
+          }
+        }
+      }
       for (const row of rows) row.proposed_fields = null;
       recountMockImport();
       return HttpResponse.json(mockImport);

@@ -1,7 +1,8 @@
 """Find possible duplicate clinics among import rows and existing clinics, for staff review (candidates-v1).
 
 The contract requires surfacing exact normalized-name collisions, shared nonblank contact identifiers and
-plausible differently written names, across both sheets and app.clinics. A candidate is never an identity
+plausible differently written names, across both sheets and app.clinics. Rows of earlier uploads that
+still await a staff decision are compared too, since they have no clinic to match yet. A candidate is never an identity
 decision: a row with any candidate is held as needs_review until staff decide, and nothing here merges.
 
 Signals (basis codes), all exact matches on a normalized key, so each one is explainable to staff:
@@ -88,22 +89,27 @@ class CandidateKeys:
         )
 
 
-# A candidate target is ("row", <row ref>) for another row in this upload or ("clinic", <clinic_id>).
+# A candidate target is ("row", <row ref>) for another row in this upload, ("clinic", <clinic_id>), or
+# ("pending", <import_row_id>) for a row of an earlier batch that still awaits a staff decision.
 Target = tuple[str, Hashable]
 
 
 def find_candidates(
     rows: Iterable[tuple[Hashable, CandidateKeys]],
     clinics: Iterable[tuple[Hashable, CandidateKeys]],
+    pending: Iterable[tuple[Hashable, CandidateKeys]] = (),
 ) -> dict[Hashable, dict[Target, list[str]]]:
-    """For each row ref, the other rows and existing clinics it may duplicate, with sorted basis codes.
+    """For each row ref, the other rows, existing clinics and pending rows it may duplicate, with sorted
+    basis codes.
 
-    Rows with no candidate are absent from the result. Symmetric between rows: if row a lists row b,
-    row b lists row a, so the outcome cannot depend on sheet or processing order.
+    Rows with no candidate are absent from the result. Symmetric between rows of this upload: if row a
+    lists row b, row b lists row a, so the outcome cannot depend on sheet or processing order. Pending rows
+    of earlier batches are targets only: they have no clinic yet, so without them an overlapping upload
+    would create a clinic that staff then create again when they decide the earlier batch.
     """
     rows = list(rows)
     index: dict[tuple[str, str], list[Target]] = defaultdict(list)
-    for kind, entries in (("row", rows), ("clinic", clinics)):
+    for kind, entries in (("row", rows), ("clinic", clinics), ("pending", pending)):
         for ref, keys in entries:
             for signal, value in (("name", keys.name), ("loose", keys.loose_name), ("email", keys.email),
                                   ("phone", keys.phone)):
@@ -129,7 +135,8 @@ def find_candidates(
 
 
 def review_groups(candidates: dict[Hashable, dict[Target, list[str]]]) -> dict[Hashable, Hashable]:
-    """Map each row with candidates to its review group: rows connected through row-to-row candidates.
+    """Map each row with candidates to its review group: rows of this upload connected through row-to-row
+    candidates. Pending rows of earlier batches belong to their own batch's groups and are not joined.
 
     Staff decide a group together so that, when they confirm two rows are one new clinic, conflicting
     values from both are seen at once and neither sheet wins by being decided first. The group key is the

@@ -34,14 +34,14 @@ Both sheets are read by explicitly versioned adapters. `ljs-v1` is positional an
 1. **Same file again** (identical SHA-256): the earlier batch is returned with `replayed: true`. Nothing is written.
 2. **Blank row** between data rows: `skipped`. **Missing facility, invalid email or an overlong value:** `rejected` with a code. The ledger keeps codes only, no values.
 3. **Same row seen before** (equal fingerprint: adapter version, sheet, row number and values): if it was accepted, it is `accepted` as `prior_import` and linked to the same clinic, with no field written. If staff rejected it, it is rejected again. An edited or moved row has a new fingerprint and goes through step 4.
-4. **New row that may duplicate another row or an existing clinic:** `needs_review`. Nothing is created or merged.
+4. **New row that may duplicate another row, an existing clinic, or a row of an earlier upload that still awaits review:** `needs_review`. Nothing is created or merged.
 5. **Any other new row:** a new clinic (`origin = 'import'`). A mapped status is stored as an `import_baseline` status event, an observation and not a dated transition.
 
 Warnings do not block a row: `unmapped_status` (status text with no approved code; status stays null), `numeric_contact_number` (Excel stored the phone as a number, so a leading zero may already be lost) and `unconfirmed_columns_held` (Jacks `J`/`K` kept as restricted evidence).
 
 ### Duplicate candidates (`candidates-v1`)
 
-A row is paired with other rows of the upload, from either sheet, and with every existing clinic on four exact keys, each reported as a `basis`:
+A row is paired with other rows of the upload, from either sheet, with every existing clinic, and with rows of earlier uploads still in `needs_review`, on four exact keys, each reported as a `basis`:
 
 | Basis | Match |
 |---|---|
@@ -50,7 +50,7 @@ A row is paired with other rows of the upload, from either sheet, and with every
 | `shared_email` | Same email, case-insensitive |
 | `shared_phone` | Same last 10 digits (`0917 000 0101` = `+63 917 000 0101`); shorter numbers are ignored |
 
-There is no fuzzy score or threshold: the contract has approved none, and an exact key tells staff why two rows were paired. Typos that survive these keys are not caught, so staff should reconcile the remaining rows before a production migration is accepted. Rows connected through row-to-row candidates share a `review_group` and should be decided together.
+There is no fuzzy score or threshold: the contract has approved none, and an exact key tells staff why two rows were paired. Typos that survive these keys are not caught, so staff should reconcile the remaining rows before a production migration is accepted. Rows of one upload connected through row-to-row candidates share a `review_group` and should be decided together. Once a candidate row is accepted, its candidate entry also carries the `clinic_id` and `clinic_name` it now belongs to, so a group decided in parts can be linked to that clinic instead of created twice.
 
 ## Staff review
 

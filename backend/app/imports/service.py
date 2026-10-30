@@ -12,7 +12,8 @@ How each staged row ends up (data contract, "Workbook migration"):
 3. Same fingerprint as a row accepted before: accepted as prior_import, linked to that clinic, no field
    written. A re-import therefore never overwrites staff edits. Same fingerprint as a row staff rejected:
    rejected again. Fingerprints include the row position, so an edited or moved row is "new".
-4. New row with a duplicate candidate (another row in this upload or an existing clinic): needs_review.
+4. New row with a duplicate candidate (another row in this upload, an existing clinic, or a row of an
+   earlier upload still awaiting review): needs_review.
    No clinic is created or merged until staff decide (decisions.py).
 5. New row without candidates: a new clinic, origin 'import'. Its status, if mapped, is recorded as an
    import baseline observation, not as a dated status transition.
@@ -160,17 +161,24 @@ def _apply_candidates(conn: Connection, planned: list[PlannedRow]) -> None:
     if not valid:
         return
     clinics = conn.execute(text("SELECT clinic_id, clinic_name, email, contact_number FROM app.clinics")).all()
+    # Rows of earlier batches still waiting for staff: an overlapping or corrected upload must not create
+    # a clinic for them behind the pending decision. This batch's rows are not inserted yet.
+    pending = conn.execute(
+        text("SELECT import_row_id, normalized_fields AS fields FROM app.import_rows WHERE result = 'needs_review'")
+    ).all()
     found = find_candidates(
         [(row_id, CandidateKeys.from_fields(row.staged.fields)) for row_id, row in valid.items()],
         [(clinic.clinic_id, CandidateKeys.from_fields(clinic._mapping)) for clinic in clinics],
+        [(earlier.import_row_id, CandidateKeys.from_fields(earlier.fields)) for earlier in pending],
     )
     groups = review_groups(found)
     for row_id, matches in found.items():
         row = valid[row_id]
         row.result = "needs_review"
         ordered = sorted(matches.items(), key=lambda item: (item[0][0], str(item[0][1])))
+        # Rows of this upload and pending rows of earlier ones are both import rows to the result reader.
         candidates = [
-            {("import_row_id" if kind == "row" else "clinic_id"): str(ref), "basis": basis}
+            {("clinic_id" if kind == "clinic" else "import_row_id"): str(ref), "basis": basis}
             for (kind, ref), basis in ordered
         ]
         row.entries.append(_review_entry(groups[row_id], candidates))

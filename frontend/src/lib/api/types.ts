@@ -131,7 +131,11 @@ export interface ImportCounts {
   skipped_rows: number;
 }
 
-/** Another row of the same upload (import_row_id, sheet, row) or an existing clinic (clinic_id, clinic_name). */
+/**
+ * Another import row (import_row_id, sheet, row) or an existing clinic (clinic_id, clinic_name). The row
+ * is from this upload or from an earlier upload still awaiting review. Once that row is accepted,
+ * clinic_id and clinic_name name its clinic, so the rest of the group can be linked to it.
+ */
 export interface ImportRowCandidate {
   import_row_id: string | null;
   sheet: string | null;

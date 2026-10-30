@@ -30,7 +30,12 @@ class ImportCounts(BaseModel):
 
 
 class RowCandidate(BaseModel):
-    """Another row of this upload (import_row_id, sheet, row) or an existing clinic (clinic_id, clinic_name)."""
+    """Another import row (import_row_id, sheet, row) or an existing clinic (clinic_id, clinic_name).
+
+    The row is from this upload, or from an earlier one that still awaited review when this file was
+    imported. Once that row is accepted, clinic_id and clinic_name name the clinic it belongs to, so the
+    rest of its review group can be linked there.
+    """
 
     import_row_id: UUID | None = None
     sheet: str | None = None
