@@ -56,7 +56,12 @@ async def upload_workbook(request: Request, user: CurrentStaff) -> ImportAccepte
     spool a large file before getting its 401. Here require_staff has already passed.
     """
     declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MAX_UPLOAD_BYTES + _MULTIPART_ALLOWANCE:
+    if not declared.isdigit():
+        # Starlette spools a multipart file part to disk with no size cap, so a chunked body of any size
+        # would be written out before the 10 MiB check. With a declared length the server refuses to read
+        # past it, so this check bounds the body. Browsers always send it for a FormData upload.
+        raise ApiError(411, "length_required", "Upload the workbook with a Content-Length header")
+    if int(declared) > MAX_UPLOAD_BYTES + _MULTIPART_ALLOWANCE:
         raise ApiError(413, "workbook_too_large", "Workbook is larger than 10 MiB")
     async with request.form(max_files=1, max_fields=1) as form:
         upload = form.get("file")

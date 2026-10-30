@@ -114,7 +114,7 @@ Sessions are server-side: they expire after 8 hours without an API request or 7 
 | `PATCH /api/v1/clinics/{clinic_id}` | Changed operational fields plus `version`; confirmed-name corrections require reason | `200` updated clinic; stale version `409` |
 | `PATCH /api/v1/inquiries/{inquiry_id}` | Changed contact/follow-up fields plus `version` | `200` updated inquiry; stale version `409` |
 | `POST /api/v1/inquiries/{inquiry_id}/confirm-clinic` | `version`, clinic name, supporting question/reply message IDs, existing `clinic_id` or create instruction, source mapping confirmation | `200` confirmed clinic row and closed inquiry; evidence or identity conflict `409/422` |
-| `POST /api/v1/imports` | Multipart `.xlsx` legacy workbook | `202` batch ID/state; poll result endpoint |
+| `POST /api/v1/imports` | Multipart `.xlsx` legacy workbook with `Content-Length` | `202` batch ID/state; poll result endpoint; no length `411`; too large `413` |
 | `GET /api/v1/imports/{batch_id}` | Batch ID | `200` counts and row results with safe codes |
 | `POST /api/v1/imports/{batch_id}/decisions` | `needs_review` row IDs, `action` (`create_clinic`, `link_clinic`, `reject`), `clinic_id` for a link, optional staff-chosen `clinic_name`, `reason` | `200` updated batch; row already decided `409`; disagreeing names without `clinic_name` `422` |
 | `POST /api/v1/imports/field-reviews/{review_id}/resolve` | `value` (null leaves the field empty), `reason` | `200` resolved review; field updated with an audit event; already resolved `409` |

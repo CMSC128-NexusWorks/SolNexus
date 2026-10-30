@@ -322,6 +322,19 @@ def test_a_failed_import_rolls_back_and_leaves_a_failed_batch(signed_in, run_sql
     assert run_sql("SELECT count(*) FROM app.import_rows")[0][0] == 0
 
 
+def test_upload_without_a_content_length_is_refused_before_reading_the_body(signed_in, run_sql):
+    # A chunked body has no declared size; Starlette would spool any amount of it to disk.
+    response = signed_in.post(
+        "/api/v1/imports",
+        content=iter([b"--b\r\n", b"x" * 1024]),
+        headers={"Content-Type": "multipart/form-data; boundary=b"},
+    )
+
+    assert response.status_code == 411
+    assert response.json()["error"]["code"] == "length_required"
+    assert run_sql("SELECT count(*) FROM app.import_batches")[0][0] == 0
+
+
 def test_a_corrupt_archive_is_an_invalid_workbook_not_a_server_error(signed_in, run_sql):
     corrupt = xlsx({LJS: ljs({"C": "Clinic One"})}).replace(b"PK\x01\x02", b"PK\x01\x00", 1)
 

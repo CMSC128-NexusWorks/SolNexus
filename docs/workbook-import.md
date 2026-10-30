@@ -17,6 +17,7 @@ Examples generated from real responses are in [phase1-api-examples-v1.json](cont
 
 | Error | Status | Meaning |
 |---|---|---|
+| `length_required` | 411 | The upload has no `Content-Length` header (for example a chunked body), so its size cannot be bounded before it is read |
 | `workbook_too_large` | 413 | Over 10 MiB, or the archive expands past 100 MiB or 1,000 entries |
 | `too_many_rows` | 422 | Over 10,000 populated rows across both sheets |
 | `invalid_workbook` | 422 | Not an `.xlsx` file, a corrupt archive, unreadable, macro-enabled, or contains XML entity declarations |
@@ -65,7 +66,7 @@ Resolving a field review sets the clinic field with the same audit trail as a da
 - **Retry:** an upload is one transaction. If it fails, nothing is written except a `failed` batch row recording the attempt; upload the same file again. A failed batch is never treated as a replay.
 - **Concurrency:** uploads, decisions and review resolutions share one advisory lock (`IMPORT_LOCK_KEY`), so a double click or both staff uploading together import the file once.
 - **Privacy:** values never appear in error responses or logs. Unhandled database errors are logged as class, SQLSTATE, table and constraint only, because PostgreSQL's error detail repeats the failing row. `app.import_rows.normalized_fields` keeps values only for accepted and `needs_review` rows; the retention period is still an open approval.
-- **Limits:** 10 MiB and 10,000 populated rows are the contract's proposed limits. Put a request-size limit in front of the API in deployment as well, because a chunked upload has no `Content-Length` to check early.
+- **Limits:** 10 MiB and 10,000 populated rows are the contract's proposed limits. Uploads must declare a `Content-Length` (browsers do), which the server enforces as the body size; a request-size limit in front of the API in deployment is still good practice.
 
 ## Real workbook dry run (October 30, 2026)
 
