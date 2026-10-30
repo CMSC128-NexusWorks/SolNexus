@@ -11,6 +11,7 @@ import copy
 import os
 import pickle
 import uuid
+from datetime import datetime, timezone
 
 import psycopg2
 import pytest
@@ -28,6 +29,9 @@ from solnexus_ingest.silver import (
     stamp_build,
     summarize_run_results,
 )
+
+
+SNAPSHOT = datetime(2026, 10, 30, 2, 0, tzinfo=timezone.utc)
 
 
 def execute(db, statement, params=None):
@@ -74,7 +78,7 @@ def live_silver(db):
 
 def test_complete_build_replaces_live_silver_and_marks_success(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new")
-    stamp_build(db, run_id)
+    stamp_build(db, run_id, SNAPSHOT)
 
     counts = publish(db, run_id, {"success": 2, "pass": 5}, attempt=1)
 
@@ -88,7 +92,7 @@ def test_incomplete_build_cannot_be_stamped(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new", tables=("interactions",))
 
     with pytest.raises(StaleBuildError, match="missing"):
-        stamp_build(db, run_id)
+        stamp_build(db, run_id, SNAPSHOT)
     db.rollback()
 
 
@@ -105,7 +109,7 @@ def test_unstamped_build_keeps_old_silver_and_does_not_mark_fresh(db, live_silve
 def test_another_runs_build_is_not_published(db, live_silver, run_id):
     # Run A's publish retried late, after run B rebuilt silver_build.
     make_schema(db, BUILD_SCHEMA, "run-b")
-    stamp_build(db, "some-other-run")
+    stamp_build(db, "some-other-run", SNAPSHOT)
 
     with pytest.raises(StaleBuildError, match="not this run"):
         publish(db, run_id, {}, attempt=2)
@@ -115,7 +119,7 @@ def test_another_runs_build_is_not_published(db, live_silver, run_id):
 
 def test_tables_replaced_after_the_stamp_are_not_published(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "passed")
-    stamp_build(db, run_id)
+    stamp_build(db, run_id, SNAPSHOT)
     # A later dbt build into silver_build replaces the tables (new OIDs) but keeps the schema comment.
     execute(db, f"DROP TABLE {BUILD_SCHEMA}.leads")
     execute(db, f"CREATE TABLE {BUILD_SCHEMA}.leads AS SELECT 'failed-tests'::text AS built_by")
@@ -148,7 +152,7 @@ def test_passing_build_is_stamped_for_its_run(db, live_silver, run_id):
 def test_first_publication_works_without_a_live_schema(db, run_id):
     execute(db, "DROP SCHEMA IF EXISTS silver CASCADE")
     make_schema(db, BUILD_SCHEMA, "first")
-    stamp_build(db, run_id)
+    stamp_build(db, run_id, SNAPSHOT)
 
     publish(db, run_id, {}, attempt=1)
 
@@ -205,7 +209,7 @@ def test_publish_reraises_the_original_error_when_rollback_also_fails():
 
 def test_a_rerun_after_publication_swaps_nothing(db, live_silver, run_id):
     make_schema(db, BUILD_SCHEMA, "new")
-    stamp_build(db, run_id)
+    stamp_build(db, run_id, SNAPSHOT)
     first = publish(db, run_id, {"pass": 5}, attempt=1)
     make_schema(db, BUILD_SCHEMA, "someone-elses-build")
 
@@ -232,7 +236,7 @@ def test_publish_waits_for_the_lock_and_then_gives_up_untouched(
     db, live_silver, run_id, other_session_holding_the_build_lock
 ):
     make_schema(db, BUILD_SCHEMA, "new")
-    stamp_build(db, run_id)
+    stamp_build(db, run_id, SNAPSHOT)
 
     with pytest.raises(psycopg2.errors.LockNotAvailable):
         publish(db, run_id, {}, attempt=1, lock_timeout="100ms")
@@ -251,3 +255,31 @@ def test_build_releases_the_lock_when_done(db, run_id):
     finally:
         other.close()
     reset_build_schema(db)
+
+
+def test_publication_records_the_build_snapshot_time_not_the_swap_time(db, live_silver, run_id):
+    make_schema(db, BUILD_SCHEMA, "new")
+    stamp_build(db, run_id, SNAPSHOT)
+
+    publish(db, run_id, {}, attempt=1)
+
+    data_as_of, finished_at = execute(
+        db,
+        "SELECT data_as_of, finished_at FROM app.pipeline_runs WHERE pipeline = %s AND airflow_run_id = %s",
+        (SILVER_PUBLISH, run_id),
+    )[0]
+    assert data_as_of == SNAPSHOT
+    assert finished_at > SNAPSHOT
+
+
+def test_build_stamps_a_snapshot_taken_before_dbt_ran(db, live_silver, run_id):
+    before = execute(db, "SELECT now()")[0][0]
+    build(db, run_id, lambda: make_schema(db, BUILD_SCHEMA, "built") or {})
+    publish(db, run_id, {}, attempt=1)
+
+    data_as_of = execute(
+        db,
+        "SELECT last_succeeded_data_as_of FROM app.pipeline_status WHERE pipeline = %s",
+        (SILVER_PUBLISH,),
+    )[0][0]
+    assert before <= data_as_of

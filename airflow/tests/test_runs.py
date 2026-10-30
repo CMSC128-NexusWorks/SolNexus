@@ -159,3 +159,12 @@ def test_a_succeeded_run_is_never_moved_back(db, run_id):
 
     assert run_row(db, run_id)[:5] == ("succeeded", 1, True, {"inserted": 3}, None)
     assert succeeded_counts(db, GMAIL_INGEST, run_id) == {"inserted": 3}
+
+
+def test_a_succeeded_silver_publication_must_carry_its_snapshot_time(db):
+    rid = f"test__{uuid.uuid4().hex}"
+    mark_running(db, "silver_publish", "transform_bronze_to_silver", rid, attempt=1)
+
+    with pytest.raises(psycopg2.errors.CheckViolation):
+        mark_succeeded(db, "silver_publish", rid, {}, attempt=1)
+    db.rollback()

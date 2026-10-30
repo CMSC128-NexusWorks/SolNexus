@@ -63,10 +63,11 @@ The task's return value (shown in XCom and the log) contains counts only: `mode`
 Every run writes one row to `app.pipeline_runs`. The dashboard-facing summary is the `app.pipeline_status` view:
 
 ```sql
-SELECT pipeline, last_run_status, last_run_error_summary, last_succeeded_at FROM app.pipeline_status;
+SELECT pipeline, last_run_status, last_run_error_summary, last_succeeded_at, last_succeeded_data_as_of
+FROM app.pipeline_status;
 ```
 
-`last_succeeded_at` for `silver_publish` is the `published_at` the API shows. It changes only when a complete, fully tested build has been swapped in, so a failed run never makes data look fresh. `counts` holds the Gmail summary above, or dbt node counts and published row counts for silver. `error_summary` holds an exception class and its first line only. Full tracebacks stay in the Airflow task log.
+`last_succeeded_data_as_of` for `silver_publish` is the `published_at` the API shows: the moment the build started reading `bronze` and `app`. `last_succeeded_at` is when it was swapped in. Both change only when a complete, fully tested build has been swapped in, so a failed run never makes data look fresh. `counts` holds the Gmail summary above, or dbt node counts and published row counts for silver. `error_summary` holds an exception class and its first line only. Full tracebacks stay in the Airflow task log.
 
 If a worker is killed mid-task, so that no callback runs, the row can stay `running` or `retrying`. The next run writes its own row, and the view always reports the latest run.
 

@@ -17,8 +17,11 @@ def upgrade() -> None:
     # One row per Airflow DAG run of a pipeline, written by the DAGs' tasks and callbacks (SNX-33).
     # The row is updated in place across task retries, so its status is the run's current state.
     # 'silver_publish' becomes 'succeeded' only in the same transaction that swaps the freshly built
-    # silver schema in. Its finished_at is therefore the silver publication time (published_at in the
-    # data/API contract), and a failed dbt build can never make old data look fresh.
+    # silver schema in, so a failed dbt build can never make old data look fresh. Its finished_at is the
+    # swap time. data_as_of is the time the build started reading bronze and app, recorded before dbt
+    # ran: every change committed before it is in that silver. It is the contract's published_at, so the
+    # API's read-through rule (show app rows newer than published_at with pending_projection) never
+    # treats a row the build missed as published.
     # counts holds per-run numbers only; error_summary holds an exception class and its first line,
     # never message content, addresses or tokens.
     op.execute(
@@ -34,6 +37,7 @@ def upgrade() -> None:
             finished_at     timestamptz,
             counts          jsonb       NOT NULL DEFAULT '{}'::jsonb,
             error_summary   text,
+            data_as_of      timestamptz,
             updated_at      timestamptz NOT NULL DEFAULT now(),
             CONSTRAINT pipeline_runs_pkey PRIMARY KEY (pipeline_run_id),
             CONSTRAINT pipeline_runs_airflow_run_key UNIQUE (pipeline, airflow_run_id),
@@ -44,7 +48,13 @@ def upgrade() -> None:
             CONSTRAINT pipeline_runs_finished_check CHECK (
                 (status IN ('succeeded', 'failed')) = (finished_at IS NOT NULL)
             ),
-            CONSTRAINT pipeline_runs_counts_check CHECK (jsonb_typeof(counts) = 'object')
+            CONSTRAINT pipeline_runs_counts_check CHECK (jsonb_typeof(counts) = 'object'),
+            -- Only a silver publication has a data snapshot time, and a succeeded one always has it.
+            CONSTRAINT pipeline_runs_data_as_of_check CHECK (
+                CASE WHEN pipeline = 'silver_publish' AND status = 'succeeded' THEN data_as_of IS NOT NULL
+                     WHEN pipeline <> 'silver_publish' THEN data_as_of IS NULL
+                     ELSE true END
+            )
         )
         """
     )
@@ -67,7 +77,7 @@ def upgrade() -> None:
     )
 
     # One row per known pipeline, even before its first run, so the API can report "never run"
-    # rather than no row. last_succeeded_at of 'silver_publish' is the contract's published_at.
+    # rather than no row. last_succeeded_data_as_of of 'silver_publish' is the contract's published_at.
     op.execute(
         """
         CREATE VIEW app.pipeline_status AS
@@ -78,6 +88,7 @@ def upgrade() -> None:
             latest.finished_at   AS last_run_finished_at,
             latest.error_summary AS last_run_error_summary,
             ok.finished_at       AS last_succeeded_at,
+            ok.data_as_of        AS last_succeeded_data_as_of,
             ok.counts            AS last_succeeded_counts
         FROM (VALUES ('gmail_ingest'), ('silver_publish')) AS p (pipeline)
         LEFT JOIN LATERAL (
@@ -88,7 +99,7 @@ def upgrade() -> None:
             LIMIT 1
         ) AS latest ON true
         LEFT JOIN LATERAL (
-            SELECT r.finished_at, r.counts
+            SELECT r.finished_at, r.data_as_of, r.counts
             FROM app.pipeline_runs AS r
             WHERE r.pipeline = p.pipeline AND r.status = 'succeeded'
             ORDER BY r.finished_at DESC
@@ -98,7 +109,7 @@ def upgrade() -> None:
     )
     op.execute(
         "COMMENT ON VIEW app.pipeline_status IS "
-        "'Latest run and last success per pipeline; silver_publish last_succeeded_at is published_at.'"
+        "'Latest run and last success per pipeline; silver_publish last_succeeded_data_as_of is published_at.'"
     )
 
 

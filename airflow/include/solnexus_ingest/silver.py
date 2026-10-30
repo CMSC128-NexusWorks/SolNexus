@@ -31,6 +31,7 @@ import subprocess
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from pathlib import Path
 
 import psycopg2
@@ -167,14 +168,19 @@ def _build_stamp(cur) -> dict | None:
         return None
 
 
-def stamp_build(conn: Connection, airflow_run_id: str) -> None:
-    """Mark silver_build as this run's passing build (see the module docstring). Commits."""
+def stamp_build(conn: Connection, airflow_run_id: str, data_as_of: datetime) -> None:
+    """Mark silver_build as this run's passing build (see the module docstring). Commits.
+
+    The stamp also carries data_as_of, the snapshot time publish() records as published_at.
+    """
     with conn.cursor() as cur:
         oids = _table_oids(cur, BUILD_SCHEMA)
         missing = set(REQUIRED_TABLES) - oids.keys()
         if missing:
             raise StaleBuildError(f"{BUILD_SCHEMA} is missing {sorted(missing)} after a passing build")
-        stamp = json.dumps({"airflow_run_id": airflow_run_id, "tables": oids}, sort_keys=True)
+        stamp = json.dumps(
+            {"airflow_run_id": airflow_run_id, "tables": oids, "data_as_of": data_as_of.isoformat()}, sort_keys=True
+        )
         cur.execute(sql.SQL("COMMENT ON SCHEMA {} IS {}").format(sql.Identifier(BUILD_SCHEMA), sql.Literal(stamp)))
     conn.commit()
 
@@ -196,8 +202,14 @@ def build(conn: Connection, airflow_run_id: str, run_dbt: Callable[[], dict[str,
     try:
         reset_build_schema(conn)
         try:
+            # Taken before dbt reads anything: every change committed before this time is in the build.
+            # The swap happens minutes later, so the swap time would overstate how fresh silver is.
+            with conn.cursor() as cur:
+                cur.execute("SELECT now()")
+                data_as_of = cur.fetchone()[0]
+            conn.commit()
             counts = run_dbt()
-            stamp_build(conn, airflow_run_id)
+            stamp_build(conn, airflow_run_id, data_as_of)
         except BaseException:
             try:
                 conn.rollback()
@@ -268,7 +280,10 @@ def publish(
             )
             cur.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(PREVIOUS_SCHEMA)))
             # Sets 'succeeded' from whatever state an earlier publish try left ('retrying' included).
-            mark_succeeded(conn, SILVER_PUBLISH, airflow_run_id, counts, attempt)
+            mark_succeeded(
+                conn, SILVER_PUBLISH, airflow_run_id, counts, attempt,
+                data_as_of=datetime.fromisoformat(stamp["data_as_of"]),
+            )
         conn.commit()
     except BaseException:
         try:

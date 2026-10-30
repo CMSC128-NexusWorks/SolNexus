@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Callable, Mapping
+from datetime import datetime
 from typing import Any
 
 import psycopg2
@@ -86,20 +87,27 @@ def mark_running(conn: Connection, pipeline: str, dag_id: str, airflow_run_id: s
 
 
 def mark_succeeded(
-    conn: Connection, pipeline: str, airflow_run_id: str, counts: Mapping[str, Any], attempt: int
+    conn: Connection,
+    pipeline: str,
+    airflow_run_id: str,
+    counts: Mapping[str, Any],
+    attempt: int,
+    data_as_of: datetime | None = None,
 ) -> None:
     """Mark the run succeeded. Does NOT commit, so the caller can commit it with the work it reports.
 
     If the run already succeeded (a cleared rerun), the first success and its counts are kept.
+    data_as_of is required for silver_publish (the build's snapshot time) and must be None otherwise.
     """
     with conn.cursor() as cur:
         cur.execute(
             """
             UPDATE app.pipeline_runs
-               SET status = 'succeeded', attempt = %s, finished_at = now(), counts = %s, error_summary = NULL
+               SET status = 'succeeded', attempt = %s, finished_at = now(), counts = %s, error_summary = NULL,
+                   data_as_of = %s
              WHERE pipeline = %s AND airflow_run_id = %s AND status <> 'succeeded'
             """,
-            (attempt, Json(dict(counts)), pipeline, airflow_run_id),
+            (attempt, Json(dict(counts)), data_as_of, pipeline, airflow_run_id),
         )
         if cur.rowcount == 0 and succeeded_counts(conn, pipeline, airflow_run_id) is None:
             # mark_running always runs first in the same DAG run, so a missing row is a wiring bug.
