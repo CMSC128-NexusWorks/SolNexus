@@ -15,17 +15,18 @@ JACKS_HEADER = {
 }
 
 # Mirrors docs/contracts/fixtures/build_synthetic_workbook.py, the contract fixture: headerless Ljs row 1,
-# Jacks's mislabeled D column, missing facilities, and Harborview on both sheets with different phones.
+# Jacks's misleading header row over Ljs-style data columns, missing facilities, and Harborview on both
+# sheets with different phones.
 CONTRACT_SHEETS = {
     JACKS: {
         1: JACKS_HEADER,
         2: {
-            "A": "Harborview Clinic", "B": "Sam Example", "C": "harborview@example.test",
-            "D": "0917 000 0199", "H": "Contacted", "I": "Call next week",
-            "J": "unmapped contact example", "K": "Staff Example",
+            "A": "Region Sample", "B": "Province Sample", "C": "Harborview Clinic",
+            "D": "0917 000 0199", "E": "harborview@example.test", "F": "Sample Street", "G": "Sample City",
+            "H": "Contacted", "I": "Call next week", "J": "unmapped contact example", "K": "Staff Example",
         },
-        3: {"A": "", "C": "missing-facility@example.test", "H": "Contacted"},
-        4: {"A": "Pinecrest Clinic", "C": "pinecrest@example.test", "D": "0917 000 0202"},
+        3: {"A": "Region Sample", "C": "", "E": "missing-facility@example.test", "H": "Contacted"},
+        4: {"A": "Region Sample", "C": "Pinecrest Clinic", "D": "0917 000 0202", "E": "pinecrest@example.test"},
     },
     LJS: {
         1: {
