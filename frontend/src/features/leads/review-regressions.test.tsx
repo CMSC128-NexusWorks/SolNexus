@@ -31,7 +31,8 @@ describe("review regressions", () => {
     setMockScenario("no-results");
     renderApp("/?q=Harborview");
     expect(await screen.findByText(/No search results/)).toBeInTheDocument();
-    const due = screen.getByRole("region", { name: "Due today" });
+    // Due today loads from its own request, which may still be pending once All leads has answered.
+    const due = await screen.findByRole("region", { name: "Due today" });
     expect(await within(due).findByRole("link", { name: "Harborview Clinic" })).toBeInTheDocument();
   });
   it("retains a rejected email draft and associates its field error with the input", async () => {
