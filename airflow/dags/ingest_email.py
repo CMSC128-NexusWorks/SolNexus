@@ -1,8 +1,9 @@
-"""Gmail -> bronze ingestion for the connected SolTech mailbox (SNX-32).
+"""Gmail -> bronze ingestion for the connected SolTech mailbox (SNX-32, scheduled in SNX-33).
 
-All connector logic lives in the solnexus_ingest package (airflow/include); this DAG only supplies
-credentials, the database connection and failure semantics. Scheduling is SNX-33's job, so the DAG
-runs on demand until then: trigger it from the UI or with `airflow dags trigger ingest_email`.
+All connector logic lives in the solnexus_ingest package (airflow/include). This DAG supplies only
+credentials, the database connection, the schedule and failure semantics. It runs hourly (Manila time,
+GMAIL_SYNC_SCHEDULE) once unpaused, records each run in app.pipeline_runs, and on success emits the
+GMAIL_BRONZE dataset event that starts transform_bronze_to_silver.
 """
 
 from __future__ import annotations
@@ -13,16 +14,22 @@ from datetime import datetime, timedelta, timezone
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowFailException
 from airflow.operators.python import get_current_context
+from airflow.timetables.trigger import CronTriggerTimetable
 
-# Airflow connection to the SolNexus warehouse (set as AIRFLOW_CONN_SOLNEXUS_DB in compose.yaml).
-WAREHOUSE_CONN_ID = "solnexus_db"
+from solnexus_ingest.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, warehouse_conn
+from solnexus_ingest.runs import GMAIL_INGEST, airflow_failure_callbacks
+
+# Hourly is the data/API contract's proposed default, pending team approval and quota validation.
+SCHEDULE = os.environ.get("GMAIL_SYNC_SCHEDULE") or "0 * * * *"
 
 
 @dag(
     dag_id="ingest_email",
     description="Incrementally ingest the connected Gmail mailbox into bronze.raw_messages.",
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
-    schedule=None,
+    # CronTriggerTimetable runs at the cron time itself, not at the end of the interval.
+    schedule=CronTriggerTimetable(SCHEDULE, timezone=SCHEDULE_TIMEZONE),
+    # No backfill of missed hours: one run resumes from the checkpoint and catches up on its own.
     catchup=False,
     # Two overlapping runs would read the same checkpoint and race to advance it.
     max_active_runs=1,
@@ -37,15 +44,23 @@ WAREHOUSE_CONN_ID = "solnexus_db"
     doc_md=__doc__,
 )
 def ingest_email():
-    @task(execution_timeout=timedelta(minutes=30))
+    @task(
+        execution_timeout=timedelta(minutes=30),
+        # Emitted even when no new mail arrived: app tables (imports, staff edits) may still have
+        # changed, and the silver build is cheap.
+        outlets=[GMAIL_BRONZE],
+        # Record 'retrying' / 'failed' in app.pipeline_runs, so the failure reaches the dashboard.
+        **airflow_failure_callbacks(GMAIL_INGEST),
+    )
     def sync_gmail() -> dict[str, int | str]:
         """Sync the mailbox and return per-run counts (no addresses or content, so safe in XCom)."""
         # Imported inside the task so the scheduler's frequent DAG-file parsing stays fast and does
         # not depend on Google/psycopg2 imports succeeding.
-        from airflow.providers.postgres.hooks.postgres import PostgresHook
-
         from solnexus_ingest.gmail.client import GmailAuthError, GmailClient, GmailPolicyError
         from solnexus_ingest.gmail.sync import SyncSettings, sync_mailbox
+        from solnexus_ingest.runs import mark_running, mark_succeeded
+
+        context = get_current_context()
 
         token_file = os.environ.get("GMAIL_TOKEN_FILE", "/opt/airflow/secrets/gmail-token.json")
         if not os.path.isfile(token_file):
@@ -58,10 +73,16 @@ def ingest_email():
             backfill_query=os.environ.get("GMAIL_BACKFILL_QUERY") or None,
         )
 
-        conn = PostgresHook(postgres_conn_id=WAREHOUSE_CONN_ID).get_conn()
+        conn = warehouse_conn()
         try:
+            mark_running(conn, GMAIL_INGEST, context["dag"].dag_id, context["run_id"], context["ti"].try_number)
             client = GmailClient.from_token_file(token_file)
-            return sync_mailbox(client, conn, settings, job_run_id=get_current_context()["run_id"])
+            counts = sync_mailbox(client, conn, settings, job_run_id=context["run_id"])
+            # sync_mailbox has already committed the pages and checkpoint. If this update fails, the task
+            # retries, finds nothing new and records zero counts: an under-count, never a duplicate.
+            mark_succeeded(conn, GMAIL_INGEST, context["run_id"], counts, context["ti"].try_number)
+            conn.commit()
+            return counts
         except (GmailAuthError, GmailPolicyError) as exc:
             # Revoked/expired consent or an admin policy will not fix itself: fail now, visibly,
             # without burning retries. See airflow/README.md for the operator steps. Every other
