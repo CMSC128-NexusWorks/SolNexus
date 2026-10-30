@@ -32,4 +32,5 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 - Branch names: `<type>/snx-<number>-short-name`, where type is `feat`, `fix`, `docs` or `chore`.
 - Commits follow Conventional Commits with the ticket as scope, e.g. `feat(snx-54): add app shell`.
 - PRs go into `main`, which is protected: one approval from someone other than the last pusher, no direct pushes.
-- Before opening a PR, run the checks for the area you changed. Frontend: `npm run typecheck && npm run lint && npm run test` in `frontend/`. Backend: `docker compose run --rm api pytest`. dbt and Airflow have no automated checks yet.
+- Before opening a PR, run the checks for the area you changed; CI (`.github/workflows/ci.yml`) runs the same commands on every PR into `main`. Frontend: `npm run typecheck && npm run lint && npm run format:check && npm run test` in `frontend/`. Backend: `docker compose run --rm api pytest`. Airflow: `docker compose --profile test run --rm airflow-tests`. dbt has no automated checks yet.
+- CI jobs **Frontend**, **Backend** and **Airflow** are required status checks on `main`: a red check blocks the merge. CI uses no secrets, so tests must use synthetic data and mocks only. The Airflow Postgres-backed tests skip in CI (they need `SOLNEXUS_TEST_DATABASE_URL`).
