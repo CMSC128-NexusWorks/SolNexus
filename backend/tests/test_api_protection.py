@@ -2,9 +2,11 @@ import re
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.auth.dependencies import require_staff
 from app.auth.sessions import SESSION_COOKIE
+from app.db import engine
 from app.errors import install_error_handlers
 from app.main import app
 
@@ -114,6 +116,28 @@ def test_unexpected_errors_return_a_contract_500_the_browser_can_read(client, mo
     # Without CORS headers the browser would hide the 500 and report a network error.
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
     assert "staff_sessions" not in response.text
+
+
+def test_database_errors_are_logged_without_row_values(client, monkeypatch, caplog):
+    # A real constraint failure: PostgreSQL's DETAIL repeats the whole failing row, and SQLAlchemy's
+    # message adds the bound parameters. Neither may reach the log.
+    def failing_insert(*_args, **_kwargs):
+        with engine.begin() as conn:
+            conn.execute(
+                text("INSERT INTO app.clinics (clinic_name, contact_number, origin) VALUES (:name, :phone, 'bogus')"),
+                {"name": "Private Clinic Name", "phone": "0917 PRIVATE"},
+            )
+
+    monkeypatch.setattr("app.auth.dependencies.find_session_user", failing_insert)
+
+    with caplog.at_level("ERROR", logger="app.errors"):
+        response = client.get("/api/v1/auth/session", headers={"Cookie": f"{SESSION_COOKIE}=some-token"})
+
+    assert response.status_code == 500
+    logged = caplog.text
+    assert "CheckViolation sqlstate=23514 table=clinics constraint=clinics_origin_check" in logged
+    assert "failing_insert" in logged  # the traceback frames are kept
+    assert "Private Clinic Name" not in logged and "0917 PRIVATE" not in logged
 
 
 def test_unknown_routes_use_the_contract_error_shape(client):
