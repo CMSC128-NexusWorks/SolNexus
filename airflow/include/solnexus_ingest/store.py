@@ -230,7 +230,10 @@ def _active_mappings(cur: Cursor, envelope: MessageEnvelope) -> list[tuple[Any, 
 
 
 def _candidate_clinics(cur: Cursor, envelope: MessageEnvelope) -> list[Any]:
-    """Clinics whose stored email equals the participant: candidate evidence only, never a link."""
+    """Clinics whose stored email equals the participant: candidate evidence only, never a link.
+
+    The WHERE expression must stay lower(btrim(email)) to use clinics_email_lookup_idx (migration 0019).
+    """
     if envelope.external_participant_id is None:
         return []
     cur.execute(
