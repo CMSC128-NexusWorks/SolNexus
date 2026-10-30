@@ -5,6 +5,7 @@ import threading
 from sqlalchemy import text
 
 from app.db import engine
+from app.imports.adapters import ADAPTERS, JACKS_SHEET
 from app.imports.service import file_hash, stage_upload, write_import
 from tests.workbooks import CONTRACT_SHEETS, JACKS, LJS, jacks, ljs, xlsx
 
@@ -130,6 +131,29 @@ def test_reuploading_the_same_file_returns_the_first_batch_unchanged(signed_in, 
     assert second.json() == {"batch_id": first["batch_id"], "state": first["state"], "replayed": True}
     assert run_sql("SELECT count(*) FROM app.import_batches")[0][0] == 1
     assert len(clinics(run_sql)) == 2
+
+
+def test_the_same_file_is_processed_again_after_an_adapter_version_change(signed_in, run_sql, monkeypatch):
+    data = xlsx(CONTRACT_SHEETS)
+    first, _ = imported(signed_in, data)
+    monkeypatch.setattr(ADAPTERS[JACKS_SHEET], "version", "jacks-v2")
+
+    again = upload(signed_in, data)
+
+    assert again.json()["replayed"] is False
+    assert again.json()["batch_id"] != first["batch_id"]
+    versions = run_sql("SELECT DISTINCT adapter_version FROM app.import_rows WHERE batch_id = :id", id=again.json()["batch_id"])
+    assert {row.adapter_version for row in versions} == {"jacks-v2", "ljs-v1"}
+
+
+def test_a_file_whose_adapters_did_not_change_still_replays(signed_in, monkeypatch):
+    data = xlsx({LJS: ljs({"C": "Clinic One"})})
+    first, _ = imported(signed_in, data)
+    monkeypatch.setattr(ADAPTERS[JACKS_SHEET], "version", "jacks-v2")
+
+    again = upload(signed_in, data)
+
+    assert (again.json()["replayed"], again.json()["batch_id"]) == (True, first["batch_id"])
 
 
 def test_resaved_workbook_with_the_same_rows_creates_no_duplicates(signed_in, run_sql):

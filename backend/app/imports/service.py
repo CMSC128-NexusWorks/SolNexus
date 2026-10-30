@@ -77,16 +77,24 @@ def write_import(
 ) -> ImportOutcome:
     """Record one upload in the caller's transaction. See the module docstring for the row rules."""
     lock_imports(conn)
+    # Replay only a batch read by the adapter versions reading this upload. After an adapter change (say
+    # jacks-v2) the same bytes mean different fields, so returning the old result would hide the new
+    # mapping; the upload is processed again, and unchanged rows still match by fingerprint where possible.
     prior = conn.execute(
         text(
             """
-            SELECT batch_id, state FROM app.import_batches
-            WHERE file_sha256 = :sha AND state IN ('completed', 'needs_review')
-            ORDER BY uploaded_at, batch_id
+            SELECT batch.batch_id, batch.state FROM app.import_batches batch
+            WHERE batch.file_sha256 = :sha AND batch.state IN ('completed', 'needs_review')
+              AND NOT EXISTS (
+                  SELECT 1 FROM app.import_rows row
+                  WHERE row.batch_id = batch.batch_id
+                    AND NOT coalesce(row.adapter_version = ANY(:versions), false)
+              )
+            ORDER BY batch.uploaded_at, batch.batch_id
             LIMIT 1
             """
         ),
-        {"sha": file_sha256},
+        {"sha": file_sha256, "versions": sorted({row.adapter_version for row in staged})},
     ).first()
     if prior is not None:
         return ImportOutcome(prior.batch_id, prior.state, replayed=True)

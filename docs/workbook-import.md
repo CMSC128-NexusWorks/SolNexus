@@ -32,7 +32,7 @@ Examples generated from real responses are in [phase1-api-examples-v1.json](cont
 
 Both sheets are read by explicitly versioned adapters. `ljs-v1` is positional and reads row 1 as data. `jacks-v1` requires the observed header text in row 1 but maps the data positions, which follow the Ljs layout (see *Jacks layout evidence* in the contract; **awaiting SolTech confirmation**).
 
-1. **Same file again** (identical SHA-256): the earlier batch is returned with `replayed: true`. Nothing is written.
+1. **Same file again** (identical SHA-256, read by the same adapter versions): the earlier batch is returned with `replayed: true`. Nothing is written. After an adapter version change, the same file is processed again.
 2. **Blank row** between data rows: `skipped`. **Missing facility, invalid email or an overlong value:** `rejected` with a code. The ledger keeps codes only, no values.
 3. **Same row seen before** (equal fingerprint: adapter version, sheet, row number and values): if it was accepted, it is `accepted` as `prior_import` and linked to the same clinic, with no field written. If staff rejected it, it is rejected again. An edited or moved row has a new fingerprint and goes through step 4.
 4. **New row that may duplicate another row, an existing clinic, or a row of an earlier upload that still awaits review:** `needs_review`. Nothing is created or merged.
