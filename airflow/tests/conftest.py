@@ -1,7 +1,9 @@
 """Shared fixtures. Postgres-backed tests run only when SOLNEXUS_TEST_DATABASE_URL is set.
 
-That URL must point at a throwaway database migrated to head (see airflow/README.md), never the dev
-database: bronze is append-only, so test rows could not be cleaned up.
+That URL must point at a throwaway database migrated to head (see airflow/README.md). It must not be the
+dev database or the backend suite's "<db>_test" database: these tests leave append-only rows (bronze
+messages, staff-confirmed mappings) that can never be deleted, which would break the backend suite's
+per-test cleanup of app.staff_users. The fixture therefore accepts only databases named "*_ingest_test".
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import psycopg2
 import pytest
 
 STAFF_USER_ID = "00000000-0000-4000-8000-0000000000aa"
+INGEST_TEST_DB_SUFFIX = "_ingest_test"
 
 
 @pytest.fixture
@@ -22,6 +25,9 @@ def db():
     if not url:
         pytest.skip("SOLNEXUS_TEST_DATABASE_URL not set; skipping Postgres-backed test")
     conn = psycopg2.connect(url)
+    if not conn.info.dbname.endswith(INGEST_TEST_DB_SUFFIX):
+        conn.close()
+        pytest.fail(f"refusing to write test rows outside a '*{INGEST_TEST_DB_SUFFIX}' database")
     with conn.cursor() as cur:
         # Mappings require a confirming staff user.
         cur.execute(

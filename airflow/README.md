@@ -55,14 +55,14 @@ Log lines and errors include status codes, Google's reason and counts. They neve
 
 ## Tests
 
-The tests run in the Airflow image. The Postgres-backed tests need a **separate, throwaway** database migrated to head. Never point them at the dev database: bronze is append-only, so test rows can't be removed.
+The tests run in the Airflow image. The Postgres-backed tests need their **own throwaway** database, `solnexus_ingest_test`, migrated to head. Don't point them at the dev database or at the backend suite's `solnexus_test`: these tests leave rows that can never be deleted (bronze and staff-confirmed mappings are append-only), and that would break the backend suite's cleanup. The fixture refuses any database whose name doesn't end in `_ingest_test`.
 
 ```bash
 set -a; . ./.env; set +a
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE DATABASE solnexus_test"
-docker compose run --rm --no-deps -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/solnexus_test" \
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE DATABASE solnexus_ingest_test"
+docker compose run --rm --no-deps -e DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/solnexus_ingest_test" \
   api alembic upgrade head
-SOLNEXUS_TEST_DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/solnexus_test" \
+SOLNEXUS_TEST_DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/solnexus_ingest_test" \
   docker compose --profile test run --rm airflow-tests
 ```
 
