@@ -222,6 +222,30 @@ def test_linking_never_reopens_a_field_staff_edited(signed_in, staff, run_sql):
     assert clinic_named(run_sql, "Clinic One").contact_number == "0917 000 0999"
 
 
+def test_linking_does_not_feed_an_open_review_for_a_field_staff_edited_since(signed_in, staff, run_sql):
+    batch = imported(signed_in, xlsx(CONTRACT_SHEETS, title="first"))
+    decide(signed_in, batch, harborview_pair(batch), "create_clinic")
+    clinic = clinic_named(run_sql, "Harborview Clinic")
+    # The phone review is still open when staff set the number in the dashboard.
+    run_sql("UPDATE app.clinics SET contact_number = '0917 000 0999', version = version + 1 WHERE clinic_id = :id",
+            id=clinic.clinic_id)
+    run_sql(
+        """INSERT INTO app.clinic_field_events (clinic_id, field_name, old_value, new_value, changed_by)
+           VALUES (:id, 'contact_number', 'null', '"0917 000 0999"', :staff)""",
+        id=clinic.clinic_id, staff=staff["user_id"],
+    )
+    later = imported(signed_in, xlsx({LJS: ljs({"C": "Harborview Clinic", "D": "0917 000 0555"})}, title="second"))
+
+    result = decide(signed_in, later, later["rows"], "link_clinic", clinic_id=str(clinic.clinic_id)).json()
+
+    # The staff edit decides the field: the new row is not added as another candidate.
+    (review,) = run_sql("SELECT review_id FROM app.import_field_reviews")
+    candidates = run_sql("SELECT count(*) FROM app.import_field_review_candidates WHERE review_id = :id", id=review.review_id)
+    assert candidates[0][0] == 2
+    assert result["field_reviews"] == [] and result["state"] == "completed"
+    assert clinic_named(run_sql, "Harborview Clinic").contact_number == "0917 000 0999"
+
+
 def test_contact_person_only_initializes_a_blank_and_never_opens_a_review(signed_in, run_sql):
     imported(signed_in, xlsx({LJS: ljs({"C": "Clinic One", "I": "Sam Example"})}))
     clinic = clinic_named(run_sql, "Clinic One")

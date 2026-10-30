@@ -178,10 +178,12 @@ def _link_clinic(conn, batch_id, decision: Decision, decided_by, rows) -> None:
     joins: dict[UUID, list[UUID]] = {}
     for field_name, by_value in values.items():
         current = getattr(clinic, field_name)
-        if field_name in open_reviews and field_name not in INITIALIZE_ONLY_FIELDS:
-            joins[open_reviews[field_name]] = _supplying_rows(by_value)
-        elif field_name in decided:
+        # Checked first: once staff edited the field, even an import review still open on it must not
+        # gather more workbook candidates that could later replace the staff value.
+        if field_name in decided:
             continue
+        elif field_name in open_reviews and field_name not in INITIALIZE_ONLY_FIELDS:
+            joins[open_reviews[field_name]] = _supplying_rows(by_value)
         elif current is not None:
             if set(by_value) != {current} and field_name not in INITIALIZE_ONLY_FIELDS:
                 conflicts[field_name] = _supplying_rows(by_value)
