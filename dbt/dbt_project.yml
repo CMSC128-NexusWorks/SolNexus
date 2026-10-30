@@ -22,5 +22,8 @@ models:
     staging:
       +materialized: ephemeral
     silver:
-      +schema: silver
+      # Airflow builds into a staging schema (--vars '{silver_schema: silver_build}') and swaps it in
+      # only after every model and test passed, so a failed build never replaces the live silver data.
+      # A plain `dbt build` still targets silver directly, for local development.
+      +schema: "{{ var('silver_schema', 'silver') }}"
       +materialized: table
