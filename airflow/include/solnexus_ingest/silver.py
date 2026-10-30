@@ -23,6 +23,7 @@ from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
+import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import connection as Connection
 
@@ -159,7 +160,12 @@ def publish(conn: Connection, airflow_run_id: str, build_counts: dict[str, int])
             mark_succeeded(conn, SILVER_PUBLISH, airflow_run_id, counts)
         conn.commit()
     except BaseException:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except psycopg2.Error:
+            # The connection is already gone (e.g. the database restarted mid-swap). The server has
+            # rolled the transaction back anyway; re-raise the original error, not the rollback's.
+            log.warning("rollback after a failed publish also failed; the connection is closed")
         raise
     log.info("published silver: %s", counts)
     return counts

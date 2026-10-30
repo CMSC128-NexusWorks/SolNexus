@@ -11,6 +11,7 @@ import copy
 import pickle
 import uuid
 
+import psycopg2
 import pytest
 
 from solnexus_ingest.runs import SILVER_PUBLISH, mark_running
@@ -127,3 +128,17 @@ def test_build_error_survives_pickle_copy_and_hashing():
         assert str(clone) == str(error)
     assert hash(error)
 
+
+class _DeadConnection:
+    """Stands in for a connection the database dropped mid-swap."""
+
+    def cursor(self):
+        raise psycopg2.OperationalError("server closed the connection unexpectedly")
+
+    def rollback(self):
+        raise psycopg2.InterfaceError("connection already closed")
+
+
+def test_publish_reraises_the_original_error_when_rollback_also_fails():
+    with pytest.raises(psycopg2.OperationalError, match="server closed"):
+        publish(_DeadConnection(), "test-run", {})
