@@ -9,3 +9,9 @@ argon2-cffi>=23.1.0,<26.0.0
 # FastAPI alone allows Starlette 0.46+, whose TestClient needs httpx rather than the httpx2 in
 # requirements-dev.txt. 1.10 is the version tested.
 starlette>=1.10.0,<2.0.0
+# Workbook import (SNX-28). openpyxl parses .xlsx; when defusedxml is installed openpyxl uses it, which
+# rejects XML entity expansion attacks hidden in an uploaded workbook.
+openpyxl>=3.1.5,<4.0.0
+defusedxml>=0.7.1,<1.0.0
+# FastAPI needs it to read multipart file uploads.
+python-multipart>=0.0.20,<1.0.0
