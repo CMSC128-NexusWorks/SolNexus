@@ -10,6 +10,7 @@ from solnexus_ingest.gmail.client import (
     GmailAuthError,
     GmailClient,
     GmailPolicyError,
+    GmailQuotaExhausted,
     GmailRetriesExhausted,
     HistoryExpired,
     RetryPolicy,
@@ -98,6 +99,22 @@ def test_policy_and_request_errors_fail_fast(failure):
     with pytest.raises(GmailPolicyError, match="domainPolicy|invalidArgument"):
         gmail.get_profile()
     assert sleeps == []
+
+
+def test_temporary_token_endpoint_failure_is_retried():
+    gmail, _, sleeps = client(RefreshError("token endpoint 503", retryable=True), response(200, {"historyId": "1"}))
+
+    assert gmail.get_profile()["historyId"] == "1"
+    assert len(sleeps) == 1
+
+
+@pytest.mark.parametrize("reason", ["dailyLimitExceeded", "quotaExceeded"])
+def test_used_up_daily_quota_is_not_an_operator_problem_or_a_quick_retry(reason):
+    gmail, _, sleeps = client(error(403, reason))
+
+    with pytest.raises(GmailQuotaExhausted):
+        gmail.get_profile()
+    assert sleeps == []  # waiting seconds will not refill a daily quota
 
 
 @pytest.mark.parametrize("failure", [RefreshError("invalid_grant"), error(401, "authError")])

@@ -31,6 +31,9 @@ REQUEST_TIMEOUT = (10, 60)
 TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
 # A 403 with one of these reasons is throttling, not a permission problem.
 RATE_LIMIT_REASONS = frozenset({"rateLimitExceeded", "userRateLimitExceeded"})
+# A 403 with one of these reasons is a used-up daily/project quota: it clears with time, not with an
+# operator, but not within seconds either, so the client does not retry it itself.
+QUOTA_EXHAUSTED_REASONS = frozenset({"dailyLimitExceeded", "quotaExceeded"})
 
 
 class GmailError(Exception):
@@ -43,6 +46,10 @@ class GmailAuthError(GmailError):
 
 class GmailPolicyError(GmailError):
     """Permanent refusal such as a Workspace domainPolicy or a bad request. Needs a person."""
+
+
+class GmailQuotaExhausted(GmailError):
+    """The daily/project quota is used up. Retry later (Airflow task retries or the next run)."""
 
 
 class GmailRetriesExhausted(GmailError):
@@ -148,10 +155,15 @@ class GmailClient:
             try:
                 response = self._session.get(API_ROOT + path, params=params, timeout=REQUEST_TIMEOUT)
             except RefreshError as exc:
-                # Raised while refreshing the access token: expired (7-day testing consent) or revoked.
-                raise GmailAuthError("OAuth refresh failed; re-authorize the mailbox") from exc
+                # Raised while refreshing the access token. google-auth marks token-endpoint outages
+                # (5xx, timeouts) retryable; invalid_grant (expired 7-day testing consent, revoked
+                # access) is not, and only re-authorization fixes it.
+                if not exc.retryable:
+                    raise GmailAuthError("OAuth refresh failed; re-authorize the mailbox") from exc
+                failure: str = "RefreshError (retryable)"
+                retry_after = None
             except (requests.ConnectionError, requests.Timeout, TransportError) as exc:
-                failure: str = type(exc).__name__
+                failure = type(exc).__name__
                 retry_after = None
             else:
                 if response.ok:
@@ -161,6 +173,8 @@ class GmailClient:
                     raise _NotFound(path)
                 if response.status_code == 401:
                     raise GmailAuthError(f"Gmail rejected the credentials (401 {reason})")
+                if response.status_code == 403 and reason in QUOTA_EXHAUSTED_REASONS:
+                    raise GmailQuotaExhausted(f"Gmail quota used up (403 {reason})")
                 retryable = response.status_code in TRANSIENT_STATUSES or (
                     response.status_code == 403 and reason in RATE_LIMIT_REASONS
                 )

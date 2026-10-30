@@ -64,7 +64,9 @@ def ingest_email():
             return sync_mailbox(client, conn, settings, job_run_id=get_current_context()["run_id"])
         except (GmailAuthError, GmailPolicyError) as exc:
             # Revoked/expired consent or an admin policy will not fix itself: fail now, visibly,
-            # without burning retries. See airflow/README.md for the operator steps.
+            # without burning retries. See airflow/README.md for the operator steps. Every other
+            # error (exhausted backoff, used-up daily quota, retryable token-endpoint outage) is
+            # left to the task's normal retries.
             raise AirflowFailException(f"Gmail needs operator action: {exc}") from exc
         finally:
             conn.close()
