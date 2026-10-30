@@ -19,6 +19,8 @@ from typing import Union
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
+from app.errors import ApiError
+
 # Proposed operational limits from the data contract, to validate with SolTech before production.
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_POPULATED_ROWS = 10_000
@@ -29,15 +31,15 @@ MAX_ZIP_ENTRIES = 1_000
 CellValue = Union[str, int, float, bool, datetime, date, time]
 
 
-class WorkbookError(Exception):
-    """The upload cannot be read as a supported workbook. Carries a safe code, never cell contents."""
+class WorkbookError(ApiError):
+    """The upload cannot be read as a supported workbook. Carries a safe code, never cell contents.
+
+    An ApiError, so the API's error handler answers it with the contract error body directly. The parser
+    and adapters keep their own (code, message) argument order and a 422 default.
+    """
 
     def __init__(self, code: str, message: str, status_code: int = 422, details: list[dict] | None = None):
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = status_code
-        self.details = details or []
+        super().__init__(status_code, code, message, details)
 
 
 @dataclass(frozen=True)

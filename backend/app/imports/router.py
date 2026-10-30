@@ -21,7 +21,7 @@ from app.imports.models import FieldReview, FieldReviewResolution, ImportAccepte
 from app.imports.results import load_field_review, load_result
 from app.imports.reviews import resolve_field_review
 from app.imports.service import file_hash, record_failed_upload, stage_upload, write_import
-from app.imports.workbook import MAX_UPLOAD_BYTES, WorkbookError
+from app.imports.workbook import MAX_UPLOAD_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +72,9 @@ async def upload_workbook(request: Request, user: CurrentStaff) -> ImportAccepte
 
 
 def _import(data: bytes, filename: str, user_id: UUID) -> ImportAccepted:
-    try:
-        staged = stage_upload(data)
-    except WorkbookError as error:
-        # A file that cannot be read as the legacy format writes nothing.
-        raise ApiError(error.status_code, error.code, error.message, error.details) from error
+    # A file that cannot be read as the legacy format raises WorkbookError (an ApiError) here and writes
+    # nothing, not even a failed batch.
+    staged = stage_upload(data)
     sha = file_hash(data)
     try:
         with engine.begin() as conn:
