@@ -16,10 +16,22 @@ x-airflow-common: &airflow-common
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_PORT: "5432"
+    # Connector package used by the DAGs (airflow/include/solnexus_ingest).
+    PYTHONPATH: /opt/airflow/include
+    # Warehouse connection for PostgresHook(postgres_conn_id="solnexus_db"). JSON instead of a URI so a
+    # password containing @ : / # % needs no URL encoding (only " and \ would need JSON escaping).
+    AIRFLOW_CONN_SOLNEXUS_DB: '{"conn_type": "postgres", "host": "postgres", "port": 5432, "login": "${POSTGRES_USER}", "password": "${POSTGRES_PASSWORD}", "schema": "${POSTGRES_DB}"}'
+    # Gmail ingestion (SNX-32). The token comes from the SNX-21 consent flow; see airflow/README.md.
+    GMAIL_TOKEN_FILE: /opt/airflow/secrets/gmail-token.json
+    GMAIL_LABEL_ID: ${GMAIL_LABEL_ID:-}
+    GMAIL_BACKFILL_QUERY: ${GMAIL_BACKFILL_QUERY:-newer_than:30d}
   volumes:
     - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/include:/opt/airflow/include:ro
     - ./dbt:/opt/airflow/dbt
     - airflow_logs:/opt/airflow/logs
+    # OAuth files stay on the host and are mounted read-only; the image never contains them.
+    - ./.secrets:/opt/airflow/secrets:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
@@ -82,6 +94,26 @@ services:
     # Only the local browser can reach the temporary OAuth callback.
     ports:
       - "127.0.0.1:8765:8765"
+
+  # Connector tests in the same image the DAGs run in: docker compose --profile test run --rm airflow-tests
+  # SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests (see airflow/README.md).
+  airflow-tests:
+    profiles: ["test"]
+    <<: *airflow-common
+    depends_on: []
+    working_dir: /opt/airflow/project
+    environment:
+      SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
+    volumes:
+      - ./airflow:/opt/airflow/project:ro
+    # Arguments after the service name are appended and reach pytest as "$$@" (e.g. -k sync).
+    # The project mount is read-only, so pytest's cache is disabled rather than written into it.
+    entrypoint:
+      - bash
+      - -c
+      - pip install --quiet --disable-pip-version-check -r requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
 
   web:
     build:

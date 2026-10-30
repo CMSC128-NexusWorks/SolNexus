@@ -1,0 +1,52 @@
+"""Shared fixtures. Postgres-backed tests run only when SOLNEXUS_TEST_DATABASE_URL is set.
+
+That URL must point at a throwaway database migrated to head (see airflow/README.md). It must not be the
+dev database or the backend suite's "<db>_test" database: these tests leave append-only rows (bronze
+messages, staff-confirmed mappings) that can never be deleted, which would break the backend suite's
+per-test cleanup of app.staff_users. The fixture therefore accepts only databases named "*_ingest_test".
+"""
+
+from __future__ import annotations
+
+import os
+import uuid
+from dataclasses import dataclass
+
+import psycopg2
+import pytest
+
+STAFF_USER_ID = "00000000-0000-4000-8000-0000000000aa"
+INGEST_TEST_DB_SUFFIX = "_ingest_test"
+
+
+@pytest.fixture
+def db():
+    url = os.environ.get("SOLNEXUS_TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("SOLNEXUS_TEST_DATABASE_URL not set; skipping Postgres-backed test")
+    conn = psycopg2.connect(url)
+    if not conn.info.dbname.endswith(INGEST_TEST_DB_SUFFIX):
+        conn.close()
+        pytest.fail(f"refusing to write test rows outside a '*{INGEST_TEST_DB_SUFFIX}' database")
+    with conn.cursor() as cur:
+        # Mappings require a confirming staff user.
+        cur.execute(
+            "INSERT INTO app.staff_users (user_id, email, password_hash) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+            (STAFF_USER_ID, "tests@example.test", "$test$login-disabled"),
+        )
+    conn.commit()
+    yield conn
+    conn.close()
+
+
+@dataclass(frozen=True)
+class Parties:
+    mailbox: str
+    lead: str
+
+
+@pytest.fixture
+def parties() -> Parties:
+    """Addresses unique to one test, so tests never see each other's rows in the shared test database."""
+    tag = uuid.uuid4().hex[:10]
+    return Parties(mailbox=f"sales-{tag}@soltech.example.test", lead=f"lead-{tag}@clinic.example.test")
