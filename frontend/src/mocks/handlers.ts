@@ -2,7 +2,10 @@ import { delay, http, HttpResponse } from "msw";
 
 import type {
   ApiErrorBody,
+  FieldReviewResolution,
   HistoryPage,
+  ImportDecisionRequest,
+  ImportResult,
   LeadRow,
   LeadsPage,
   StaffUser,
@@ -12,7 +15,7 @@ import type {
 
 import { getMockScenario } from "./scenarios";
 import { MOCK_CREDENTIALS } from "./credentials";
-import { businessDate, MOCK_HISTORY, MOCK_LEADS, MOCK_USER } from "./data";
+import { businessDate, MOCK_HISTORY, MOCK_IMPORT_RESULT, MOCK_LEADS, MOCK_USER } from "./data";
 
 // Mock implementation of the proposed /api/v1 contract. "*" matches any API origin.
 const api = (path: string) => `*/api/v1${path}`;
@@ -92,6 +95,33 @@ function dueRows(today = businessDate()) {
       lead.next_action_date !== null &&
       lead.next_action_date <= today,
   ).sort((a, b) => a.next_action_date!.localeCompare(b.next_action_date!));
+}
+
+// The mock import batch, changed by decisions and review resolutions. Tests can reset it.
+let mockImport: ImportResult = structuredClone(MOCK_IMPORT_RESULT);
+
+export function resetMockImport() {
+  mockImport = structuredClone(MOCK_IMPORT_RESULT);
+}
+
+// Recount like the real API: needs_review while a row awaits a decision or a field review is open.
+function recountMockImport() {
+  const rows = mockImport.rows;
+  const count = (result: string) => rows.filter((row) => row.result === result).length;
+  const created = new Set(
+    rows
+      .filter((row) => row.match_basis === "new_clinic" || row.match_basis === "staff_new_clinic")
+      .map((row) => row.clinic_id),
+  );
+  mockImport.counts = {
+    created_clinics: created.size,
+    accepted_rows: count("accepted"),
+    needs_review_rows: count("needs_review"),
+    rejected_rows: count("rejected"),
+    skipped_rows: count("skipped"),
+  };
+  const openReview = mockImport.field_reviews.some((review) => review.state === "unresolved");
+  mockImport.state = count("needs_review") > 0 || openReview ? "needs_review" : "completed";
 }
 
 export const handlers = [
@@ -297,6 +327,128 @@ export const handlers = [
         items: MOCK_HISTORY[clinicId] ?? [],
         next_cursor: null,
       });
+    },
+  ),
+
+  http.post(api("/imports"), async () => {
+    await delay(300);
+    if (!mockSessionUser()) return unauthorized();
+    return HttpResponse.json(
+      { batch_id: mockImport.batch_id, state: mockImport.state, replayed: false },
+      { status: 202 },
+    );
+  }),
+
+  http.get<{ batchId: string }>(api("/imports/:batchId"), async ({ params }) => {
+    await delay(300);
+    if (!mockSessionUser()) return unauthorized();
+    if (params.batchId !== mockImport.batch_id)
+      return error(404, "not_found", "Import batch not found");
+    return HttpResponse.json(mockImport);
+  }),
+
+  // Simplified decision: marks rows accepted or rejected. For create_clinic over rows whose phones
+  // differ it opens a contact_number review, as the real API does for any disagreeing field.
+  http.post<{ batchId: string }, ImportDecisionRequest>(
+    api("/imports/:batchId/decisions"),
+    async ({ params, request }) => {
+      await delay(300);
+      if (!mockSessionUser()) return unauthorized();
+      if (params.batchId !== mockImport.batch_id)
+        return error(404, "not_found", "Import batch not found");
+      const body = await request.json();
+      const rows = mockImport.rows.filter((row) => body.import_row_ids.includes(row.import_row_id));
+      if (rows.some((row) => row.result !== "needs_review")) {
+        return error(
+          409,
+          "row_already_decided",
+          "Some rows were already decided; reload the import",
+        );
+      }
+      const clinicId = body.clinic_id ?? crypto.randomUUID();
+      for (const row of rows) {
+        row.result = body.action === "reject" ? "rejected" : "accepted";
+        row.clinic_id = body.action === "reject" ? null : clinicId;
+        row.match_basis =
+          body.action === "reject"
+            ? null
+            : body.action === "link_clinic"
+              ? "staff_link"
+              : "staff_new_clinic";
+        row.reasons = body.action === "reject" ? ["rejected_by_staff"] : [];
+        row.candidates = [];
+        row.review_group = null;
+      }
+      const phones = new Set(
+        rows.map((row) => row.proposed_fields?.contact_number).filter(Boolean),
+      );
+      if (body.action === "create_clinic" && phones.size > 1) {
+        mockImport.field_reviews.push({
+          review_id: crypto.randomUUID(),
+          clinic_id: clinicId,
+          field_name: "contact_number",
+          state: "unresolved",
+          resolved_value: null,
+          current_value: null,
+          clinic_version: 1,
+          candidate_rows: rows.map((row) => ({
+            import_row_id: row.import_row_id,
+            sheet: row.sheet,
+            row: row.row,
+            value: row.proposed_fields?.contact_number ?? null,
+          })),
+        });
+      }
+      // Like the real API, a row still in review shows the clinic its decided candidate rows now belong to,
+      // so staff can link the rest of the group there instead of creating the clinic twice.
+      if (body.action !== "reject") {
+        const decided = new Set(rows.map((row) => row.import_row_id));
+        const clinicName =
+          body.action === "create_clinic"
+            ? (body.clinic_name ?? rows[0]?.proposed_fields?.clinic_name ?? null)
+            : null;
+        for (const row of mockImport.rows) {
+          for (const candidate of row.candidates) {
+            if (candidate.import_row_id && decided.has(candidate.import_row_id)) {
+              candidate.clinic_id = clinicId;
+              candidate.clinic_name = clinicName;
+            }
+          }
+        }
+      }
+      for (const row of rows) row.proposed_fields = null;
+      recountMockImport();
+      return HttpResponse.json(mockImport);
+    },
+  ),
+
+  http.post<{ reviewId: string }, FieldReviewResolution>(
+    api("/imports/field-reviews/:reviewId/resolve"),
+    async ({ params, request }) => {
+      await delay(300);
+      if (!mockSessionUser()) return unauthorized();
+      const review = mockImport.field_reviews.find((item) => item.review_id === params.reviewId);
+      if (!review) return error(404, "not_found", "Field review not found");
+      if (review.state === "resolved") {
+        return error(
+          409,
+          "review_already_resolved",
+          "This field review was already resolved; reload the import",
+        );
+      }
+      const body = await request.json();
+      if (body.clinic_version !== review.clinic_version) {
+        return error(409, "version_conflict", "This row changed. Refresh it before retrying.");
+      }
+      const value = body.value?.trim() || null;
+      review.state = "resolved";
+      review.resolved_value = value;
+      if (value !== review.current_value && review.clinic_version !== null) {
+        review.current_value = value;
+        review.clinic_version += 1;
+      }
+      recountMockImport();
+      return HttpResponse.json(review);
     },
   ),
 

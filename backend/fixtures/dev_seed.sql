@@ -130,16 +130,25 @@ INSERT INTO app.import_batches (batch_id, uploaded_by, file_sha256, original_fil
      '2026-10-17T15:00:00+08:00', 'needs_review', 1, 2, 0, 1, 0)
 ON CONFLICT DO NOTHING;
 
+-- Staff confirmed that the Ljs and Jacks Riverside rows are one clinic, so both rows point at it.
+INSERT INTO app.import_row_decisions (decision_id, batch_id, action, clinic_id, reason, decided_by, decided_at) VALUES
+    ('21000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'create_clinic',
+     '10000000-0000-4000-8000-000000000003', 'Synthetic: both sheets list the same clinic',
+     '00000000-0000-4000-8000-000000000002', '2026-10-17T15:30:00+08:00')
+ON CONFLICT DO NOTHING;
+
 INSERT INTO app.import_rows (import_row_id, batch_id, sheet_name, row_number, row_fingerprint,
-                             normalized_fields, validation_errors, result, clinic_id) VALUES
+                             normalized_fields, validation_errors, result, clinic_id, match_basis, decision_id) VALUES
     ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Ljs Calling Sheet', 1,
      'synthetic-fp-ljs-1', '{"clinic_name":"Riverside Clinic","contact_number":"0917 000 0301","status_code":"proposal_sent"}',
-     '[]', 'accepted', '10000000-0000-4000-8000-000000000003'),
+     '[]', 'accepted', '10000000-0000-4000-8000-000000000003', 'staff_new_clinic',
+     '21000000-0000-4000-8000-000000000001'),
     ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'Jacks Calling Sheet', 2,
      'synthetic-fp-jacks-2', '{"clinic_name":"Riverside Clinic","contact_number":"0917 000 0302"}',
-     '[]', 'accepted', '10000000-0000-4000-8000-000000000003'),
+     '[]', 'accepted', '10000000-0000-4000-8000-000000000003', 'staff_new_clinic',
+     '21000000-0000-4000-8000-000000000001'),
     ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000001', 'Jacks Calling Sheet', 3,
-     'synthetic-fp-jacks-3', '{}', '[{"code":"missing_facility"}]', 'rejected', NULL)
+     'synthetic-fp-jacks-3', '{}', '[{"code":"missing_facility"}]', 'rejected', NULL, NULL, NULL)
 ON CONFLICT DO NOTHING;
 
 -- The two sheets disagree on Riverside's number; staff have not chosen yet, so the clinic field stays null.

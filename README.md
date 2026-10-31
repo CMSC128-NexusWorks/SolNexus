@@ -218,6 +218,7 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 - [Phase 1 Data and API Contract](docs/contracts/phase1-data-api-v1.md)
 - [Database Schema and Ownership](docs/database.md)
 - [Staff Sign-in and Sessions](docs/authentication.md)
+- [Legacy Workbook Import](docs/workbook-import.md)
 - [Wireframes](docs/wireframes)
 
 ## Team

@@ -31,29 +31,281 @@
   "import": {
     "request": "multipart field file: synthetic-lead-import-v1.xlsx",
     "synthetic_source_rows": {
-      "synthetic_ljs_row_1_positions": {"A": "Region Sample", "B": "Province Sample", "C": "Harborview Clinic", "D": "0917 000 0101", "E": "harborview@example.test", "F": "Sample Street", "G": "Sample City", "H": "Asked for a follow-up email", "I": "Sam Example"},
+      "synthetic_ljs_row_1_positions": {
+        "A": "Region Sample",
+        "B": "Province Sample",
+        "C": "Harborview Clinic",
+        "D": "0917 000 0101",
+        "E": "harborview@example.test",
+        "F": "Sample Street",
+        "G": "Sample City",
+        "H": "Asked for a follow-up email",
+        "I": "Sam Example"
+      },
       "synthetic_ljs_meaning": {"H": "calling_notes", "I": "person_spoken_to"},
       "synthetic_jacks_header_positions": {"A": "Facility", "B": "Name", "C": "Email", "D": "Status", "H": "Status", "I": "Next Step", "J": "Contact", "K": "Point Person"},
-      "synthetic_jacks_row_2_positions": {"A": "Harborview Clinic", "B": "Sam Example", "C": "harborview@example.test", "D": "0917 000 0199", "H": "Contacted", "I": "Call next week", "J": "unmapped contact example", "K": "Staff Example"},
-      "synthetic_jacks_corrected_meaning": {"D": "contact_number_despite_status_header", "H": "status_source", "J": "unconfirmed"}
+      "synthetic_jacks_row_2_positions": {
+        "A": "Region Sample",
+        "B": "Province Sample",
+        "C": "Harborview Clinic",
+        "D": "0917 000 0199",
+        "E": "harborview@example.test",
+        "F": "Sample Street",
+        "G": "Sample City",
+        "H": "Contacted",
+        "I": "Call next week",
+        "J": "unmapped contact example",
+        "K": "Staff Example"
+      },
+      "synthetic_jacks_corrected_meaning": {
+        "A": "region",
+        "B": "province",
+        "C": "clinic_name",
+        "D": "contact_number_despite_status_header",
+        "E": "email",
+        "F": "address",
+        "G": "municipality",
+        "H": "status_source",
+        "I": "next_step",
+        "J": "unconfirmed",
+        "K": "unconfirmed"
+      }
     },
-    "accepted_response": {"batch_id": "20000000-0000-4000-8000-000000000001", "state": "processing"},
+    "generated_from": "Real API responses for the synthetic workbook (SNX-28), with UUIDs and upload time replaced by readable placeholders",
+    "accepted_response": {"batch_id": "20000000-0000-4000-8000-000000000001", "state": "needs_review", "replayed": false},
+    "needs_review_response": {
+      "batch_id": "20000000-0000-4000-8000-000000000001",
+      "state": "needs_review",
+      "original_filename": "synthetic-lead-import-v1.xlsx",
+      "uploaded_at": "2026-10-30T07:00:00Z",
+      "counts": {"created_clinics": 2, "accepted_rows": 2, "needs_review_rows": 2, "rejected_rows": 2, "skipped_rows": 0},
+      "rows": [
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000001",
+          "sheet": "Jacks Calling Sheet",
+          "row": 2,
+          "result": "needs_review",
+          "clinic_id": null,
+          "match_basis": null,
+          "reasons": [],
+          "warnings": ["unconfirmed_columns_held"],
+          "review_group": "30000000-0000-4000-8000-000000000001",
+          "candidates": [{"import_row_id": "30000000-0000-4000-8000-000000000002", "sheet": "Ljs Calling Sheet", "row": 1, "clinic_id": null, "clinic_name": null, "basis": ["exact_name", "shared_email"]}],
+          "proposed_fields": {
+            "email": "harborview@example.test",
+            "region": "Region Sample",
+            "address": "Sample Street",
+            "province": "Province Sample",
+            "next_step": "Call next week",
+            "clinic_name": "Harborview Clinic",
+            "status_code": "contacted",
+            "municipality": "Sample City",
+            "contact_number": "0917 000 0199"
+          }
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000003",
+          "sheet": "Jacks Calling Sheet",
+          "row": 3,
+          "result": "rejected",
+          "clinic_id": null,
+          "match_basis": null,
+          "reasons": ["missing_facility"],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000004",
+          "sheet": "Jacks Calling Sheet",
+          "row": 4,
+          "result": "accepted",
+          "clinic_id": "10000000-0000-4000-8000-000000000001",
+          "match_basis": "new_clinic",
+          "reasons": [],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000002",
+          "sheet": "Ljs Calling Sheet",
+          "row": 1,
+          "result": "needs_review",
+          "clinic_id": null,
+          "match_basis": null,
+          "reasons": [],
+          "warnings": [],
+          "review_group": "30000000-0000-4000-8000-000000000001",
+          "candidates": [{"import_row_id": "30000000-0000-4000-8000-000000000001", "sheet": "Jacks Calling Sheet", "row": 2, "clinic_id": null, "clinic_name": null, "basis": ["exact_name", "shared_email"]}],
+          "proposed_fields": {
+            "email": "harborview@example.test",
+            "region": "Region Sample",
+            "address": "Sample Street",
+            "province": "Province Sample",
+            "clinic_name": "Harborview Clinic",
+            "municipality": "Sample City",
+            "calling_notes": "Asked for a follow-up email",
+            "contact_number": "0917 000 0101",
+            "contact_person": "Sam Example",
+            "person_spoken_to": "Sam Example"
+          }
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000005",
+          "sheet": "Ljs Calling Sheet",
+          "row": 2,
+          "result": "rejected",
+          "clinic_id": null,
+          "match_basis": null,
+          "reasons": ["missing_facility"],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000006",
+          "sheet": "Ljs Calling Sheet",
+          "row": 3,
+          "result": "accepted",
+          "clinic_id": "10000000-0000-4000-8000-000000000002",
+          "match_basis": "new_clinic",
+          "reasons": [],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        }
+      ],
+      "field_reviews": []
+    },
+    "decision_request": {
+      "path": "POST /api/v1/imports/{batch_id}/decisions",
+      "import_row_ids": ["30000000-0000-4000-8000-000000000002", "30000000-0000-4000-8000-000000000001"],
+      "action": "create_clinic",
+      "reason": "Same clinic: confirmed by phone"
+    },
     "result_response": {
       "batch_id": "20000000-0000-4000-8000-000000000001",
-      "precondition": "staff_confirmed_harborview_cross_sheet_identity",
       "state": "needs_review",
+      "original_filename": "synthetic-lead-import-v1.xlsx",
+      "uploaded_at": "2026-10-30T07:00:00Z",
       "counts": {"created_clinics": 3, "accepted_rows": 4, "needs_review_rows": 0, "rejected_rows": 2, "skipped_rows": 0},
       "rows": [
-        {"sheet": "Ljs Calling Sheet", "row": 1, "result": "accepted", "clinic_id": "10000000-0000-4000-8000-000000000002", "field_review_required": true},
-        {"sheet": "Jacks Calling Sheet", "row": 2, "result": "accepted", "match_basis": "staff_confirmed", "clinic_id": "10000000-0000-4000-8000-000000000002", "field_review_required": true, "warnings": ["field_conflict_unresolved"]},
-        {"sheet": "Jacks Calling Sheet", "row": 3, "result": "rejected", "reason": "missing_facility"},
-        {"sheet": "Jacks Calling Sheet", "row": 4, "result": "accepted", "clinic_id": "10000000-0000-4000-8000-000000000003"},
-        {"sheet": "Ljs Calling Sheet", "row": 2, "result": "rejected", "reason": "missing_facility"},
-        {"sheet": "Ljs Calling Sheet", "row": 3, "result": "accepted", "clinic_id": "10000000-0000-4000-8000-000000000004"}
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000001",
+          "sheet": "Jacks Calling Sheet",
+          "row": 2,
+          "result": "accepted",
+          "clinic_id": "10000000-0000-4000-8000-000000000003",
+          "match_basis": "staff_new_clinic",
+          "reasons": [],
+          "warnings": ["unconfirmed_columns_held"],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000003",
+          "sheet": "Jacks Calling Sheet",
+          "row": 3,
+          "result": "rejected",
+          "clinic_id": null,
+          "match_basis": null,
+          "reasons": ["missing_facility"],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000004",
+          "sheet": "Jacks Calling Sheet",
+          "row": 4,
+          "result": "accepted",
+          "clinic_id": "10000000-0000-4000-8000-000000000001",
+          "match_basis": "new_clinic",
+          "reasons": [],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000002",
+          "sheet": "Ljs Calling Sheet",
+          "row": 1,
+          "result": "accepted",
+          "clinic_id": "10000000-0000-4000-8000-000000000003",
+          "match_basis": "staff_new_clinic",
+          "reasons": [],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000005",
+          "sheet": "Ljs Calling Sheet",
+          "row": 2,
+          "result": "rejected",
+          "clinic_id": null,
+          "match_basis": null,
+          "reasons": ["missing_facility"],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        },
+        {
+          "import_row_id": "30000000-0000-4000-8000-000000000006",
+          "sheet": "Ljs Calling Sheet",
+          "row": 3,
+          "result": "accepted",
+          "clinic_id": "10000000-0000-4000-8000-000000000002",
+          "match_basis": "new_clinic",
+          "reasons": [],
+          "warnings": [],
+          "review_group": null,
+          "candidates": [],
+          "proposed_fields": null
+        }
       ],
-      "field_review": {"review_id": "60000000-0000-4000-8000-000000000001", "field_name": "contact_number", "candidate_rows": [{"sheet": "Ljs Calling Sheet", "row": 1}, {"sheet": "Jacks Calling Sheet", "row": 2}], "state": "unresolved", "selected_value": null}
+      "field_reviews": [
+        {
+          "review_id": "60000000-0000-4000-8000-000000000001",
+          "clinic_id": "10000000-0000-4000-8000-000000000003",
+          "field_name": "contact_number",
+          "state": "unresolved",
+          "resolved_value": null,
+          "current_value": null,
+          "clinic_version": 1,
+          "candidate_rows": [
+            {"import_row_id": "30000000-0000-4000-8000-000000000001", "sheet": "Jacks Calling Sheet", "row": 2, "value": "0917 000 0199"},
+            {"import_row_id": "30000000-0000-4000-8000-000000000002", "sheet": "Ljs Calling Sheet", "row": 1, "value": "0917 000 0101"}
+          ]
+        }
+      ]
     },
-    "changed_header_response": {"error": {"code": "unsupported_workbook_format", "message": "Workbook layout needs review", "details": []}}
+    "resolve_field_review_request": {"path": "POST /api/v1/imports/field-reviews/{review_id}/resolve", "value": "0917 000 0101", "reason": "Clinic confirmed its main line", "clinic_version": 1},
+    "resolve_field_review_response": {
+      "review_id": "60000000-0000-4000-8000-000000000001",
+      "clinic_id": "10000000-0000-4000-8000-000000000003",
+      "field_name": "contact_number",
+      "state": "resolved",
+      "resolved_value": "0917 000 0101",
+      "current_value": "0917 000 0101",
+      "clinic_version": 2,
+      "candidate_rows": [
+        {"import_row_id": "30000000-0000-4000-8000-000000000001", "sheet": "Jacks Calling Sheet", "row": 2, "value": "0917 000 0199"},
+        {"import_row_id": "30000000-0000-4000-8000-000000000002", "sheet": "Ljs Calling Sheet", "row": 1, "value": "0917 000 0101"}
+      ]
+    },
+    "replay_response": {"batch_id": "20000000-0000-4000-8000-000000000001", "state": "completed", "replayed": true},
+    "changed_header_response": {"error": {"code": "unsupported_workbook_format", "message": "Workbook layout needs review", "details": [{"field": "Jacks Calling Sheet!D1", "reason": "unexpected_header"}]}}
   },
   "leads": {
     "request": "/api/v1/leads?status=contacted&q=harbor&limit=20",

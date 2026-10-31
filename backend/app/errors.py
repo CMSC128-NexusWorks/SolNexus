@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -80,8 +81,21 @@ class UnexpectedErrorMiddleware:
 
         try:
             await self.app(scope, receive, track_start)
-        except Exception:
-            logger.exception("Unhandled error on %s %s", scope["method"], scope["path"])
+        except Exception as exc:
+            database_error = _database_error_in(exc)
+            if database_error is None:
+                logger.exception("Unhandled error on %s %s", scope["method"], scope["path"])
+            else:
+                # PostgreSQL's DETAIL ("Failing row contains (...)") and SQLAlchemy's [parameters: ...] put
+                # whole rows, such as imported client leads or staff emails, into the message. Log where it
+                # failed and which constraint, never the message.
+                logger.error(
+                    "Unhandled database error on %s %s: %s\n%s",
+                    scope["method"],
+                    scope["path"],
+                    _describe_database_error(database_error),
+                    "".join(traceback.format_tb(exc.__traceback__)),
+                )
             if response_started:
                 # Too late to replace the response; let the server close the connection.
                 raise
@@ -91,6 +105,33 @@ class UnexpectedErrorMiddleware:
             await response(scope, receive, send)
 
 
+def _database_error_in(exc: BaseException) -> DBAPIError | None:
+    """The first database error in exc's cause/context chain, since a later error can wrap one."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        if isinstance(current, DBAPIError):
+            return current
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def _describe_database_error(error: DBAPIError) -> str:
+    """Error class, SQLSTATE, table and constraint: enough to debug, with no row values."""
+    original = error.orig
+    diag = getattr(original, "diag", None)
+    parts = [type(original).__name__ if original is not None else type(error).__name__]
+    for label, value in (
+        ("sqlstate", getattr(original, "sqlstate", None)),
+        ("table", getattr(diag, "table_name", None)),
+        ("constraint", getattr(diag, "constraint_name", None)),
+    ):
+        if value:
+            parts.append(f"{label}={value}")
+    return " ".join(parts)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     """Call before adding CORSMiddleware: middleware added later wraps it, so CORS stays outermost."""
     app.add_middleware(UnexpectedErrorMiddleware)
@@ -98,7 +139,11 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(SQLAlchemyError)
     async def handle_database_error(_: Request, exc: SQLAlchemyError) -> JSONResponse:
         # Never log SQL/parameters: even an integrity or programming exception can contain private edits.
-        logger.warning("Database request failed (%s)", type(exc).__name__)
+        # For a driver error, add SQLSTATE, table and constraint, which locate the failure without values.
+        logger.warning(
+            "Database request failed (%s)",
+            _describe_database_error(exc) if isinstance(exc, DBAPIError) else type(exc).__name__,
+        )
         if isinstance(
             exc, (OperationalError, InterfaceError, DisconnectionError, DatabaseTimeout)
         ) or (isinstance(exc, DBAPIError) and exc.connection_invalidated):

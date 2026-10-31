@@ -15,7 +15,9 @@ def sqlalchemy_url(database_url: str) -> str:
 
 
 # Queries are hand-written SQL through SQLAlchemy Core (`text()`), matching the hand-written migrations.
-engine = create_engine(sqlalchemy_url(settings.database_url), pool_pre_ping=True)
+# hide_parameters keeps bound values (passwords' hashes, emails, imported lead rows) out of exception
+# messages and therefore out of any log or traceback that prints them.
+engine = create_engine(sqlalchemy_url(settings.database_url), pool_pre_ping=True, hide_parameters=True)
 
 
 def get_db() -> Iterator[Connection]:

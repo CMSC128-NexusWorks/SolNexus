@@ -64,7 +64,8 @@ Rules that follow from this:
 | `app.message_resolution_events` | History of changed resolutions | Append-only |
 | `app.clinic_field_events` | Audit of staff row edits and name confirmations | Append-only |
 | `app.clinic_status_events` | Staff status transitions and import baselines | Append-only |
-| `app.import_batches`, `app.import_rows` | Workbook uploads and per-row results | Update while processing |
+| `app.import_batches`, `app.import_rows` | Workbook uploads and per-row results; `match_basis` says why an accepted row points at its clinic | Written in the upload's transaction; a row changes once more when staff decide it. See [workbook import](workbook-import.md) |
+| `app.import_row_decisions` | Staff decisions on possible-duplicate import rows: action, clinic, chosen name, actor, reason | Append-only |
 | `app.import_field_reviews`, `app.import_field_review_candidates` | Cross-sheet value conflicts and their staff decisions | Update to resolve |
 | `app.ingestion_checkpoints` | Each connector's resume cursor per connected account (Gmail `historyId`) | Upsert, only in the transaction that stores the last page it covers |
 | `app.pipeline_runs` | One Airflow run of `gmail_ingest` or `silver_publish`: status, attempt, counts, a redacted error summary | Updated in place across retries by the DAGs; `silver_publish` turns `succeeded` only in the transaction that swaps silver in |
