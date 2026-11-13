@@ -100,8 +100,12 @@ function dueRows(today = businessDate()) {
 // The mock import batch, changed by decisions and review resolutions. Tests can reset it.
 let mockImport: ImportResult = structuredClone(MOCK_IMPORT_RESULT);
 
+// Files the mock has "imported", so a second upload of the same file reports a replay.
+const mockUploadedFiles = new Set<string>();
+
 export function resetMockImport() {
   mockImport = structuredClone(MOCK_IMPORT_RESULT);
+  mockUploadedFiles.clear();
 }
 
 // Recount like the real API: needs_review while a row awaits a decision or a field review is open.
@@ -330,11 +334,27 @@ export const handlers = [
     },
   ),
 
-  http.post(api("/imports"), async () => {
+  // Mirrors the real upload's refusals and replay rule. The real API replays on the file's SHA-256;
+  // the raw multipart body stands in for it here. The mock never parses the workbook: every accepted
+  // upload returns the same synthetic batch. The body is read as text rather than request.formData()
+  // because undici's multipart parser rejects its own File objects under Vitest's jsdom environment.
+  http.post(api("/imports"), async ({ request }) => {
     await delay(300);
+    const failure = await readFailure();
+    if (failure) return failure;
     if (!mockSessionUser()) return unauthorized();
+    const body = await request.text();
+    const filename = /name="file"; filename="([^"]*)"/.exec(body)?.[1];
+    if (filename === undefined) return validation("file", "Field required");
+    if (!filename.toLowerCase().endsWith(".xlsx"))
+      return error(422, "unsupported_file_type", "Upload the lead workbook as an .xlsx file");
+    // The boundary differs per request, so drop it before comparing bodies.
+    const boundary = body.slice(0, body.indexOf("\r\n"));
+    const fingerprint = body.split(boundary).join("");
+    const replayed = mockUploadedFiles.has(fingerprint);
+    mockUploadedFiles.add(fingerprint);
     return HttpResponse.json(
-      { batch_id: mockImport.batch_id, state: mockImport.state, replayed: false },
+      { batch_id: mockImport.batch_id, state: mockImport.state, replayed },
       { status: 202 },
     );
   }),
