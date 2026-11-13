@@ -3,6 +3,8 @@ import { createBrowserRouter } from "react-router";
 import { AppShell } from "@/components/layout/app-shell";
 import { LoginPage } from "@/features/auth/login-page";
 import { RequireAuth } from "@/features/auth/require-auth";
+import { ImportPage } from "@/features/imports/import-page";
+import { ImportResultPage } from "@/features/imports/import-result-page";
 import { DashboardPage } from "@/features/leads/dashboard-page";
 import { LeadDetailPage } from "@/features/leads/lead-detail-page";
 
@@ -19,6 +21,8 @@ export const routes = [
         children: [
           { index: true, element: <DashboardPage /> },
           { path: "leads/:clinicId", element: <LeadDetailPage /> },
+          { path: "imports", element: <ImportPage /> },
+          { path: "imports/:batchId", element: <ImportResultPage /> },
           { path: "*", element: <NotFoundPage /> },
         ],
       },
