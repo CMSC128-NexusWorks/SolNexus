@@ -43,6 +43,7 @@ src/
   features/
     auth/           auth context, route guard, login page
     leads/          dashboard, lead detail, data hooks (queries.ts)
+    imports/        workbook upload and import results
   lib/
     api/            typed API client: types.ts mirrors docs/contracts/phase1-data-api-v1.md
     format.ts       date helpers (Asia/Manila business dates)
@@ -62,11 +63,13 @@ src/
 
 ## Screens and tickets
 
-| Route              | Screen                         | Wireframe | Ticket         |
-| ------------------ | ------------------------------ | --------- | -------------- |
-| `/login`           | Sign-in                        | 01        | SNX-56         |
-| `/`                | Due today + All leads          | 02, 03    | SNX-57, SNX-58 |
-| `/leads/:clinicId` | Lead detail + history          | 04        | SNX-59         |
-| all                | Loading / empty / error states | 08        | SNX-60         |
+| Route               | Screen                         | Wireframe | Ticket         |
+| ------------------- | ------------------------------ | --------- | -------------- |
+| `/login`            | Sign-in                        | 01        | SNX-56         |
+| `/`                 | Due today + All leads          | 02, 03    | SNX-57, SNX-58 |
+| `/leads/:clinicId`  | Lead detail + history          | 04        | SNX-59         |
+| all                 | Loading / empty / error states | 08        | SNX-60         |
+| `/imports`          | Upload the lead workbook       | none      | SNX-62         |
+| `/imports/:batchId` | Import results                 | none      | SNX-62         |
 
 Wireframes are in `docs/wireframes/` and in the Figma file "SolTech Leads — Phase 1 Wireframes".
