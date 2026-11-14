@@ -17,6 +17,8 @@ VITE_USE_MOCKS=true npm run dev
 
 In mock mode, **Mock scenario** selects loading, empty due, no search results (enter a search), API failure, expired session, failed/stale pipeline, and field validation. It remains accessible on sign-in for recovery and is absent with mocks disabled. Pipeline warnings use `/pipeline/status`; `published_at` belongs to Airflow's last successful swap. The UI exposes search and a single status filter, with no advanced date-filter control. A row's suggested interaction topic and operational next step have separate columns.
 
+**Download leads** (above All leads) saves `GET /leads/export` as `solnexus-leads-<Manila date>.xlsx`, or `.csv` if the API sends CSV. It always exports every current lead; search and the status filter don't apply. The mock serves a synthetic CSV with the contract's columns. The real endpoint arrives with SNX-53.
+
 > After pulling changes to `package.json`, Docker keeps old packages in the `web_node_modules` volume. Run `docker compose run --rm web npm install` to refresh it.
 
 ## Scripts
