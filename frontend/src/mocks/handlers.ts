@@ -97,6 +97,48 @@ function dueRows(today = businessDate()) {
   ).sort((a, b) => a.next_action_date!.localeCompare(b.next_action_date!));
 }
 
+// FR-19 export columns from the data/API contract. The real export (SNX-53) is a spreadsheet; the
+// mock answers with CSV so mock mode still saves a file that opens, without a workbook library.
+// Columns the mock rows don't carry (point_person, discovery_source, origin) are left blank.
+const EXPORT_COLUMNS = [
+  "lead_id",
+  "record_type",
+  "clinic_name",
+  "clinic_name_state",
+  "contact_person",
+  "contact_number",
+  "email",
+  "region",
+  "province",
+  "municipality",
+  "address",
+  "status_code",
+  "next_action_date",
+  "next_step",
+  "calling_notes",
+  "person_spoken_to",
+  "point_person",
+  "discovery_source",
+  "last_contact_at",
+  "origin",
+] as const;
+
+function exportCsv() {
+  const cell = (value: unknown) => {
+    let text = value == null ? "" : String(value);
+    // The contract requires escaping formula-leading text so a cell can't run as a formula.
+    if (/^[=+\-@]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  const rows = MOCK_LEADS.map((lead) => {
+    const record = lead as unknown as Record<string, unknown>;
+    return EXPORT_COLUMNS.map((column) => cell(record[column])).join(",");
+  });
+  // First line is the contract's format/version marker and snapshot time.
+  const marker = ["solnexus-leads-v1", new Date().toISOString()].map(cell).join(",");
+  return [marker, EXPORT_COLUMNS.join(","), ...rows].join("\r\n") + "\r\n";
+}
+
 // The mock import batch, changed by decisions and review resolutions. Tests can reset it.
 let mockImport: ImportResult = structuredClone(MOCK_IMPORT_RESULT);
 
@@ -151,6 +193,15 @@ export const handlers = [
       ],
     };
     return HttpResponse.json(payload);
+  }),
+  // Must come before "/leads/:id", which would otherwise treat "export" as a lead ID.
+  http.get(api("/leads/export"), async () => {
+    if (!mockSessionUser()) return unauthorized();
+    const failure = await readFailure();
+    if (failure) return failure;
+    return new HttpResponse(exportCsv(), {
+      headers: { "Content-Type": "text/csv; charset=utf-8" },
+    });
   }),
   http.get(api("/leads/needs-name"), async () => {
     if (!mockSessionUser()) return unauthorized();

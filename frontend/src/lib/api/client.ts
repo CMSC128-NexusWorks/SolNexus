@@ -66,3 +66,16 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
+
+/**
+ * Fetches a file, such as the lead export, as a Blob. Sends the session cookie and throws ApiError
+ * like apiFetch, but never parses a successful body as JSON. Errors still arrive as contract JSON.
+ */
+export async function apiDownload(path: string): Promise<Blob> {
+  const response = await fetch(buildUrl(path), { credentials: "include" });
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as ApiErrorBody | null;
+    throw new ApiError(response.status, errorBody);
+  }
+  return response.blob();
+}
