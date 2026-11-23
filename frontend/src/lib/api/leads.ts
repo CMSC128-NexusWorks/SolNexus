@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiDownload, apiFetch } from "./client";
 import type { HistoryPage, LeadRow, LeadsPage, LeadsQuery, PipelineStatus } from "./types";
 
 export function getLeads(query: LeadsQuery = {}) {
@@ -50,6 +50,12 @@ export interface Confirmation {
 }
 export const confirmClinic = (id: string, body: Confirmation) =>
   apiFetch<LeadRow>(`/inquiries/${id}/confirm-clinic`, { method: "POST", body });
+
+/**
+ * FR-19 snapshot of every current lead the signed-in staff member may see. It takes no search or
+ * status filter: the export is the whole list, not the rows on screen.
+ */
+export const downloadLeadsExport = () => apiDownload("/leads/export");
 
 export function getLeadHistory(clinicId: string, cursor?: string) {
   return apiFetch<HistoryPage>(`/leads/${clinicId}/history`, { query: { cursor } });

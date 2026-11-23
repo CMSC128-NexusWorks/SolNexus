@@ -7,6 +7,8 @@ import { STATUS_LABELS, type StatusCode } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { DataState } from "./data-state";
 import { LeadTable } from "./lead-table";
+import { DownloadLeadsButton } from "./download-leads-button";
+import type { ReactNode } from "react";
 
 /** Independent cursors keep search from hiding urgent work in the other tables. */
 function LeadSection({
@@ -14,11 +16,14 @@ function LeadSection({
   mode,
   q,
   status,
+  action,
 }: {
   title: string;
   mode: "all" | "due" | "needs-name";
   q?: string;
   status?: StatusCode;
+  /** Optional control shown beside the heading, e.g. the All leads download. */
+  action?: ReactNode;
 }) {
   const all = useLeads({ q, status }, mode === "all");
   const due = useDueLeads(mode === "due");
@@ -30,9 +35,12 @@ function LeadSection({
   const heading = `heading-${mode}`;
   return (
     <section aria-labelledby={heading} className="grid gap-3">
-      <h2 id={heading} className="text-lg font-semibold">
-        {title}
-      </h2>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h2 id={heading} className="text-lg font-semibold">
+          {title}
+        </h2>
+        {action}
+      </div>
       <DataState pending={data.isPending} error={data.error} retry={() => void data.refetch()} />
       {data.data && !data.error && (
         <LeadTable
@@ -108,6 +116,7 @@ export function DashboardPage() {
       <LeadSection
         title="All leads"
         mode="all"
+        action={<DownloadLeadsButton />}
         q={params.get("q") ?? undefined}
         status={
           status && Object.prototype.hasOwnProperty.call(STATUS_LABELS, status)
