@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/features/auth/auth-provider";
 import { createQueryClient } from "@/lib/query-client";
+import { MockScenarioControl } from "@/mocks/scenario-control";
 
 export function AppProviders({
   children,
@@ -20,6 +21,7 @@ export function AppProviders({
         {children}
         <Toaster />
       </AuthProvider>
+      {import.meta.env.VITE_USE_MOCKS === "true" && <MockScenarioControl />}
     </QueryClientProvider>
   );
 }

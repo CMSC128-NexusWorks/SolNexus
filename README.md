@@ -133,6 +133,14 @@ docker compose run --rm --no-deps api alembic upgrade head
 
 The last command creates or upgrades the database schema. Rerun it after pulling new migrations; see [Database schema and ownership](docs/database.md).
 
+There is no sign-up page. Create a development staff account, using a synthetic email:
+
+```bash
+docker compose run --rm api python -m app.staff_account staff.one@example.test
+```
+
+See [Staff sign-in and sessions](docs/authentication.md) for session rules and cookie settings.
+
 | Service | URL |
 |---|---|
 | React dashboard | http://localhost:5173 |
@@ -167,7 +175,7 @@ See the [frontend README](frontend/README.md) for scripts and conventions.
 
 ```
 .
-├── airflow/    Airflow image and DAGs
+├── airflow/    Airflow image, DAGs and the Gmail connector (see airflow/README.md)
 ├── backend/    FastAPI app, Alembic migrations and dev seed
 ├── dbt/        dbt project (silver models; reads bronze and app as sources)
 ├── docker/     container init scripts (Postgres)
@@ -181,11 +189,25 @@ See the [frontend README](frontend/README.md) for scripts and conventions.
 - Work is tracked in Jira project **SNX**. Pick up a ticket, then branch from `main` as `<type>/snx-<number>-short-name` (`feat`, `fix`, `docs` or `chore`).
 - Keep commits atomic: one logical change per commit, so each can be reviewed and reverted on its own.
 - Write commits as [Conventional Commits](https://www.conventionalcommits.org/) with the ticket as scope, e.g. `feat(snx-54): add app shell`.
-- Run the checks for the area you changed before opening a PR. Frontend: `npm run typecheck && npm run lint && npm run test`.
-- Open a PR into `main`. It needs one approval from someone other than the last pusher.
+- Run the checks for the area you changed before opening a PR; see [Automated checks](#automated-checks) for the commands. CI runs the same ones.
+- Open a PR into `main`. It needs one approval from someone other than the last pusher, and the **Frontend**, **Backend** and **Airflow** CI checks must pass.
 - Use synthetic data only in fixtures, mocks, tests and screenshots. Real client data stays in the git-ignored `leads-data/` folder.
 
 AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project context.
+
+### Automated checks
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs three parallel jobs on every pull request into `main` (and on every push to `main`). They are required status checks, so a failing job blocks the merge. CI needs no secrets and uses the same runtime versions as the Dockerfiles (Node 22, Python 3.12, Airflow 2.10.5, PostgreSQL 16).
+
+| CI job | What it runs | Run the same checks locally |
+|---|---|---|
+| **Frontend** | `npm ci`, then `typecheck`, `lint`, `format:check` and `test` (vitest) in `frontend/` | `cd frontend && npm ci && npm run typecheck && npm run lint && npm run format:check && npm run test` |
+| **Backend** | `pytest` in `backend/`, against a PostgreSQL service container (it creates its own `solnexus_test` database) | `docker compose run --rm api pytest` |
+| **Airflow** | `pytest` in `airflow/`, inside the project's Airflow image: DAG import test and the Gmail connector tests, which fake Gmail in memory | `docker compose --profile test run --rm airflow-tests` |
+
+- `npm run format:check` fails on unformatted files; fix them with `npm run format` in `frontend/`.
+- The Airflow tests that need Postgres skip in CI because `SOLNEXUS_TEST_DATABASE_URL` is not set. Run them locally with the steps in [airflow/README.md](airflow/README.md#tests).
+- dbt models and tests are not run in CI yet.
 
 ## Documentation
 
@@ -196,6 +218,8 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 - [Implementation Roadmap](docs/implementation_roadmap.md)
 - [Phase 1 Data and API Contract](docs/contracts/phase1-data-api-v1.md)
 - [Database Schema and Ownership](docs/database.md)
+- [Staff Sign-in and Sessions](docs/authentication.md)
+- [Legacy Workbook Import](docs/workbook-import.md)
 - [Wireframes](docs/wireframes)
 
 ## Team

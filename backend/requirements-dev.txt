@@ -1,0 +1,5 @@
+# Test-only tools. Not part of the runtime image unless built with INSTALL_DEV=true, which
+# compose.yaml does for local development so `docker compose run --rm api pytest` works.
+-r requirements.txt
+pytest>=8.3.0,<10.0.0
+httpx2>=2.16.0,<3.0.0

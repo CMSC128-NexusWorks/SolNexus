@@ -3,6 +3,7 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 
 import { server } from "@/mocks/server";
+import { resetMockImport, resetMockLeads } from "@/mocks/handlers";
 
 // jsdom has no matchMedia; sonner and responsive components call it.
 Object.defineProperty(window, "matchMedia", {
@@ -24,5 +25,8 @@ afterEach(() => {
   server.resetHandlers();
   cleanup();
   sessionStorage.clear();
+  resetMockLeads();
+  // The mock import batch changes with decisions and resolutions; each test starts from the upload.
+  resetMockImport();
 });
 afterAll(() => server.close());

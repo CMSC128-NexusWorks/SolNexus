@@ -16,13 +16,15 @@ JACKS = [
         "A": "Facility", "B": "Name", "C": "Email", "D": "Status",
         "H": "Status", "I": "Next Step", "J": "Contact", "K": "Point Person",
     },
+    # Data rows follow the Ljs A-G layout under the misleading header (data contract, Jacks layout evidence).
     {
-        "A": "Harborview Clinic", "B": "Sam Example", "C": "harborview@example.test",
-        "D": "0917 000 0199", "H": "Contacted", "I": "Call next week",
+        "A": "Region Sample", "B": "Province Sample", "C": "Harborview Clinic",
+        "D": "0917 000 0199", "E": "harborview@example.test", "F": "Sample Street", "G": "Sample City",
+        "H": "Contacted", "I": "Call next week",
         "J": "unmapped contact example", "K": "Staff Example",
     },
-    {"A": "", "C": "missing-facility@example.test", "H": "Contacted"},
-    {"A": "Pinecrest Clinic", "C": "pinecrest@example.test", "D": "0917 000 0202"},
+    {"A": "Region Sample", "C": "", "E": "missing-facility@example.test", "H": "Contacted"},
+    {"A": "Region Sample", "C": "Pinecrest Clinic", "D": "0917 000 0202", "E": "pinecrest@example.test"},
 ]
 
 LJS = [

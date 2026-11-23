@@ -16,10 +16,26 @@ x-airflow-common: &airflow-common
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_PORT: "5432"
+    # Connector package used by the DAGs (airflow/include/solnexus_ingest).
+    PYTHONPATH: /opt/airflow/include
+    # Warehouse connection for PostgresHook(postgres_conn_id="solnexus_db"). JSON instead of a URI so a
+    # password containing @ : / # % needs no URL encoding (only " and \ would need JSON escaping).
+    AIRFLOW_CONN_SOLNEXUS_DB: '{"conn_type": "postgres", "host": "postgres", "port": 5432, "login": "${POSTGRES_USER}", "password": "${POSTGRES_PASSWORD}", "schema": "${POSTGRES_DB}"}'
+    # Gmail ingestion (SNX-32). The token comes from the SNX-21 consent flow; see airflow/README.md.
+    GMAIL_TOKEN_FILE: /opt/airflow/secrets/gmail-token.json
+    GMAIL_LABEL_ID: ${GMAIL_LABEL_ID:-}
+    GMAIL_BACKFILL_QUERY: ${GMAIL_BACKFILL_QUERY:-newer_than:30d}
+    # Schedules (SNX-33), cron in Asia/Manila. They take effect only once the DAGs are unpaused.
+    GMAIL_SYNC_SCHEDULE: ${GMAIL_SYNC_SCHEDULE:-0 * * * *}
+    SILVER_REFRESH_SCHEDULE: ${SILVER_REFRESH_SCHEDULE:-30 * * * *}
+    DBT_PROJECT_DIR: /opt/airflow/dbt
   volumes:
     - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/include:/opt/airflow/include:ro
     - ./dbt:/opt/airflow/dbt
     - airflow_logs:/opt/airflow/logs
+    # OAuth files stay on the host and are mounted read-only; the image never contains them.
+    - ./.secrets:/opt/airflow/secrets:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
@@ -46,14 +62,23 @@ services:
   api:
     build:
       context: ./backend
+      args:
+        # Local dev image includes test tools for `docker compose run --rm api pytest`.
+        INSTALL_DEV: "true"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       API_HOST: ${API_HOST}
       API_PORT: ${API_PORT}
+      PIPELINE_STALE_AFTER_MINUTES: ${PIPELINE_STALE_AFTER_MINUTES:-120}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
+      # Read-only contract/model sources used by backend integration tests in the dev container.
+      - ./dbt:/dbt:ro
+      - ./docs/contracts/fixtures:/docs/contracts/fixtures:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
@@ -77,6 +102,26 @@ services:
     # Only the local browser can reach the temporary OAuth callback.
     ports:
       - "127.0.0.1:8765:8765"
+
+  # Connector tests in the same image the DAGs run in: docker compose --profile test run --rm airflow-tests
+  # SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests (see airflow/README.md).
+  airflow-tests:
+    profiles: ["test"]
+    <<: *airflow-common
+    depends_on: []
+    working_dir: /opt/airflow/project
+    environment:
+      SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
+    volumes:
+      - ./airflow:/opt/airflow/project:ro
+    # Arguments after the service name are appended and reach pytest as "$$@" (e.g. -k sync).
+    # The project mount is read-only, so pytest's cache is disabled rather than written into it.
+    entrypoint:
+      - bash
+      - -c
+      - pip install --quiet --disable-pip-version-check -r requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
 
   web:
     build:

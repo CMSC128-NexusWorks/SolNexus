@@ -4,16 +4,12 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from app.core.config import settings
+from app.db import sqlalchemy_url
 
 if context.config.config_file_name is not None:
-    fileConfig(context.config.config_file_name)
-
-
-def sqlalchemy_url(database_url: str) -> str:
-    # .env uses the libpq form shared with other tools; SQLAlchemy needs the psycopg 3 driver named.
-    if database_url.startswith("postgresql://"):
-        return "postgresql+psycopg://" + database_url.removeprefix("postgresql://")
-    return database_url
+    # Keep loggers that already exist: the test suite runs migrations in-process after importing the app,
+    # and the default would silence every app.* logger for the rest of the session.
+    fileConfig(context.config.config_file_name, disable_existing_loggers=False)
 
 
 def run_migrations_offline() -> None:

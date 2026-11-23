@@ -53,7 +53,10 @@ Rules that follow from this:
 | Table | Holds | Change rule |
 |---|---|---|
 | `bronze.raw_messages` | One row per source message: exact payload bytes, source IDs, event and ingest times | Append-only. `INSERT ... ON CONFLICT DO NOTHING` on `raw_messages_source_key` |
-| `app.staff_users` | The SolTech dashboard accounts | Deactivate with `is_active`; never delete |
+| `bronze.quarantined_messages` | Source messages a connector could not parse or store, with the reason and bytes when readable | Append-only; one row per source key |
+| `bronze.raw_message_discrepancies` | A replay whose payload bytes differ from the stored first copy | Append-only; one row per distinct differing payload |
+| `app.staff_users` | The SolTech dashboard accounts | Create or reset with `python -m app.staff_account`; deactivate with `is_active`; never delete |
+| `app.staff_sessions` | Sign-in sessions; only a hash of each cookie token | Insert on login; revoke with `revoked_at`. See [authentication](authentication.md) |
 | `app.clinics` | Confirmed clinic leads | Versioned edits: `SET ..., version = version + 1 WHERE version = :expected` |
 | `app.lead_inquiries` | Unknown-name first contacts | Versioned edits, as for clinics |
 | `app.clinic_source_identities` | Staff-confirmed source identity to clinic links | Revoke once, then insert a replacement; no other change |
@@ -61,8 +64,12 @@ Rules that follow from this:
 | `app.message_resolution_events` | History of changed resolutions | Append-only |
 | `app.clinic_field_events` | Audit of staff row edits and name confirmations | Append-only |
 | `app.clinic_status_events` | Staff status transitions and import baselines | Append-only |
-| `app.import_batches`, `app.import_rows` | Workbook uploads and per-row results | Update while processing |
+| `app.import_batches`, `app.import_rows` | Workbook uploads and per-row results; `match_basis` says why an accepted row points at its clinic | Written in the upload's transaction; a row changes once more when staff decide it. See [workbook import](workbook-import.md) |
+| `app.import_row_decisions` | Staff decisions on possible-duplicate import rows: action, clinic, chosen name, actor, reason | Append-only |
 | `app.import_field_reviews`, `app.import_field_review_candidates` | Cross-sheet value conflicts and their staff decisions | Update to resolve |
+| `app.ingestion_checkpoints` | Each connector's resume cursor per connected account (Gmail `historyId`) | Upsert, only in the transaction that stores the last page it covers |
+| `app.pipeline_runs` | One Airflow run of `gmail_ingest` or `silver_publish`: status, attempt, counts, a redacted error summary | Updated in place across retries by the DAGs; `silver_publish` turns `succeeded` only in the transaction that swaps silver in |
+| `app.pipeline_status` (view) | Latest run and last success per pipeline, one row each even before the first run | Read-only; `silver_publish.last_succeeded_data_as_of` is the contract's `published_at` |
 
 Append-only tables reject `UPDATE`, `DELETE` and `TRUNCATE` with a trigger. Every service currently connects as one superuser, which bypasses `GRANT`/`REVOKE`, so the triggers are what stops accidental edits. They do not stop an owner who disables them.
 
@@ -71,12 +78,14 @@ Append-only tables reject `UPDATE`, `DELETE` and `TRUNCATE` with a trigger. Ever
 `silver.interactions`: one row per `bronze.raw_messages` row, unique on `raw_message_id`.
 
 - `clinic_id` is set only when the message's `app.message_resolutions` row is `linked` **and** an active `app.clinic_source_identities` row for the message's exact `(source_channel, source_account_id, external_participant_id)` points to the same clinic. Otherwise it is null and the row stays available for review.
-- Parsed status or next-action values are suggestions with a `parser_version`; they never change `app` rows.
+- Parsed status or next-action values are suggestions with a `parser_version`; they never change `app` rows. `topic`, `derived_status_code`, `derived_next_action_date` and `parser_version` exist but stay null until the baseline rules are approved and ingestion fills `parsed_payload`.
 
 `silver.leads`: one row per confirmed clinic or open inquiry, unique on `(record_type, lead_id)`.
 
 - `record_type = 'clinic'` comes from `app.clinics`; `record_type = 'inquiry'` comes from `app.lead_inquiries` where `state = 'open'`, with `clinic_name` null and `clinic_name_state = 'unknown'`.
 - Operational fields come from `app` unchanged. `last_interaction_at` and `interaction_count` are derived from linked `silver.interactions`.
-- Clinics with no messages still appear.
+- Every silver row is a snapshot as of the last successful publication (`published_at` = `app.pipeline_status.last_succeeded_data_as_of` for `silver_publish`). That is the time the build started reading `bronze` and `app`, not the later swap time, so every change committed before `published_at` is in silver. Airflow builds silver into `silver_build` and swaps it in only after every model and dbt test passed (SNX-33), so a failed run keeps the previous tables and `published_at`. A mapping revocation or correction made after that run still counts toward the old clinic's `last_interaction_at` and `interaction_count` until the next run. Clinic history must apply the read-time link check in [the data/API contract](contracts/phase1-data-api-v1.md); whether the API also recomputes these two columns at read time, or shows them as of `published_at`, is open for SNX-30.
+- Clinics with no messages still appear. That includes clinics from the workbook import: they enter silver at the next publication, which runs hourly even when Gmail ingestion is failing.
+- Nothing outside the `silver` schema may depend on silver tables (views, foreign keys): the publish step drops the previous schema with `CASCADE`.
 
 dbt tests on these models should check uniqueness of the keys above and relationships to their `app` and `bronze` sources.
