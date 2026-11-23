@@ -34,6 +34,9 @@ export function AppShell() {
           </Link>
           <SyncStatus />
           <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/imports">Import workbook</Link>
+            </Button>
             <span className="hidden text-sm text-muted-foreground sm:inline">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               Sign out

@@ -45,18 +45,22 @@ function buildUrl(path: string, query?: Query) {
 /**
  * The single way screens talk to the backend. Sends the session cookie,
  * encodes JSON bodies and throws ApiError on failure.
+ *
+ * A FormData body (file upload) is sent as-is with no Content-Type, so the browser writes the
+ * multipart boundary itself and sends a Content-Length, which POST /imports requires.
  */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { query, body, headers, ...init } = options;
+  const isForm = body instanceof FormData;
   const response = await fetch(buildUrl(path, query), {
     ...init,
     credentials: "include",
     headers: {
       Accept: "application/json",
-      ...(body !== undefined && { "Content-Type": "application/json" }),
+      ...(body !== undefined && !isForm && { "Content-Type": "application/json" }),
       ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
 
   if (!response.ok) {
