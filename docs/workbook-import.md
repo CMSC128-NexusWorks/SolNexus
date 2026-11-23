@@ -2,6 +2,8 @@
 
 SolTech's lead workbook seeds SolNexus once (FR-02). After migration, SolNexus is the source of truth: staff edit leads in the dashboard, and the workbook is never synced back. This page covers what the importer does, how staff resolve what it will not decide alone, and how to operate it. The rules it implements are in the [data/API contract](contracts/phase1-data-api-v1.md#workbook-migration-fr-02); the code is in [backend/app/imports](../backend/app/imports).
 
+Staff upload the workbook from **Import workbook** in the dashboard's top bar (`/imports`, SNX-62). The results page (`/imports/{batch_id}`) shows the counts, the rows held for review with their possible matches, the rejected rows with reasons, and how often each warning occurred. Deciding held rows and resolving field reviews still go through the API below; the screen does not do them yet.
+
 ## Endpoints
 
 All require a signed-in staff session.
