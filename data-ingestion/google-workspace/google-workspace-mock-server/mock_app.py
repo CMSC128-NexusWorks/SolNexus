@@ -4,10 +4,10 @@ The master service talks to it exactly as it talks to Google, so the whole pipel
 in CI with no Google account and no secrets. So far it has validated settings, a validated dataset loaded
 into in-memory state (mock_state), the health route, the error formats, the OAuth token endpoint and access
 checks (mock_oauth), injected delays and failures (mock_faults), the Gmail API (routes_gmail) and Calendar
-events.list with sync tokens (routes_calendar).
+events.list with sync tokens (routes_calendar), and runtime controls under /_mock (routes_mock_control).
 
 Route namespaces:
-- `/_mock/*` holds the mock's own routes (health now; data control and fault injection later). The
+- `/_mock/*` holds the mock's own routes (health, data changes, cursor expiry, OAuth and fault controls). The
   underscore prefix can never collide with a real Google path, and it makes a test's intent obvious.
 - Google-shaped paths (e.g. `/gmail/v1/...`) mirror Google's URLs and return Google's error format
   (google_errors), so the master's real error classification is what gets tested.
@@ -28,6 +28,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import mock_oauth
 import routes_calendar
 import routes_gmail
+import routes_mock_control
 from google_errors import GoogleApiError, OAuthTokenError, google_error_response, oauth_error_response
 from mock_dataset import read_dataset_or_problems
 from mock_settings import MockServerSettings, format_startup_report, load_mock_server_settings_or_exit
@@ -40,6 +41,8 @@ ERROR_CODE_BY_STATUS = {
     400: "BAD_REQUEST",
     404: "NOT_FOUND",
     405: "METHOD_NOT_ALLOWED",
+    # A change that conflicts with the current state, e.g. adding a duplicate message or cancelling twice.
+    409: "CONFLICT",
     422: "VALIDATION_FAILED",
     500: "INTERNAL_ERROR",
 }
@@ -139,6 +142,7 @@ def build_mock_google_app(settings: MockServerSettings, state: MockGoogleState) 
     app.include_router(mock_oauth.router)
     app.include_router(routes_gmail.router)
     app.include_router(routes_calendar.router)
+    app.include_router(routes_mock_control.router)
 
     @app.get("/_mock/health")
     def mock_health() -> dict[str, str]:
