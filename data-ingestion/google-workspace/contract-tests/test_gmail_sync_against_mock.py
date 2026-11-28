@@ -119,9 +119,12 @@ def test_history_gap_falls_back_to_a_full_resync_without_duplicates(gmail, db, j
     mock_control("gmail/expire-history")
 
     summary = sync_mailbox(gmail, db, SETTINGS, job_run_id=job_run_id)
+    next_run = sync_mailbox(gmail, db, SETTINGS, job_run_id=job_run_id)
 
     assert summary["mode"] == "full_resync"
     assert summary["inserted"] == 0 and summary["already_stored"] == 8  # recognized, not stored twice
+    # The cursor the resync saved is valid, so the following run is incremental again (not another resync).
+    assert next_run["mode"] == "incremental"
 
 
 def test_throttling_is_ridden_out_by_backoff(gmail, db, job_run_id, mock_control, sleeps):

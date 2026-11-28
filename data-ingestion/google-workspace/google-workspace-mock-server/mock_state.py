@@ -168,6 +168,19 @@ class MockGmailMailbox:
             )
         )
 
+    def expire_history_handed_out_so_far(self) -> int:
+        """Make every historyId handed out until now too old for history.list (a "history gap"); return the boundary.
+
+        The mailbox's historyId first moves one step forward (Gmail's historyId also advances for reasons other than
+        new mail), then the boundary is set AT that new value. Cursors handed out earlier are refused with 404, while
+        the historyId a full sync reads from the profile right afterwards is accepted, so the client gets back to
+        incremental sync. Setting the boundary one past the current value instead would also refuse that fresh
+        cursor and trap the client in a full resync on every run.
+        """
+        self.current_history_id += 1
+        self.oldest_available_history_id = self.current_history_id
+        return self.oldest_available_history_id
+
 
 # --- Calendar ------------------------------------------------------------------------------------------
 
@@ -329,6 +342,18 @@ class MockGoogleCalendar:
         resource = self._latest_resource_copy(event_id)
         resource["status"] = "cancelled"
         self._write_version(resource, at)
+
+    def expire_sync_tokens_handed_out_so_far(self) -> int:
+        """Make every sync token handed out until now expired (410 fullSyncRequired); return the boundary.
+
+        Same shape as the Gmail history gap: the change counter moves one position forward (a position with no event
+        write, like Google's own internal token bumps), then the boundary is set AT it. Tokens handed out earlier sit
+        below it and get 410; the nextSyncToken of the full sync that follows is exactly the boundary and is accepted,
+        so the client gets back to incremental sync instead of looping on full syncs.
+        """
+        self.change_counter += 1
+        self.oldest_valid_sync_position = self.change_counter
+        return self.oldest_valid_sync_position
 
 
 # --- The whole mock ------------------------------------------------------------------------------------

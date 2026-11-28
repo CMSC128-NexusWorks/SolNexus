@@ -104,13 +104,19 @@ def test_deleting_an_unknown_message_is_a_404(client):
     assert response.status_code == 404 and response.json()["error"] == "NOT_FOUND"
 
 
-def test_expired_history_forces_the_full_sync_path(client):
-    cursor = client.get(f"{GMAIL}/profile").json()["historyId"]  # what a client stored after its last sync
+def test_expired_history_forces_one_full_sync_then_incremental_sync_works_again(client):
+    old_cursor = client.get(f"{GMAIL}/profile").json()["historyId"]  # what a client stored after its last sync
 
     client.post("/_mock/gmail/expire-history")
+    gap = client.get(f"{GMAIL}/history", params={"startHistoryId": old_cursor})
+    # The client's full resync: list everything, and take the profile's historyId as its new cursor.
+    assert client.get(f"{GMAIL}/messages").status_code == 200
+    new_cursor = client.get(f"{GMAIL}/profile").json()["historyId"]
+    next_run = client.get(f"{GMAIL}/history", params={"startHistoryId": new_cursor})
 
-    assert client.get(f"{GMAIL}/history", params={"startHistoryId": cursor}).status_code == 404
-    assert client.get(f"{GMAIL}/messages").status_code == 200  # the full sync still works
+    assert gap.status_code == 404
+    # Regression: the fresh cursor must be accepted, or every later run would be another full resync.
+    assert next_run.status_code == 200 and int(new_cursor) > int(old_cursor)
 
 
 # --- Calendar data ---
@@ -143,13 +149,17 @@ def test_cancelling_twice_is_a_409_and_an_unknown_event_a_404(client):
     assert client.post("/_mock/calendar/events/evt-nope/cancel").status_code == 404
 
 
-def test_expired_sync_tokens_force_a_410(client):
-    token = calendar_sync(client)["nextSyncToken"]
+def test_expired_sync_tokens_force_one_full_sync_then_incremental_sync_works_again(client):
+    old_token = calendar_sync(client)["nextSyncToken"]
 
     client.post("/_mock/calendar/expire-sync-tokens")
+    gone = client.get(EVENTS, params={"singleEvents": "true", "syncToken": old_token})
+    new_token = calendar_sync(client)["nextSyncToken"]  # the client's full sync after the 410
+    next_run = client.get(EVENTS, params={"singleEvents": "true", "syncToken": new_token})
 
-    response = client.get(EVENTS, params={"singleEvents": "true", "syncToken": token})
-    assert response.status_code == 410
+    assert gone.status_code == 410
+    # Regression: the full sync's token must be accepted, or every later run would 410 again.
+    assert next_run.status_code == 200 and next_run.json()["items"] == []
 
 
 # --- scripted changes, state and reset ---

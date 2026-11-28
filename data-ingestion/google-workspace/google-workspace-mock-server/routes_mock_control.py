@@ -154,15 +154,15 @@ def delete_gmail_message(message_id: str, request: Request) -> dict[str, Any]:
 
 @router.post("/gmail/expire-history")
 def expire_gmail_history(request: Request) -> dict[str, Any]:
-    """Make every history cursor a client holds too old (a "history gap").
+    """Make every history cursor handed out so far too old (a "history gap").
 
-    The boundary moves past the current historyId, so even a client that synced a moment ago gets 404 from
-    history.list and must fall back to a full sync, which is the recovery path this exists to test.
+    Even a client that synced a moment ago gets 404 from history.list and must fall back to a full sync, the recovery
+    path this exists to test. The cursor that full sync then stores is valid, so the client returns to incremental
+    sync afterwards (see MockGmailMailbox.expire_history_handed_out_so_far).
     """
     state = mock_state(request)
     with state.lock:
-        state.mailbox.oldest_available_history_id = state.mailbox.current_history_id + 1
-        boundary = state.mailbox.oldest_available_history_id
+        boundary = state.mailbox.expire_history_handed_out_so_far()
     return ok({"oldest_available_history_id": boundary})
 
 
@@ -208,11 +208,14 @@ def cancel_calendar_event(event_id: str, request: Request) -> dict[str, Any]:
 
 @router.post("/calendar/expire-sync-tokens")
 def expire_calendar_sync_tokens(request: Request) -> dict[str, Any]:
-    """Make every sync token handed out so far expired: the next incremental sync gets 410 fullSyncRequired."""
+    """Make every sync token handed out so far expired: the next incremental sync gets 410 fullSyncRequired.
+
+    The full sync the client then runs hands out a valid token, so it returns to incremental sync afterwards (see
+    MockGoogleCalendar.expire_sync_tokens_handed_out_so_far).
+    """
     state = mock_state(request)
     with state.lock:
-        state.calendar.oldest_valid_sync_position = state.calendar.change_counter + 1
-        boundary = state.calendar.oldest_valid_sync_position
+        boundary = state.calendar.expire_sync_tokens_handed_out_so_far()
     return ok({"oldest_valid_sync_position": boundary})
 
 
