@@ -28,17 +28,17 @@ from dataclasses import dataclass
 
 from psycopg2.extensions import connection as Connection
 
-from solnexus_ingest.envelope import MessageEnvelope, QuarantinedMessage
-from solnexus_ingest.gmail.client import GmailClient, HistoryExpired
-from solnexus_ingest.gmail.parsing import (
+from services.message_envelope import MessageEnvelope, QuarantinedMessage
+from services.gmail_client import GmailClient, HistoryExpired
+from services.gmail_parsing import (
     SOURCE_CHANNEL,
     canonical_address,
     decode_raw,
     parse_gmail_message,
     should_ingest,
 )
-from solnexus_ingest.core.checkpoints import Checkpoint, load_checkpoint
-from solnexus_ingest.store import store_page, stored_message_ids
+from services.checkpoints import Checkpoint, load_checkpoint
+from services.message_store import store_page, stored_message_ids
 
 log = logging.getLogger(__name__)
 

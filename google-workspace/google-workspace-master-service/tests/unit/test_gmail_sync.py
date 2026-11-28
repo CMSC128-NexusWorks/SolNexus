@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from solnexus_ingest.gmail.client import GmailRetriesExhausted, HistoryExpired
-from solnexus_ingest.gmail.sync import SyncSettings, sync_mailbox
-from solnexus_ingest.core.checkpoints import load_checkpoint
-from tests.gmail.messages import api_message, inbound, outbound, rfc822
+from services.gmail_client import GmailRetriesExhausted, HistoryExpired
+from services.gmail_sync import SyncSettings, sync_mailbox
+from services.checkpoints import load_checkpoint
+from tests.unit.gmail_messages import api_message, inbound, outbound, rfc822
 
 RUN = "test-run"
 

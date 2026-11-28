@@ -6,7 +6,7 @@ import pytest
 import requests
 from google.auth.exceptions import RefreshError
 
-from solnexus_ingest.gmail.client import (
+from services.gmail_client import (
     GmailAuthError,
     GmailClient,
     GmailPolicyError,

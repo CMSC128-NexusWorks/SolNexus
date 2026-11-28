@@ -1,7 +1,9 @@
 """Gmail -> bronze ingestion for the connected SolTech mailbox (SNX-32, scheduled in SNX-33).
 
-All connector logic lives in the solnexus_ingest package (airflow/include). This DAG supplies only
-credentials, the database connection, the schedule and failure semantics. It runs hourly (Manila time,
+All connector logic lives in the Google Workspace master's services package
+(google-workspace/google-workspace-master-service). Until the master has its scan API, this DAG imports
+that package directly: compose.yaml mounts it read-only and puts it on PYTHONPATH (SNX-67). The DAG
+supplies only credentials, the database connection, the schedule and failure semantics. It runs hourly (Manila time,
 GMAIL_SYNC_SCHEDULE) once unpaused, records each run in app.pipeline_runs, and on success emits the
 GMAIL_BRONZE dataset event that starts transform_bronze_to_silver.
 """
@@ -55,9 +57,9 @@ def ingest_email():
     def sync_gmail() -> dict[str, int | str]:
         """Sync the mailbox and return per-run counts (no addresses or content, so safe in XCom)."""
         # Imported inside the task so the scheduler's frequent DAG-file parsing stays fast and does
-        # not depend on Google/psycopg2 imports succeeding.
-        from solnexus_ingest.gmail.client import GmailAuthError, GmailClient, GmailPolicyError
-        from solnexus_ingest.gmail.sync import SyncSettings, sync_mailbox
+        # not depend on Google/psycopg2 imports succeeding, or on the master's package being mounted.
+        from services.gmail_client import GmailAuthError, GmailClient, GmailPolicyError
+        from services.gmail_sync import SyncSettings, sync_mailbox
         from solnexus_ingest.core.runs import mark_running, mark_succeeded
 
         context = get_current_context()

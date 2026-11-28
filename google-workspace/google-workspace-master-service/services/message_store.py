@@ -27,9 +27,9 @@ from psycopg2.extensions import connection as Connection
 from psycopg2.extensions import cursor as Cursor
 from psycopg2.extras import Json
 
-from solnexus_ingest.core.checkpoints import Checkpoint, save_checkpoint
-from solnexus_ingest.envelope import MessageEnvelope, QuarantinedMessage
-from solnexus_ingest.resolution import Resolution, decide, opens_inquiry
+from services.checkpoints import Checkpoint, save_checkpoint
+from services.message_envelope import MessageEnvelope, QuarantinedMessage
+from services.message_resolution import Resolution, decide, opens_inquiry
 
 log = logging.getLogger(__name__)
 

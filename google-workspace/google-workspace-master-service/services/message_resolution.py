@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 from uuid import UUID
 
-from solnexus_ingest.envelope import MessageEnvelope
+from services.message_envelope import MessageEnvelope
 
 ReviewReason = Literal[
     "no_match",

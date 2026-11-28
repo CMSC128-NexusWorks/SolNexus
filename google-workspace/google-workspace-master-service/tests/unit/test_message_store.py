@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from solnexus_ingest.gmail.parsing import parse_gmail_message
-from solnexus_ingest.core.checkpoints import Checkpoint, load_checkpoint
-from solnexus_ingest.store import store_page
-from tests.conftest import STAFF_USER_ID
-from tests.gmail.messages import api_message, inbound, outbound, rfc822
+from services.gmail_parsing import parse_gmail_message
+from services.checkpoints import Checkpoint, load_checkpoint
+from services.message_store import store_page
+from tests.unit.conftest import STAFF_USER_ID
+from tests.unit.gmail_messages import api_message, inbound, outbound, rfc822
 
 RUN = "test-run"
 

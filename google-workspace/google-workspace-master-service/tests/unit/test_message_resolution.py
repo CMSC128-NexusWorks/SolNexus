@@ -2,9 +2,9 @@
 
 import pytest
 
-from solnexus_ingest.gmail.parsing import parse_gmail_message
-from solnexus_ingest.resolution import decide, opens_inquiry
-from tests.gmail.messages import MAILBOX, inbound, outbound
+from services.gmail_parsing import parse_gmail_message
+from services.message_resolution import decide, opens_inquiry
+from tests.unit.gmail_messages import MAILBOX, inbound, outbound
 
 CLINIC_A, CLINIC_B, MAPPING = "clinic-a", "clinic-b", "mapping-1"
 

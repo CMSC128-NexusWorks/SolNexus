@@ -1,5 +1,5 @@
-"""SolNexus source connectors: fetch conversations and store them in bronze.
+"""Airflow-side helpers for the SolNexus pipelines: run status, shared DAG names, silver publication.
 
-The package is plain Python so it can be unit-tested without Airflow; the DAGs in airflow/dags only
-wire it to Airflow connections and scheduling.
+Source connectors live outside Airflow, in their own services (google-workspace/). This package is
+plain Python so it can be unit-tested without running Airflow; the DAGs in airflow/dags wire it up.
 """

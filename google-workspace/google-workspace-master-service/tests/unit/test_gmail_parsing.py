@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from solnexus_ingest.gmail.parsing import parse_gmail_message, should_ingest
-from tests.gmail.messages import LEAD, MAILBOX, api_message, inbound, outbound, rfc822
+from services.gmail_parsing import parse_gmail_message, should_ingest
+from tests.unit.gmail_messages import LEAD, MAILBOX, api_message, inbound, outbound, rfc822
 
 
 def test_inbound_message_uses_sender_as_participant():

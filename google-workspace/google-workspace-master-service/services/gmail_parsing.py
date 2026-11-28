@@ -15,7 +15,7 @@ from email.message import EmailMessage
 from email.parser import BytesParser
 from typing import Any
 
-from solnexus_ingest.envelope import MessageEnvelope
+from services.message_envelope import MessageEnvelope
 
 SOURCE_CHANNEL = "gmail"
 # Bump when parsed_payload's shape or extraction rules change, so stored rows can be told apart.

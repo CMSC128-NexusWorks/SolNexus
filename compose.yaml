@@ -16,8 +16,9 @@ x-airflow-common: &airflow-common
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_PORT: "5432"
-    # Connector package used by the DAGs (airflow/include/solnexus_ingest).
-    PYTHONPATH: /opt/airflow/include
+    # Airflow-side helpers (airflow/include/solnexus_ingest), plus the Google Workspace master's
+    # `services` package, which ingest_email imports until the master has its scan API (SNX-67).
+    PYTHONPATH: /opt/airflow/include:/opt/airflow/google-workspace-master
     # Warehouse connection for PostgresHook(postgres_conn_id="solnexus_db"). JSON instead of a URI so a
     # password containing @ : / # % needs no URL encoding (only " and \ would need JSON escaping).
     AIRFLOW_CONN_SOLNEXUS_DB: '{"conn_type": "postgres", "host": "postgres", "port": 5432, "login": "${POSTGRES_USER}", "password": "${POSTGRES_PASSWORD}", "schema": "${POSTGRES_DB}"}'
@@ -32,6 +33,8 @@ x-airflow-common: &airflow-common
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/include:/opt/airflow/include:ro
+    # Transitional (SNX-67): removed once ingest_email calls the master over HTTP.
+    - ./google-workspace/google-workspace-master-service:/opt/airflow/google-workspace-master:ro
     - ./dbt:/opt/airflow/dbt
     - airflow_logs:/opt/airflow/logs
     # OAuth files stay on the host and are mounted read-only; the image never contains them.
@@ -120,6 +123,27 @@ services:
       - bash
       - -c
       - pip install --quiet --disable-pip-version-check -r requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
+
+  # Google Workspace master tests: docker compose --profile test run --rm google-workspace-master-tests
+  # Plain Python, no Airflow. SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests; they share the
+  # throwaway solnexus_ingest_test database with the Airflow tests (airflow/README.md).
+  google-workspace-master-tests:
+    profiles: ["test"]
+    image: python:3.12-slim
+    working_dir: /app
+    environment:
+      SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_ROOT_USER_ACTION: ignore
+    volumes:
+      - ./google-workspace/google-workspace-master-service:/app:ro
+    # Read-only mount, so pytest's cache is disabled. Arguments after the service name reach pytest.
+    entrypoint:
+      - bash
+      - -c
+      - pip install --quiet -r requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
       - "--"
     command: []
 

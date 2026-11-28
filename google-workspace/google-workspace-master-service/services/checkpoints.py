@@ -3,7 +3,7 @@
 One row per (source_channel, source_account_id). The cursor is opaque here: Gmail stores a historyId,
 Calendar will store a sync token. Callers decide WHEN to save it; the rule every connector follows is
 to save it in the same transaction as the last page it covers, so a crash can never move the cursor
-past data that was not stored (see messages.store.store_page).
+past data that was not stored (see message_store.store_page).
 """
 
 from __future__ import annotations
