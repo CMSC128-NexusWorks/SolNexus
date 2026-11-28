@@ -2,14 +2,14 @@
 
 The master service talks to it exactly as it talks to Google, so the whole pipeline can run locally and
 in CI with no Google account and no secrets. So far it has validated settings, a validated dataset loaded
-into in-memory state (mock_state), the health route and the error envelope. Google-shaped routes (Gmail,
-Calendar, the OAuth token endpoint) arrive in later steps.
+into in-memory state (mock_state), the health route and the error formats. Gmail, Calendar and the
+OAuth token endpoint arrive in later steps.
 
 Route namespaces:
 - `/_mock/*` holds the mock's own routes (health now; data control and fault injection later). The
   underscore prefix can never collide with a real Google path, and it makes a test's intent obvious.
-- Google-shaped paths (e.g. `/gmail/v1/...`) will mirror Google's URLs and return Google's error format,
-  so the master's real error classification is what gets tested.
+- Google-shaped paths (e.g. `/gmail/v1/...`) mirror Google's URLs and return Google's error format
+  (google_errors), so the master's real error classification is what gets tested.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from google_errors import GoogleApiError, google_error_response
 from mock_dataset import read_dataset_or_problems
 from mock_settings import MockServerSettings, format_startup_report, load_mock_server_settings_or_exit
 from mock_state import MockGoogleState, find_unplayable_dataset_parts
@@ -44,7 +45,7 @@ def error_envelope(status: int, message: str) -> JSONResponse:
     """The mock's error response: {"success": false, "error": CODE, "message": ..., "status": N}.
 
     Used for the mock's own routes. It never includes a stack trace or exception text, so nothing internal
-    leaks to a caller. (Google-shaped routes will answer in Google's own error format instead.)
+    leaks to a caller. (Google-shaped routes answer in Google's own error format instead.)
     """
     code = ERROR_CODE_BY_STATUS.get(status, f"HTTP_{status}")
     return JSONResponse(
@@ -53,24 +54,46 @@ def error_envelope(status: int, message: str) -> JSONResponse:
     )
 
 
-def register_error_envelope_handlers(app: FastAPI) -> None:
-    """Route every error through error_envelope, including unexpected exceptions."""
+def is_mock_control_path(path: str) -> bool:
+    """The mock's own routes (`/_mock/*`) use the envelope; every other path imitates Google."""
+    return path == "/_mock" or path.startswith("/_mock/")
+
+
+def register_error_handlers(app: FastAPI) -> None:
+    """Answer every error in the caller's dialect: the envelope on /_mock/*, Google's format everywhere else.
+
+    No handler ever returns exception text or a stack trace; those stay in the mock's log.
+    """
+
+    @app.exception_handler(GoogleApiError)
+    async def google_api_error(_: Request, exc: GoogleApiError) -> JSONResponse:
+        return google_error_response(exc.code, exc.reason, exc.message)
 
     @app.exception_handler(StarletteHTTPException)
-    async def http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
-        # Covers unknown paths (404) and wrong methods (405) as well as errors raised by route code.
-        return error_envelope(exc.status_code, str(exc.detail))
+    async def http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # Unknown paths (404) and wrong methods (405), plus errors raised by route code.
+        if is_mock_control_path(request.url.path):
+            return error_envelope(exc.status_code, str(exc.detail))
+        reason = "notFound" if exc.status_code == 404 else "invalid"
+        return google_error_response(exc.status_code, reason, str(exc.detail))
 
     @app.exception_handler(RequestValidationError)
-    async def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
-        # A count, not FastAPI's detail list: the details can echo the submitted values back.
-        return error_envelope(422, f"request failed validation ({len(exc.errors())} problem(s))")
+    async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+        if is_mock_control_path(request.url.path):
+            # A count, not FastAPI's detail list: the details can echo the submitted values back.
+            return error_envelope(422, f"request failed validation ({len(exc.errors())} problem(s))")
+        # Google answers a bad query parameter with 400 invalidArgument naming the parameter, not 422.
+        first_location = exc.errors()[0]["loc"] if exc.errors() else ()
+        parameter = str(first_location[-1]) if first_location else "request"
+        return google_error_response(400, "invalidArgument", f"Invalid value for {parameter}.")
 
     @app.exception_handler(Exception)
-    async def unexpected_error(_: Request, exc: Exception) -> JSONResponse:
+    async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
         # Full traceback in the server log for debugging; the caller gets a generic message only.
         log.exception("Unhandled error in the mock (%s)", type(exc).__name__)
-        return error_envelope(500, "the mock hit an unexpected error; see its log")
+        if is_mock_control_path(request.url.path):
+            return error_envelope(500, "the mock hit an unexpected error; see its log")
+        return google_error_response(500, "backendError", "Backend Error")
 
 
 def load_mock_google_state_or_exit(settings: MockServerSettings, stderr: TextIO = sys.stderr) -> MockGoogleState:
@@ -96,7 +119,7 @@ def build_mock_google_app(settings: MockServerSettings, state: MockGoogleState) 
         openapi_url="/_mock/openapi.json",
         redoc_url=None,
     )
-    register_error_envelope_handlers(app)
+    register_error_handlers(app)
     # Routes reach the state through app.state, so tests can build an app around any state they like.
     app.state.mock_google_state = state
 
