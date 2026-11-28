@@ -35,7 +35,7 @@ from app.imports.candidates import CandidateKeys, find_candidates, review_groups
 from app.imports.workbook import read_workbook
 
 # Held for the transaction by uploads and staff import decisions. "SN28" in ASCII; distinct from the
-# silver build lock (BUILD_LOCK_KEY in airflow/include/solnexus_ingest/silver.py).
+# silver build lock (BUILD_LOCK_KEY in data-platform/include/solnexus_ingest/silver.py).
 IMPORT_LOCK_KEY = 0x534E3238
 
 # The clinic fields an adapter can supply, in app.clinics column order.

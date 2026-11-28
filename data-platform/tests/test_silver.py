@@ -1,7 +1,7 @@
 """Silver publication: the swap is all-or-nothing and only a complete build becomes live.
 
 These tests create and drop the silver schemas, so they need the throwaway *_ingest_test database
-(conftest.db), never a database the dashboard reads. dbt itself is not run here; see airflow/README.md
+(conftest.db), never a database the dashboard reads. dbt itself is not run here; see data-platform/README.md
 for the end-to-end check.
 """
 

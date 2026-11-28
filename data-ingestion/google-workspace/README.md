@@ -9,7 +9,7 @@ Google, a mock of Google for local runs and tests, and the contracts between the
 
 | Folder | What it is | Status |
 |---|---|---|
-| `google-workspace-master-service/` | Talks to Google: fetch, parse, store to bronze, keep each source's sync cursor. Flat layout: `services/` for logic, `tests/unit/` for tests | Gmail extraction moved here from `airflow/include` |
+| `google-workspace-master-service/` | Talks to Google: fetch, parse, store to bronze, keep each source's sync cursor. Flat layout: `services/` for logic, `tests/unit/` for tests | Gmail extraction moved here from `data-platform/include` |
 | `google-workspace-mock-server/` | A fake Gmail and Calendar API seeded with synthetic data, so the master can run end to end with no Google account | Planned (built before the pipeline work) |
 | `contracts/` | Machine-readable contracts: the master's scan API and the record shapes it writes | Planned |
 | `contract-tests/` | The real master against the mock, end to end | Planned |
@@ -49,4 +49,4 @@ docker compose --profile test run --rm google-workspace-master-tests
 ```
 
 The Postgres-backed tests use the same throwaway `solnexus_ingest_test` database as the Airflow tests; see
-[airflow/README.md](../../airflow/README.md#tests) for creating it, and set `SOLNEXUS_TEST_DATABASE_URL`.
+[data-platform/README.md](../../data-platform/README.md#tests) for creating it, and set `SOLNEXUS_TEST_DATABASE_URL`.

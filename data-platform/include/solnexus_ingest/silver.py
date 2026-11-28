@@ -16,7 +16,7 @@ drops silver_build at once, so its tables never wait around to be swapped in.
 
 Builds and swaps also hold one PostgreSQL advisory lock (BUILD_LOCK_KEY), so two of them never touch
 silver_build at once, even when an operator runs `airflow dags test` beside the scheduler, which
-max_active_runs does not cover. Manual dbt runs must use another schema (airflow/README.md).
+max_active_runs does not cover. Manual dbt runs must use another schema (data-platform/README.md).
 
 dbt owns only the silver tables (dbt_project.yml). Nothing outside silver may depend on them, because
 the swap drops the previous schema with CASCADE.

@@ -38,8 +38,8 @@ dbt/package-lock.yml
 dbt/.user.yml
 
 # Airflow
-airflow/logs/
-airflow/airflow.db
+data-platform/logs/
+data-platform/airflow.db
 
 # IDE / OS
 .idea/

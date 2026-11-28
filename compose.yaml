@@ -1,6 +1,6 @@
 x-airflow-common: &airflow-common
   build:
-    context: ./airflow
+    context: ./data-platform
   environment: &airflow-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
@@ -16,13 +16,13 @@ x-airflow-common: &airflow-common
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_PORT: "5432"
-    # Airflow-side helpers (airflow/include/solnexus_ingest), plus the Google Workspace master's
+    # Airflow-side helpers (data-platform/include/solnexus_ingest), plus the Google Workspace master's
     # `services` package, which ingest_email imports until the master has its scan API (SNX-67).
     PYTHONPATH: /opt/airflow/include:/opt/airflow/google-workspace-master
     # Warehouse connection for PostgresHook(postgres_conn_id="solnexus_db"). JSON instead of a URI so a
     # password containing @ : / # % needs no URL encoding (only " and \ would need JSON escaping).
     AIRFLOW_CONN_SOLNEXUS_DB: '{"conn_type": "postgres", "host": "postgres", "port": 5432, "login": "${POSTGRES_USER}", "password": "${POSTGRES_PASSWORD}", "schema": "${POSTGRES_DB}"}'
-    # Gmail ingestion (SNX-32). The token comes from the SNX-21 consent flow; see airflow/README.md.
+    # Gmail ingestion (SNX-32). The token comes from the SNX-21 consent flow; see data-platform/README.md.
     GMAIL_TOKEN_FILE: /opt/airflow/secrets/gmail-token.json
     GMAIL_LABEL_ID: ${GMAIL_LABEL_ID:-}
     GMAIL_BACKFILL_QUERY: ${GMAIL_BACKFILL_QUERY:-newer_than:30d}
@@ -31,8 +31,8 @@ x-airflow-common: &airflow-common
     SILVER_REFRESH_SCHEDULE: ${SILVER_REFRESH_SCHEDULE:-30 * * * *}
     DBT_PROJECT_DIR: /opt/airflow/dbt
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
-    - ./airflow/include:/opt/airflow/include:ro
+    - ./data-platform/dags:/opt/airflow/dags
+    - ./data-platform/include:/opt/airflow/include:ro
     # Transitional (SNX-67): removed once ingest_email calls the master over HTTP.
     - ./data-ingestion/google-workspace/google-workspace-master-service:/opt/airflow/google-workspace-master:ro
     - ./dbt:/opt/airflow/dbt
@@ -107,7 +107,7 @@ services:
       - "127.0.0.1:8765:8765"
 
   # Connector tests in the same image the DAGs run in: docker compose --profile test run --rm airflow-tests
-  # SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests (see airflow/README.md).
+  # SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests (see data-platform/README.md).
   airflow-tests:
     profiles: ["test"]
     <<: *airflow-common
@@ -116,7 +116,7 @@ services:
     environment:
       SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
     volumes:
-      - ./airflow:/opt/airflow/project:ro
+      - ./data-platform:/opt/airflow/project:ro
     # Arguments after the service name are appended and reach pytest as "$$@" (e.g. -k sync).
     # The project mount is read-only, so pytest's cache is disabled rather than written into it.
     entrypoint:
@@ -128,7 +128,7 @@ services:
 
   # Google Workspace master tests: docker compose --profile test run --rm google-workspace-master-tests
   # Plain Python, no Airflow. SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests; they share the
-  # throwaway solnexus_ingest_test database with the Airflow tests (airflow/README.md).
+  # throwaway solnexus_ingest_test database with the Airflow tests (data-platform/README.md).
   google-workspace-master-tests:
     profiles: ["test"]
     image: python:3.12-slim

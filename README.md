@@ -175,7 +175,7 @@ See the [frontend README](web/README.md) for scripts and conventions.
 
 ```
 .
-├── airflow/    Airflow image, DAGs and the Gmail connector (see airflow/README.md)
+├── data-platform/    Airflow image, DAGs and the Gmail connector (see data-platform/README.md)
 ├── api/    FastAPI app, Alembic migrations and dev seed
 ├── dbt/        dbt project (silver models; reads bronze and app as sources)
 ├── docker/     container init scripts (Postgres)
@@ -203,10 +203,10 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 |---|---|---|
 | **Frontend** | `npm ci`, then `typecheck`, `lint`, `format:check`, `test` (vitest) and `build` (production Vite bundle) in `web/` | `cd web && npm ci && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build` |
 | **Backend** | `pytest` in `api/`, against a PostgreSQL service container (it creates its own `solnexus_test` database) | `docker compose run --rm api pytest` |
-| **Airflow** | `pytest` in `airflow/`, inside the project's Airflow image: DAG import test, the Gmail connector tests (Gmail faked in memory) and the Postgres-backed tests, against a throwaway `solnexus_ingest_test` database migrated to head | `docker compose --profile test run --rm airflow-tests` (add the database steps in [airflow/README.md](airflow/README.md#tests) to include the Postgres-backed tests) |
+| **Airflow** | `pytest` in `data-platform/`, inside the project's Airflow image: DAG import test, the Gmail connector tests (Gmail faked in memory) and the Postgres-backed tests, against a throwaway `solnexus_ingest_test` database migrated to head | `docker compose --profile test run --rm airflow-tests` (add the database steps in [data-platform/README.md](data-platform/README.md#tests) to include the Postgres-backed tests) |
 
 - `npm run format:check` fails on unformatted files; fix them with `npm run format` in `web/`.
-- Locally, the Airflow tests that need Postgres skip unless `SOLNEXUS_TEST_DATABASE_URL` is set. CI sets it; to run them yourself, follow [airflow/README.md](airflow/README.md#tests).
+- Locally, the Airflow tests that need Postgres skip unless `SOLNEXUS_TEST_DATABASE_URL` is set. CI sets it; to run them yourself, follow [data-platform/README.md](data-platform/README.md#tests).
 - dbt models and tests are not run in CI yet.
 
 ## Documentation

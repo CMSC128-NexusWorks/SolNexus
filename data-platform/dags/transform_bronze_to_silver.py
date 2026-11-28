@@ -71,7 +71,7 @@ def transform_bronze_to_silver():
         except DbtBuildError as exc:
             if exc.tests_only:
                 # The data broke a silver contract test. Retrying rebuilds the same data, so fail now
-                # and leave the run visibly failed for an operator (airflow/README.md).
+                # and leave the run visibly failed for an operator (data-platform/README.md).
                 raise AirflowFailException(str(exc)) from exc
             raise
         finally:

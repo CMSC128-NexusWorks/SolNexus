@@ -88,7 +88,7 @@ def ingest_email():
             return counts
         except (GoogleAuthError, GooglePolicyError) as exc:
             # Revoked/expired consent or an admin policy will not fix itself: fail now, visibly,
-            # without burning retries. See airflow/README.md for the operator steps. Every other
+            # without burning retries. See data-platform/README.md for the operator steps. Every other
             # error (exhausted backoff, used-up daily quota, retryable token-endpoint outage) is
             # left to the task's normal retries.
             raise AirflowFailException(f"Gmail needs operator action: {exc}") from exc

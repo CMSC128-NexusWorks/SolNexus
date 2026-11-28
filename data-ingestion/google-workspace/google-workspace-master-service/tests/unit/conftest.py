@@ -1,6 +1,6 @@
 """Shared fixtures. Postgres-backed tests run only when SOLNEXUS_TEST_DATABASE_URL is set.
 
-That URL must point at a throwaway database migrated to head (see airflow/README.md#tests; the Airflow tests share it). It must not be the
+That URL must point at a throwaway database migrated to head (see data-platform/README.md#tests; the Airflow tests share it). It must not be the
 dev database or the backend suite's "<db>_test" database: these tests leave append-only rows (bronze
 messages, staff-confirmed mappings) that can never be deleted, which would break the backend suite's
 per-test cleanup of app.staff_users. The fixture therefore accepts only databases named "*_ingest_test".
