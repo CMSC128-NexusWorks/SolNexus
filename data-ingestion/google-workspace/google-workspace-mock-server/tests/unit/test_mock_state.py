@@ -183,3 +183,15 @@ def test_reset_returns_to_the_seed_and_rewinds_scripted_changes(state):
     assert state.calendar.change_counter == seeded_counter
     assert state.calendar.events["evt-calendly-pena-demo"].resource["status"] == "confirmed"
     assert state.next_scripted_change_index == 0
+
+
+def test_default_clock_starts_at_seeded_at_and_moves_forward():
+    # Relative Gmail queries (newer_than:30d) are measured from this clock, so it must start at the dataset's
+    # seed time, not today's date, and still advance so later changes get later timestamps.
+    dataset, _ = read_dataset_or_problems(DATASETS_DIR / "synthetic_soltech.json")
+    state = MockGoogleState(dataset)
+
+    first, second = state.clock(), state.clock()
+
+    assert dataset.seeded_at <= first <= second
+    assert (first - dataset.seeded_at).total_seconds() < 60

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -91,6 +92,9 @@ class StoredGmailMessage:
     raw_rfc822: bytes
     # The historyId at which the message was added.
     history_id: int
+    # Gmail's short plain-text preview of the body, and its size estimate in bytes.
+    snippet: str
+    size_estimate: int
 
 
 @dataclass(frozen=True)
@@ -113,6 +117,10 @@ class MockGmailMailbox:
         self.history: list[GmailHistoryRecord] = []
         # The mailbox's latest historyId, which users.getProfile returns. Only ever grows.
         self.current_history_id = first_history_id
+        # The oldest startHistoryId users.history.list still accepts. Gmail keeps history for a limited time
+        # (about a week); asking from before this point is a "history gap" and gets a 404, which tells the
+        # client to run a full sync. Starts at the very beginning; fault controls (step 6) can raise it.
+        self.oldest_available_history_id = first_history_id
 
     def _take_next_history_id(self) -> int:
         self.current_history_id += 1
@@ -127,8 +135,11 @@ class MockGmailMailbox:
             thread_id=message.thread_id,
             label_ids=tuple(message.labels),
             internal_date_ms=int(message.sent_at.timestamp() * 1000),
-            raw_rfc822=render_rfc822_bytes(message),
+            raw_rfc822=(raw := render_rfc822_bytes(message)),
             history_id=history_id,
+            # Gmail's snippet is the start of the body as plain text, whitespace collapsed.
+            snippet=" ".join(message.body.split())[:100],
+            size_estimate=len(raw),
         )
         self.messages[message.id] = stored
         self.history.append(
@@ -310,13 +321,30 @@ class MockGoogleCalendar:
 # --- The whole mock ------------------------------------------------------------------------------------
 
 
+class VirtualClockStartingAt:
+    """A clock that starts at a fixed moment and then advances with real elapsed time.
+
+    The mock's "now" starts at the dataset's `seeded_at` instead of the real date. Relative Gmail queries such as
+    `newer_than:30d` therefore always match the same seeded messages, whether the tests run today or next year,
+    while time still moves forward, so later changes get later `updated` times.
+    """
+
+    def __init__(self, start: datetime) -> None:
+        self._start = start
+        # monotonic(): immune to the host clock being changed while the mock runs.
+        self._started_at = time.monotonic()
+
+    def __call__(self) -> datetime:
+        return self._start + timedelta(seconds=time.monotonic() - self._started_at)
+
+
 class MockGoogleState:
     """Everything the mock serves: the mailbox, the calendar, and progress through the scripted changes."""
 
-    def __init__(self, dataset: MockDataset, clock: Callable[[], datetime] = lambda: datetime.now(UTC)) -> None:
+    def __init__(self, dataset: MockDataset, clock: Callable[[], datetime] | None = None) -> None:
         self.dataset = dataset
-        # Injected so tests can freeze time; seeded versions always use dataset.seeded_at instead.
-        self._clock = clock
+        # The mock's notion of "now" (see VirtualClockStartingAt). Injectable so tests can freeze time.
+        self.clock = clock or VirtualClockStartingAt(dataset.seeded_at)
         # One lock for every read and write. FastAPI runs plain `def` routes on a thread pool, so two
         # requests can touch the state at once. Re-entrant, so a locked method may call another.
         self.lock = threading.RLock()
@@ -342,7 +370,7 @@ class MockGoogleState:
     def apply_scripted_change(self, change: ScriptedChange) -> None:
         """Apply one change from the dataset's scripted list. Raises MockStateError if it cannot apply."""
         with self.lock:
-            now = self._clock()
+            now = self.clock()
             if isinstance(change, AddMessageChange):
                 self.mailbox.add_message(change.message)
             elif isinstance(change, DeleteMessageChange):
