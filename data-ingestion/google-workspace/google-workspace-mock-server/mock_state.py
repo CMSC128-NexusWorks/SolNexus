@@ -38,6 +38,7 @@ from mock_dataset import (
     RescheduleEventChange,
     ScriptedChange,
 )
+from mock_faults import FaultPlan
 from mock_oauth import DEFAULT_GRANTED_SCOPES, MockOAuthServer
 from mock_settings import StartupProblem
 
@@ -343,8 +344,8 @@ class VirtualClockStartingAt:
 
 
 class MockGoogleState:
-    """Everything the mock serves: the mailbox, the calendar, OAuth tokens, and progress through the scripted
-    changes."""
+    """Everything the mock serves: the mailbox, the calendar, OAuth tokens, injected faults, and progress through
+    the scripted changes."""
 
     def __init__(
         self,
@@ -353,11 +354,13 @@ class MockGoogleState:
         *,
         granted_scopes: tuple[str, ...] = DEFAULT_GRANTED_SCOPES,
         access_token_ttl_seconds: int = 3600,
+        default_response_delay_ms: int = 0,
     ) -> None:
         self.dataset = dataset
         # Startup settings that reset() restores (runtime controls may change them in between).
         self._granted_scopes = frozenset(granted_scopes)
         self._access_token_ttl_seconds = access_token_ttl_seconds
+        self._default_response_delay_ms = default_response_delay_ms
         # The mock's notion of "now" (see VirtualClockStartingAt). Injectable so tests can freeze time.
         self.clock = clock or VirtualClockStartingAt(dataset.seeded_at)
         # One lock for every read and write. FastAPI runs plain `def` routes on a thread pool, so two
@@ -367,9 +370,10 @@ class MockGoogleState:
 
     def reset(self) -> None:
         """Back to the start: fresh mailbox and calendar from the seed, scripted changes rewound, no issued tokens,
-        and no revocation."""
+        no revocation and no injected faults."""
         with self.lock:
             self.oauth = MockOAuthServer(self._granted_scopes, self._access_token_ttl_seconds)
+            self.faults = FaultPlan(self._default_response_delay_ms)
             mailbox_seed = self.dataset.mailbox
             self.mailbox = MockGmailMailbox(mailbox_seed.address, mailbox_seed.first_history_id)
             # Seed in time order, so history IDs grow with the messages' dates, as they would in Gmail.

@@ -3,7 +3,7 @@
 The master service talks to it exactly as it talks to Google, so the whole pipeline can run locally and
 in CI with no Google account and no secrets. So far it has validated settings, a validated dataset loaded
 into in-memory state (mock_state), the health route, the error formats, the OAuth token endpoint and access
-checks (mock_oauth), the Gmail API (routes_gmail) and Calendar
+checks (mock_oauth), injected delays and failures (mock_faults), the Gmail API (routes_gmail) and Calendar
 events.list with sync tokens (routes_calendar).
 
 Route namespaces:
@@ -71,7 +71,7 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(GoogleApiError)
     async def google_api_error(_: Request, exc: GoogleApiError) -> JSONResponse:
-        return google_error_response(exc.code, exc.reason, exc.message)
+        return google_error_response(exc.code, exc.reason, exc.message, headers=exc.headers)
 
     @app.exception_handler(OAuthTokenError)
     async def oauth_token_error(_: Request, exc: OAuthTokenError) -> JSONResponse:
@@ -119,6 +119,7 @@ def load_mock_google_state_or_exit(settings: MockServerSettings, stderr: TextIO 
         dataset,
         granted_scopes=settings.granted_scopes,
         access_token_ttl_seconds=settings.access_token_ttl_seconds,
+        default_response_delay_ms=settings.response_delay_ms,
     )
 
 

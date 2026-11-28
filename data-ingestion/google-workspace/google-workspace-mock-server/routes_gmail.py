@@ -25,6 +25,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, Request
 
 from google_errors import GoogleApiError
+from mock_faults import apply_scheduled_faults
 from mock_oauth import require_access_token_for
 from mock_paging import slice_page
 from mock_state import GmailHistoryRecord, MockGmailMailbox, MockGoogleState, StoredGmailMessage
@@ -32,7 +33,9 @@ from mock_state import GmailHistoryRecord, MockGmailMailbox, MockGoogleState, St
 router = APIRouter(
     prefix="/gmail/v1/users/{user_id}",
     dependencies=[
-        # The access token must be one the mock issued, unexpired, with a Gmail scope.
+        # In this order: injected delay/failure first (as a throttled Google answers before checking much), then
+        # the access token, which must be one the mock issued, unexpired, with a Gmail scope.
+        Depends(apply_scheduled_faults("gmail")),
         Depends(require_access_token_for("gmail")),
     ],
 )

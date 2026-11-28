@@ -34,11 +34,13 @@ GOOGLE_STATUS_BY_CODE = {
 class GoogleApiError(Exception):
     """Raised by a Google-shaped route to answer with a Google error. Handled in mock_app."""
 
-    def __init__(self, code: int, reason: str, message: str) -> None:
+    def __init__(self, code: int, reason: str, message: str, headers: dict[str, str] | None = None) -> None:
         super().__init__(message)
         self.code = code
         self.reason = reason
         self.message = message
+        # Extra response headers, e.g. Retry-After on a 429, which the master honours when backing off.
+        self.headers = headers or {}
 
 
 class OAuthTokenError(Exception):
@@ -63,8 +65,8 @@ def google_error_body(code: int, reason: str, message: str) -> dict[str, Any]:
     return {"error": error}
 
 
-def google_error_response(code: int, reason: str, message: str) -> JSONResponse:
-    return JSONResponse(status_code=code, content=google_error_body(code, reason, message))
+def google_error_response(code: int, reason: str, message: str, headers: dict[str, str] | None = None) -> JSONResponse:
+    return JSONResponse(status_code=code, content=google_error_body(code, reason, message), headers=headers)
 
 
 def oauth_error_response(error: OAuthTokenError) -> JSONResponse:

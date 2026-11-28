@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Query, Request
 
 from google_errors import GoogleApiError
+from mock_faults import apply_scheduled_faults
 from mock_oauth import require_access_token_for
 from mock_paging import decode_opaque_token, encode_opaque_token
 from mock_state import MockGoogleCalendar, MockGoogleState, StoredCalendarEvent, format_google_timestamp
@@ -40,7 +41,9 @@ from mock_state import MockGoogleCalendar, MockGoogleState, StoredCalendarEvent,
 router = APIRouter(
     prefix="/calendar/v3/calendars/{calendar_id}",
     dependencies=[
-        # The access token must be one the mock issued, unexpired, with a Calendar scope.
+        # In this order: injected delay/failure first (as a throttled Google answers before checking much), then
+        # the access token, which must be one the mock issued, unexpired, with a Calendar scope.
+        Depends(apply_scheduled_faults("calendar")),
         Depends(require_access_token_for("calendar")),
     ],
 )

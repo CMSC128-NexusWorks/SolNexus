@@ -41,6 +41,8 @@ class MockServerSettings:
     log_level: str
     # Name of the dataset file (datasets/<name>.json) the mock is seeded from.
     dataset_name: str
+    # Added to every Google-shaped response before it is sent, to simulate a slow network or API (0 = none).
+    response_delay_ms: int = 0
     # Lifetime of access tokens issued by the fake token endpoint. Short values exercise token refresh.
     access_token_ttl_seconds: int = 3600
     # What the fake refresh token was consented for. Leaving out the Calendar scope simulates a mailbox that
@@ -107,6 +109,15 @@ def collect_settings_or_errors(
             )
         )
 
+    response_delay_ms = read_int_in_range(
+        environ,
+        "MOCK_RESPONSE_DELAY_MS",
+        default=0,
+        lowest=0,
+        highest=30_000,
+        problems=problems,
+        fix="set MOCK_RESPONSE_DELAY_MS to a whole number of milliseconds from 0 to 30000, or leave it unset for 0.",
+    )
     access_token_ttl_seconds = read_int_in_range(
         environ,
         "MOCK_ACCESS_TOKEN_TTL_SECONDS",
@@ -137,6 +148,7 @@ def collect_settings_or_errors(
             environment=environment,
             log_level=log_level,
             dataset_name=dataset_name,
+            response_delay_ms=response_delay_ms,
             access_token_ttl_seconds=access_token_ttl_seconds,
             granted_scopes=granted_scopes,
         ),

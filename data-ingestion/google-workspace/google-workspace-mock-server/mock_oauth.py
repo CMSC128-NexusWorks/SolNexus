@@ -24,9 +24,10 @@ from datetime import datetime, timedelta
 from typing import Literal
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Depends, Header, Request
 
 from google_errors import GoogleApiError, OAuthTokenError
+from mock_faults import apply_scheduled_faults
 
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 CALENDAR_EVENTS_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly"
@@ -103,7 +104,7 @@ class MockOAuthServer:
 router = APIRouter()
 
 
-@router.post("/token")
+@router.post("/token", dependencies=[Depends(apply_scheduled_faults("token"))])
 async def exchange_token(request: Request) -> dict[str, str | int]:
     """OAuth token endpoint (form-encoded body, as google-auth sends it).
 
