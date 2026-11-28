@@ -37,7 +37,8 @@ from solnexus_ingest.gmail.parsing import (
     parse_gmail_message,
     should_ingest,
 )
-from solnexus_ingest.store import Checkpoint, load_checkpoint, store_page, stored_message_ids
+from solnexus_ingest.core.checkpoints import Checkpoint, load_checkpoint
+from solnexus_ingest.store import store_page, stored_message_ids
 
 log = logging.getLogger(__name__)
 

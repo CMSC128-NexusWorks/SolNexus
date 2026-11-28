@@ -6,7 +6,7 @@ import pytest
 
 from solnexus_ingest.gmail.client import GmailRetriesExhausted, HistoryExpired
 from solnexus_ingest.gmail.sync import SyncSettings, sync_mailbox
-from solnexus_ingest.store import load_checkpoint
+from solnexus_ingest.core.checkpoints import load_checkpoint
 from tests.gmail.messages import api_message, inbound, outbound, rfc822
 
 RUN = "test-run"

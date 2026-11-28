@@ -20,7 +20,6 @@ import hashlib
 import logging
 from collections import Counter
 from collections.abc import Iterable
-from dataclasses import dataclass
 from typing import Any
 
 import psycopg2
@@ -28,6 +27,7 @@ from psycopg2.extensions import connection as Connection
 from psycopg2.extensions import cursor as Cursor
 from psycopg2.extras import Json
 
+from solnexus_ingest.core.checkpoints import Checkpoint, save_checkpoint
 from solnexus_ingest.envelope import MessageEnvelope, QuarantinedMessage
 from solnexus_ingest.resolution import Resolution, decide, opens_inquiry
 
@@ -39,13 +39,6 @@ class StoreOutcome(str, enum.Enum):
     DUPLICATE = "duplicate"  # same key, same bytes: an ordinary replay
     DISCREPANCY = "discrepancy"  # same key, different bytes: kept for review
     QUARANTINED = "quarantined"  # unparseable or rejected by PostgreSQL: kept for review, run continues
-
-
-@dataclass(frozen=True)
-class Checkpoint:
-    source_channel: str
-    source_account_id: str
-    cursor_value: str
 
 
 def store_page(
@@ -148,17 +141,6 @@ def store_envelope(cur: Cursor, envelope: MessageEnvelope, job_run_id: str) -> t
     return StoreOutcome.INSERTED, opened
 
 
-def save_checkpoint(cur: Cursor, checkpoint: Checkpoint) -> None:
-    cur.execute(
-        """
-        INSERT INTO app.ingestion_checkpoints (source_channel, source_account_id, cursor_value)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (source_channel, source_account_id) DO UPDATE SET cursor_value = EXCLUDED.cursor_value
-        """,
-        (checkpoint.source_channel, checkpoint.source_account_id, checkpoint.cursor_value),
-    )
-
-
 def stored_message_ids(conn: Connection, source_channel: str, source_account_id: str, message_ids: list[str]) -> set[str]:
     """Which of these source message IDs bronze already holds for this account.
 
@@ -178,17 +160,6 @@ def stored_message_ids(conn: Connection, source_channel: str, source_account_id:
         found = {row[0] for row in cur.fetchall()}
     conn.commit()  # end the read-only transaction; the page is written in its own transaction
     return found
-
-
-def load_checkpoint(conn: Connection, source_channel: str, source_account_id: str) -> str | None:
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT cursor_value FROM app.ingestion_checkpoints WHERE source_channel = %s AND source_account_id = %s",
-            (source_channel, source_account_id),
-        )
-        row = cur.fetchone()
-    conn.commit()  # end the read-only transaction so the connection does not sit "idle in transaction"
-    return row[0] if row else None
 
 
 def _classify_replay(cur: Cursor, envelope: MessageEnvelope, job_run_id: str) -> StoreOutcome:
