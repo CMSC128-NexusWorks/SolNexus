@@ -11,6 +11,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY *.py ./
+# Synthetic seed data, selected at startup by MOCK_DATASET.
+COPY datasets ./datasets
 
 # Run as an unprivileged user: the mock needs no root access.
 RUN useradd --create-home --uid 10001 mock && chown -R mock:mock /app

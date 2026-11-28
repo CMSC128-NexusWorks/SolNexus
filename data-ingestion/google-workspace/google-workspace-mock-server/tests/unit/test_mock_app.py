@@ -5,22 +5,29 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from mock_app import build_mock_google_app
+from mock_dataset import read_dataset_or_problems
 from mock_settings import MockServerSettings
+from mock_state import MockGoogleState
 
 CI_SETTINGS = MockServerSettings(environment="ci", log_level="INFO", dataset_name="synthetic_soltech")
 
 
+def build_test_app():
+    dataset, _ = read_dataset_or_problems(CI_SETTINGS.dataset_path)
+    return build_mock_google_app(CI_SETTINGS, MockGoogleState(dataset))
+
+
 def test_health_reports_ok_and_which_environment_this_mock_is():
-    client = TestClient(build_mock_google_app(CI_SETTINGS))
+    client = TestClient(build_test_app())
 
     response = client.get("/_mock/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "environment": "ci"}
+    assert response.json() == {"status": "ok", "environment": "ci", "dataset": "synthetic_soltech"}
 
 
 def test_unknown_path_answers_with_the_error_envelope():
-    client = TestClient(build_mock_google_app(CI_SETTINGS))
+    client = TestClient(build_test_app())
 
     response = client.get("/_mock/nothing-here")
 
@@ -29,7 +36,7 @@ def test_unknown_path_answers_with_the_error_envelope():
 
 
 def test_unexpected_error_returns_a_generic_500_without_internal_details():
-    app = build_mock_google_app(CI_SETTINGS)
+    app = build_test_app()
 
     def broken_route():
         raise RuntimeError("internal detail that must not leak")
