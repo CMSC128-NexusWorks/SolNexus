@@ -156,9 +156,7 @@ def test_revoked_consent_is_an_auth_error_that_needs_a_person(
     token_file, mock_url, mock_token_uri, db, job_run_id, mock_control
 ):
     mock_control("oauth/revoke")
-    gmail = GmailClient.from_token_file(
-        token_file, token_uri=mock_token_uri, api_root=f"{mock_url}/gmail/v1/users/me"
-    )
+    gmail = GmailClient.from_token_file(token_file, token_uri=mock_token_uri, api_root=f"{mock_url}/gmail/v1/users/me")
 
     with pytest.raises(GoogleAuthError):
         sync_mailbox(gmail, db, SETTINGS, job_run_id=job_run_id)
