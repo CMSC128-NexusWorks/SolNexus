@@ -151,7 +151,8 @@ services:
   # account. Opt-in profile, so `docker compose up` behaves as before:
   #   docker compose --profile mock up -d google-workspace-mock   ->  http://127.0.0.1:18090/_mock/health
   google-workspace-mock:
-    profiles: ["mock"]
+    # "test" too, so the contract tests below can start it as a dependency.
+    profiles: ["mock", "test"]
     build:
       context: ./data-ingestion/google-workspace/google-workspace-mock-server
     environment:
@@ -182,6 +183,34 @@ services:
         && ruff check --no-cache .
         && ruff format --no-cache --check .
         && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
+
+  # Contract tests (SNX-69): the master's real Gmail client and sync against the running mock and a throwaway
+  # Postgres. docker compose --profile test run --rm google-workspace-contract-tests
+  # Needs SOLNEXUS_TEST_DATABASE_URL (the *_ingest_test database, data-platform/README.md#tests); the database
+  # tests skip without it. Starts the mock first and waits until its health check passes.
+  google-workspace-contract-tests:
+    profiles: ["test"]
+    image: python:3.12-slim
+    working_dir: /contract-tests
+    depends_on:
+      google-workspace-mock:
+        condition: service_healthy
+    environment:
+      GOOGLE_WORKSPACE_MOCK_URL: http://google-workspace-mock:8090
+      SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
+      # The master's code, imported exactly as it runs in production.
+      PYTHONPATH: /master
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_ROOT_USER_ACTION: ignore
+    volumes:
+      - ./data-ingestion/google-workspace/contract-tests:/contract-tests:ro
+      - ./data-ingestion/google-workspace/google-workspace-master-service:/master:ro
+    entrypoint:
+      - bash
+      - -c
+      - pip install --quiet -r /master/requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
       - "--"
     command: []
 
