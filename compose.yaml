@@ -35,7 +35,7 @@ x-airflow-common: &airflow-common
     - ./data-platform/include:/opt/airflow/include:ro
     # Transitional (SNX-67): removed once ingest_email calls the master over HTTP.
     - ./data-ingestion/google-workspace/google-workspace-master-service:/opt/airflow/google-workspace-master:ro
-    - ./dbt:/opt/airflow/dbt
+    - ./data-platform/dbt:/opt/airflow/dbt
     - airflow_logs:/opt/airflow/logs
     # OAuth files stay on the host and are mounted read-only; the image never contains them.
     - ./.secrets:/opt/airflow/secrets:ro
@@ -80,7 +80,7 @@ services:
     volumes:
       - ./api:/app
       # Read-only contract/model sources used by backend integration tests in the dev container.
-      - ./dbt:/dbt:ro
+      - ./data-platform/dbt:/dbt:ro
       - ./docs/contracts/fixtures:/docs/contracts/fixtures:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:

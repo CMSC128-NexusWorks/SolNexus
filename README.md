@@ -177,7 +177,7 @@ See the [frontend README](web/README.md) for scripts and conventions.
 .
 ├── data-platform/    Airflow image, DAGs and the Gmail connector (see data-platform/README.md)
 ├── api/    FastAPI app, Alembic migrations and dev seed
-├── dbt/        dbt project (silver models; reads bronze and app as sources)
+├── data-platform/dbt/        dbt project (silver models; reads bronze and app as sources)
 ├── docker/     container init scripts (Postgres)
 ├── docs/       proposal, requirements, architecture, contracts, roadmap, wireframes
 ├── web/   React dashboard

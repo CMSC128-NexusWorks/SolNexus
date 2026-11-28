@@ -39,12 +39,12 @@ Each schema has exactly one tool that changes its structure.
 |---|---|---|---|
 | `bronze` | Alembic (`api/migrations`) | Ingestion connectors, insert only | Never |
 | `app` | Alembic (`api/migrations`) | API, ingestion, import, resolution job | Never |
-| `silver` | dbt (`dbt/models/silver`) | dbt only | Yes, on any dbt run |
+| `silver` | dbt (`data-platform/dbt/models/silver`) | dbt only | Yes, on any dbt run |
 | `public` | Alembic's `alembic_version` table and the `citext` extension | Alembic | No |
 
 Rules that follow from this:
 
-- dbt reads `bronze` and `app` through [dbt/models/sources.yml](../dbt/models/sources.yml) and never writes to them. A staff edit stored in `silver` would be lost on the next dbt run.
+- dbt reads `bronze` and `app` through [data-platform/dbt/models/sources.yml](../data-platform/dbt/models/sources.yml) and never writes to them. A staff edit stored in `silver` would be lost on the next dbt run.
 - The API never writes to `silver`. It reads silver, plus `app` rows for edits not yet projected (`pending_projection`).
 - A schema change to `bronze` or `app` is a new Alembic revision. Never edit a merged revision.
 
