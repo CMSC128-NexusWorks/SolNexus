@@ -1,0 +1,5 @@
+# Runtime dependencies of the mock Google server, pinned exactly so every build serves the same behavior.
+# Versions match the SolNexus API image (api/requirements.txt resolves to these).
+fastapi==0.165.0
+starlette==1.10.0
+uvicorn==0.54.0
