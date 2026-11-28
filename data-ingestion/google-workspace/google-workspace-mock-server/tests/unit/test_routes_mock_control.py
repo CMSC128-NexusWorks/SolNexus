@@ -249,3 +249,11 @@ def test_delays_are_set_listed_and_cleared(client):
 
     assert listed == {"gmail": 0, "calendar": 250, "token": 0}
     assert client.get("/_mock/faults").json()["data"]["delay_ms"]["calendar"] == 0
+
+
+@pytest.mark.parametrize("delay_ms", [1001, 1003, 29_999])
+def test_delays_are_reported_exactly_as_set(client, delay_ms):
+    # Regression: reading the delay back through float seconds used to truncate, e.g. 1001 came back as 1000.
+    client.put("/_mock/delays/gmail", json={"delay_ms": delay_ms})
+
+    assert client.get("/_mock/faults").json()["data"]["delay_ms"]["gmail"] == delay_ms

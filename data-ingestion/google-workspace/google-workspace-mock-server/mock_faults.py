@@ -96,8 +96,14 @@ class FaultPlan:
                 return fault
         return None
 
+    def delay_ms_for(self, target: str) -> int:
+        """The delay for a target in whole milliseconds, exactly as it was set (what /_mock/faults reports)."""
+        return self.delay_ms_by_target.get(target, self.default_delay_ms)
+
     def delay_seconds_for(self, target: str) -> float:
-        return self.delay_ms_by_target.get(target, self.default_delay_ms) / 1000
+        """The same delay in seconds, for asyncio.sleep. Only for sleeping: converting back to milliseconds with
+        int() would truncate float error (1001 ms would read back as 1000), so reporting uses delay_ms_for."""
+        return self.delay_ms_for(target) / 1000
 
 
 def error_for_fault(fault: ScheduledFault) -> Exception:

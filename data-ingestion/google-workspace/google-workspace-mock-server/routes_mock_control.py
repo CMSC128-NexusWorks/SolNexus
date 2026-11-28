@@ -264,7 +264,7 @@ def list_faults(request: Request) -> dict[str, Any]:
                     }
                     for f in state.faults.scheduled
                 ],
-                "delay_ms": {target: int(state.faults.delay_seconds_for(target) * 1000) for target in FAULT_TARGETS},
+                "delay_ms": {target: state.faults.delay_ms_for(target) for target in FAULT_TARGETS},
             }
         )
 
