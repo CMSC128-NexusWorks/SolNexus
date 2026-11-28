@@ -18,9 +18,9 @@ from __future__ import annotations
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from mock_dataset import DatasetEvent, DatasetEventTime, DatasetMessage
+from mock_dataset import DatasetEvent, DatasetEventTime, DatasetMessage, problem_with_event_span
 from mock_faults import FAULT_TARGETS, FaultKind, FaultTarget, ScheduledFault
 from mock_state import MockGoogleState, MockStateError
 
@@ -36,6 +36,14 @@ class StrictBody(BaseModel):
 class RescheduleBody(StrictBody):
     start: DatasetEventTime
     end: DatasetEventTime
+
+    @model_validator(mode="after")
+    def start_and_end_form_a_valid_span(self) -> RescheduleBody:
+        # The same rule as dataset events: a reschedule must not create an event Google would never return.
+        problem = problem_with_event_span(self.start, self.end)
+        if problem:
+            raise ValueError(problem)
+        return self
 
 
 class ScheduleFaultBody(StrictBody):

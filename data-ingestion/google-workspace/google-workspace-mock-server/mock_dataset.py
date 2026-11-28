@@ -87,6 +87,29 @@ class DatasetEventTime(StrictModel):
         return self
 
 
+def problem_with_event_span(start: DatasetEventTime, end: DatasetEventTime) -> str | None:
+    """Why this start/end pair is not an event Google would return, or None if it is fine.
+
+    Shared by every place an event's time is set (dataset events, scripted reschedules, the reschedule control
+    route), so none of them can create a mixed or zero/negative-length event that the master would then ingest.
+    - Both all-day or both timed: Google never mixes the two in one event.
+    - End strictly after start. All-day end dates are exclusive (a one-day event on the 7th ends on the 8th), so an
+      all-day event must end at least one day later; timed events are compared as instants in their own zones.
+    """
+    if (start.date is None) != (end.date is None):
+        return "start and end must both be all-day or both be timed"
+    if start.date is not None and end.date is not None:
+        if end.date <= start.date:
+            return "end must be after start (all-day end dates are exclusive: at least the next day)"
+        return None
+    assert start.date_time and end.date_time and start.time_zone and end.time_zone  # guaranteed above
+    start_instant = start.date_time.replace(tzinfo=ZoneInfo(start.time_zone))
+    end_instant = end.date_time.replace(tzinfo=ZoneInfo(end.time_zone))
+    if end_instant <= start_instant:
+        return "end must be after start"
+    return None
+
+
 class DatasetAttendee(StrictModel):
     email: str
     response_status: Literal["needsAction", "accepted", "declined", "tentative"] = "needsAction"
@@ -112,9 +135,10 @@ class DatasetEvent(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def start_and_end_are_the_same_kind(self) -> DatasetEvent:
-        if (self.start.date is None) != (self.end.date is None):
-            raise ValueError("start and end must both be all-day or both be timed")
+    def start_and_end_form_a_valid_span(self) -> DatasetEvent:
+        problem = problem_with_event_span(self.start, self.end)
+        if problem:
+            raise ValueError(problem)
         return self
 
 
@@ -154,6 +178,13 @@ class RescheduleEventChange(StrictModel):
     event_id: str
     start: DatasetEventTime
     end: DatasetEventTime
+
+    @model_validator(mode="after")
+    def start_and_end_form_a_valid_span(self) -> RescheduleEventChange:
+        problem = problem_with_event_span(self.start, self.end)
+        if problem:
+            raise ValueError(problem)
+        return self
 
 
 class CancelEventChange(StrictModel):

@@ -265,3 +265,23 @@ def test_retry_after_with_a_non_throttling_fault_is_a_422(client):
     )
 
     assert response.status_code == 422 and "retry_after_seconds" in response.json()["message"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # Mixed: an all-day start with a timed end.
+        {"start": {"date": "2026-12-04"}, "end": {"date_time": "2026-12-04T15:30:00", "time_zone": "Asia/Manila"}},
+        # Negative length.
+        {
+            "start": {"date_time": "2026-12-04T15:30:00", "time_zone": "Asia/Manila"},
+            "end": {"date_time": "2026-12-04T15:00:00", "time_zone": "Asia/Manila"},
+        },
+    ],
+)
+def test_reschedule_into_an_event_google_would_never_return_is_a_422(client, body):
+    response = client.post("/_mock/calendar/events/evt-calendly-reyes-demo/reschedule", json=body)
+    served = calendar_sync(client)["items"][0]
+
+    assert response.status_code == 422 and response.json()["error"] == "VALIDATION_FAILED"
+    assert served["start"]["dateTime"] == "2026-12-02T10:00:00+08:00"  # the event was left as it was

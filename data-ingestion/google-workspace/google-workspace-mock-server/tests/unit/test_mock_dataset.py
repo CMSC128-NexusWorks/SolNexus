@@ -109,3 +109,44 @@ def test_scripted_change_that_references_a_missing_id_is_reported_with_its_posit
     assert [p.problem for p in problems] == [
         f"scripted_changes.{position} (cancel_event): event evt-does-not-exist is not in the calendar"
     ]
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "expected"),
+    [
+        (
+            {"date_time": "2026-12-02T10:30:00", "time_zone": "Asia/Manila"},
+            {"date_time": "2026-12-02T10:00:00", "time_zone": "Asia/Manila"},
+            "end must be after start",
+        ),
+        ({"date": "2026-12-07"}, {"date": "2026-12-07"}, "at least the next day"),
+    ],
+)
+def test_events_must_end_after_they_start(tmp_path, start, end, expected):
+    data = shipped_dataset_dict()
+    data["calendar"]["events"][0]["start"], data["calendar"]["events"][0]["end"] = start, end
+
+    _, problems = read_dataset_or_problems(write_dataset(tmp_path, data))
+
+    assert any(expected in p.problem for p in problems)
+
+
+def test_end_after_start_is_compared_as_instants_across_time_zones(tmp_path):
+    # 09:00 in Manila (01:00 UTC) to 18:00 the previous day in Los Angeles (02:00 UTC): a valid one-hour event.
+    data = shipped_dataset_dict()
+    data["calendar"]["events"][0]["start"] = {"date_time": "2026-12-02T09:00:00", "time_zone": "Asia/Manila"}
+    data["calendar"]["events"][0]["end"] = {"date_time": "2026-12-01T18:00:00", "time_zone": "America/Los_Angeles"}
+
+    _, problems = read_dataset_or_problems(write_dataset(tmp_path, data))
+
+    assert problems == []
+
+
+def test_scripted_reschedule_must_also_be_a_valid_span(tmp_path):
+    data = shipped_dataset_dict()
+    reschedule = next(change for change in data["scripted_changes"] if change["kind"] == "reschedule_event")
+    reschedule["end"] = {"date": "2026-12-05"}  # timed start, all-day end
+
+    _, problems = read_dataset_or_problems(write_dataset(tmp_path, data))
+
+    assert any("both be all-day or both be timed" in p.problem for p in problems)
