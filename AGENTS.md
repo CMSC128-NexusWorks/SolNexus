@@ -1,11 +1,11 @@
 # SolNexus
 
-Lead and client communication pipeline for SolTech EMR, our client. Conversations (Gmail in Phase 1; Facebook Page and Viber in Phase 2, only after Phase 1 acceptance) land in PostgreSQL bronze tables, dbt builds silver models, FastAPI serves them, and a React dashboard shows them to SolTech staff. This is a CMSC 128/129 student team project.
+Lead and client communication pipeline for SolTech EMR, our client. Conversations and bookings from Google Workspace (Gmail, and Google Calendar bookings that SolTech receives through Calendly) land in PostgreSQL bronze tables, dbt builds silver models, FastAPI serves them, and a React dashboard shows them to SolTech staff. This is a CMSC 128/129 student team project.
 
 ## Where to look
 
 - **API shapes, data ownership, import rules:** `docs/contracts/phase1-data-api-v1.md`. Message-to-clinic linking is in `docs/contracts/phase1-identity-v1.md`. The contract is the single source of truth: when it changes, update `web/src/lib/api/types.ts` and `web/src/mocks/` in the same PR.
-- **Scope and sprint targets:** `docs/implementation_roadmap.md`. Phase 1 is the semester deliverable; Phase 2 work starts only after Phase 1 is accepted.
+- **Scope and sprint targets:** `docs/implementation_roadmap.md`. Phase 1 is the semester deliverable. Data sources are Google Workspace only; Facebook and Viber are out of scope (Product Owner, November 28, 2026). Google Phase 2 work (LLM enrichment, S3 retention, gold analytics, alerts) may run in parallel with Phase 1 acceptance, one PR per ticket, on live evidence. The calendar contract is `docs/contracts/google-calendar-v1.md`.
 - **Requirement IDs (FR-xx, NFR-xx):** `docs/software_requirements.md`.
 - **Screens:** `docs/wireframes/`. They are low-fidelity: follow their structure and fields, not their visual styling.
 - **Schema changes, migrations, table ownership:** `docs/database.md`. Read it before touching `api/migrations/` or writing to `bronze` or `app` tables.
