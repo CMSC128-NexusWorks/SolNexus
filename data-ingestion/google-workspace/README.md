@@ -10,9 +10,9 @@ Google, a mock of Google for local runs and tests, and the contracts between the
 | Folder | What it is | Status |
 |---|---|---|
 | `google-workspace-master-service/` | Talks to Google: fetch, parse, store to bronze, keep each source's sync cursor. Flat layout: `services/` for logic, `tests/unit/` for tests | Gmail extraction moved here from `data-platform/include` |
-| `google-workspace-mock-server/` | A fake Gmail and Calendar API seeded with synthetic data, so the master can run end to end with no Google account | Planned (built before the pipeline work) |
+| [`google-workspace-mock-server/`](google-workspace-mock-server/README.md) | A fake Gmail and Calendar API that behaves like Google (paths, shapes, errors, OAuth), seeded with synthetic data, with runtime controls and fault injection | Built (SNX-69) |
 | `contracts/` | Machine-readable contracts: the master's scan API and the record shapes it writes | Planned |
-| `contract-tests/` | The real master against the mock, end to end | Planned |
+| `contract-tests/` | Integration tests: the master's real code against the running mock and a throwaway Postgres | Gmail sync covered (SNX-69); Calendar follows with SNX-72 |
 | `docs/` | Authorization, field mapping, incremental sync, running the master | Planned |
 
 ## How it fits the rest of SolNexus
@@ -44,9 +44,14 @@ switches to calling it over HTTP and that mount is removed.
 
 ## Tests
 
+Three tiers, from fastest to most complete:
+
 ```bash
-docker compose --profile test run --rm google-workspace-master-tests
+docker compose --profile test run --rm google-workspace-master-tests      # master unit tests (Google faked in memory)
+docker compose --profile test run --rm google-workspace-mock-tests        # mock lint + unit tests (no network, no DB)
+docker compose --profile test run --rm google-workspace-contract-tests    # master's real code against the running mock
 ```
 
 The Postgres-backed tests use the same throwaway `solnexus_ingest_test` database as the Airflow tests; see
 [data-platform/README.md](../../data-platform/README.md#tests) for creating it, and set `SOLNEXUS_TEST_DATABASE_URL`.
+CI runs all three in the **Google Workspace** job.
