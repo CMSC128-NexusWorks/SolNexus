@@ -48,6 +48,9 @@ API_FAULT_RESPONSES: dict[str, tuple[int, str, str]] = {
     # The access token expired mid-run: google-auth's session refreshes it and repeats the call by itself.
     "expired_access_token": (401, "authError", "Request had invalid authentication credentials."),
 }
+# Throttling answers: the ones that can carry Retry-After, and that the master retries as throttling (both the 429 and
+# the 403 userRateLimitExceeded). retry_after_seconds is sent with these and refused for every other kind.
+THROTTLING_FAULT_KINDS = frozenset({"rate_limit", "user_rate_limit"})
 # What each token-endpoint fault answers with, in OAuth's format. google-auth treats invalid_grant as permanent
 # (re-consent needed) and a 500 with internal_failure as retryable.
 TOKEN_FAULT_RESPONSES: dict[str, tuple[int, str, str]] = {
@@ -84,6 +87,9 @@ class FaultPlan:
             raise ValueError(f"fault {fault.kind!r} does not apply to target {fault.target!r}")
         if fault.remaining < 1:
             raise ValueError("a fault must apply to at least one request")
+        if fault.retry_after_seconds is not None and fault.kind not in THROTTLING_FAULT_KINDS:
+            # Refused rather than silently dropped, so a test never believes it sent Retry-After when it did not.
+            raise ValueError(f"retry_after_seconds applies only to {', '.join(sorted(THROTTLING_FAULT_KINDS))}")
         self.scheduled.append(fault)
 
     def take_next_fault(self, target: str) -> ScheduledFault | None:
@@ -112,7 +118,8 @@ def error_for_fault(fault: ScheduledFault) -> Exception:
         code, error, description = TOKEN_FAULT_RESPONSES[fault.kind]
         return OAuthTokenError(code, error, description)
     code, reason, message = API_FAULT_RESPONSES[fault.kind]
-    headers = {"Retry-After": str(fault.retry_after_seconds)} if fault.retry_after_seconds and code == 429 else None
+    sends_retry_after = fault.retry_after_seconds is not None and fault.kind in THROTTLING_FAULT_KINDS
+    headers = {"Retry-After": str(fault.retry_after_seconds)} if sends_retry_after else None
     return GoogleApiError(code, reason, message, headers=headers)
 
 

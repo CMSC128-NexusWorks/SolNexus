@@ -142,3 +142,20 @@ def test_reset_clears_scheduled_faults_and_delays(state):
     state.reset()
 
     assert state.faults.scheduled == [] and state.faults.delay_seconds_for("gmail") == 0
+
+
+def test_retry_after_is_sent_with_the_403_rate_limit_too(client, state):
+    # Regression: the header used to be added only to 429s, though the master retries 403 userRateLimitExceeded as
+    # throttling too and honours Retry-After on it.
+    state.faults.schedule(ScheduledFault("gmail", "user_rate_limit", remaining=1, retry_after_seconds=40))
+
+    response = client.get(GMAIL_PROFILE)
+
+    assert response.status_code == 403 and response.headers["Retry-After"] == "40"
+
+
+def test_retry_after_on_a_non_throttling_fault_is_refused_not_dropped():
+    plan = FaultPlan()
+
+    with pytest.raises(ValueError, match="retry_after_seconds applies only to"):
+        plan.schedule(ScheduledFault("gmail", "backend_error", remaining=1, retry_after_seconds=5))

@@ -43,7 +43,7 @@ class ScheduleFaultBody(StrictBody):
     kind: FaultKind
     # How many upcoming requests to that target fail.
     times: int = Field(default=1, ge=1, le=1000)
-    # Sent as Retry-After with rate-limit answers.
+    # Sent as Retry-After with the throttling kinds (rate_limit, user_rate_limit); a 422 with any other kind.
     retry_after_seconds: int | None = Field(default=None, ge=1, le=3600)
 
 

@@ -257,3 +257,11 @@ def test_delays_are_reported_exactly_as_set(client, delay_ms):
     client.put("/_mock/delays/gmail", json={"delay_ms": delay_ms})
 
     assert client.get("/_mock/faults").json()["data"]["delay_ms"]["gmail"] == delay_ms
+
+
+def test_retry_after_with_a_non_throttling_fault_is_a_422(client):
+    response = client.post(
+        "/_mock/faults", json={"target": "calendar", "kind": "service_unavailable", "retry_after_seconds": 5}
+    )
+
+    assert response.status_code == 422 and "retry_after_seconds" in response.json()["message"]
