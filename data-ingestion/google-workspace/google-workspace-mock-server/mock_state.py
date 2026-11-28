@@ -267,6 +267,9 @@ class MockGoogleCalendar:
         # Incremented on every write. Sync tokens (step 4) will be positions on this counter, so "changes
         # since my token" is simply "events whose change_number is greater than the token's position".
         self.change_counter = 0
+        # Sync tokens below this position are expired: Google answers 410 fullSyncRequired and the client must
+        # run a full sync again. Starts at 0 (nothing expired); fault controls (step 6) can raise it.
+        self.oldest_valid_sync_position = 0
 
     def _write_version(self, resource: dict[str, Any], at: datetime) -> None:
         """Store a new version: next change number, a new etag and a new `updated` time."""
