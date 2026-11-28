@@ -14,6 +14,7 @@ from services.google_api import (
     GoogleQuotaExhausted,
     GoogleRetriesExhausted,
     RetryPolicy,
+    authorized_session,
 )
 
 
@@ -159,3 +160,19 @@ def test_errors_name_the_product():
 
     with pytest.raises(GooglePolicyError, match="^Gmail refused"):
         api.get("/profile")
+
+
+def test_token_endpoint_comes_from_configuration_never_from_the_token_file(tmp_path):
+    # google-auth ignores token_uri inside the file (so a tampered file cannot redirect secrets); the address
+    # comes from configuration: Google's by default, the mock Google server's in tests.
+    token_file = tmp_path / "token.json"
+    token_file.write_text(
+        '{"client_id": "id", "client_secret": "secret", "refresh_token": "refresh",'
+        ' "token_uri": "https://attacker.example.test/token"}'
+    )
+
+    default = authorized_session(str(token_file), ["scope"])
+    configured = authorized_session(str(token_file), ["scope"], token_uri="http://mock.example.test/token")
+
+    assert default.credentials.token_uri == "https://oauth2.googleapis.com/token"
+    assert configured.credentials.token_uri == "http://mock.example.test/token"

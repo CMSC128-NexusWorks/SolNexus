@@ -26,6 +26,8 @@ from google.oauth2.credentials import Credentials
 
 log = logging.getLogger(__name__)
 
+# Google's OAuth token endpoint, where access tokens are refreshed (the default for authorized_session).
+GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
 # (connect, read) seconds. Without a timeout a stalled connection would hang the scan forever.
 REQUEST_TIMEOUT = (10, 60)
 
@@ -80,14 +82,22 @@ class RetryPolicy:
         return max(backoff, retry_after or 0.0)
 
 
-def authorized_session(token_path: str, scopes: Sequence[str]) -> AuthorizedSession:
+def authorized_session(
+    token_path: str, scopes: Sequence[str], token_uri: str = GOOGLE_TOKEN_URI
+) -> AuthorizedSession:
     """An HTTP session for the account whose OAuth token (authorized-user JSON from SNX-21) is at token_path.
 
     The access token is refreshed in memory as needed; the file is only read, so it can be mounted
     read-only. scopes must be ones the token was granted, or Google refuses the refresh.
+
+    token_uri is simply the address of the token endpoint, like a client's API address: Google's by default,
+    the mock Google server's /token in local runs and contract tests. The code behaves the same either way.
+    It comes from the caller's configuration, never from the file: google-auth deliberately ignores any
+    `token_uri` inside an authorized-user file, so a tampered file cannot send the client secret and refresh
+    token to someone else's server.
     """
     credentials = Credentials.from_authorized_user_file(token_path, scopes=list(scopes))
-    return AuthorizedSession(credentials)
+    return AuthorizedSession(credentials.with_token_uri(token_uri))
 
 
 class GoogleApi:

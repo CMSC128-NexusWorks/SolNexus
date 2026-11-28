@@ -12,10 +12,18 @@ from typing import Any
 
 import requests
 
-from services.google_api import GoogleApi, GoogleApiError, GoogleNotFound, RetryPolicy, authorized_session
+from services.google_api import (
+    GOOGLE_TOKEN_URI,
+    GoogleApi,
+    GoogleApiError,
+    GoogleNotFound,
+    RetryPolicy,
+    authorized_session,
+)
 
 # Where Gmail lives: Google by default. It is an ordinary configurable address (api_root), like a database URL;
-# local runs and contract tests set the mock Google server's, e.g. "http://google-workspace-mock:8090/gmail/v1/users/me".
+# local runs and contract tests set the mock Google server's,
+# e.g. "http://google-workspace-mock:8090/gmail/v1/users/me".
 API_ROOT = "https://gmail.googleapis.com/gmail/v1/users/me"
 # Least privilege that can read message bodies (SNX-21 findings).
 READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
@@ -36,9 +44,15 @@ class GmailClient:
         self._api = GoogleApi(session, api_root.rstrip("/"), "Gmail", retry_policy, sleep)
 
     @classmethod
-    def from_token_file(cls, token_path: str, **kwargs: Any) -> GmailClient:
-        """Client for the mailbox whose OAuth token is at token_path (see google_api.authorized_session)."""
-        return cls(authorized_session(token_path, [READONLY_SCOPE]), **kwargs)
+    def from_token_file(cls, token_path: str, token_uri: str = GOOGLE_TOKEN_URI, **kwargs: Any) -> GmailClient:
+        """Client for the mailbox whose OAuth token is at token_path (see google_api.authorized_session).
+
+        The client talks to two addresses, both Google's by default: token_uri (where access tokens are
+        refreshed) and api_root (where Gmail lives). Pointing both at the mock Google server is how local runs
+        and contract tests use it; the client cannot tell the difference. Other keyword arguments (retry_policy,
+        sleep, api_root) go to the constructor.
+        """
+        return cls(authorized_session(token_path, [READONLY_SCOPE], token_uri), **kwargs)
 
     def get_profile(self) -> dict[str, Any]:
         """The connected mailbox's address and its current historyId."""
