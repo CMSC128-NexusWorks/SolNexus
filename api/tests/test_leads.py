@@ -8,12 +8,18 @@ from sqlalchemy import text
 from app.db import engine, get_db
 from app.main import app
 
-MODELS = Path(__file__).resolve().parents[2] / "dbt" / "models"
+# The dbt models, found at the same repo-relative path everywhere: on a CI runner parents[2] is the repo root, and
+# in the api container (/app/tests/...) it is "/", where compose.yaml mounts the project at /data-platform/dbt.
+MODELS = Path(__file__).resolve().parents[2] / "data-platform" / "dbt" / "models"
 
 
 def compile_model(name):
     """Inline ephemeral source models for test setup; production uses dbt build unchanged."""
-    path = next(MODELS.rglob(name + ".sql"))
+    path = next(MODELS.rglob(name + ".sql"), None)
+    if path is None:
+        # Fail with the reason, not a bare StopIteration (which pytest reports as an opaque RuntimeError when it
+        # escapes a fixture): the usual cause is the dbt project having moved without this path following it.
+        raise FileNotFoundError(f"dbt model {name}.sql not found under {MODELS}")
     sql = path.read_text(encoding="utf-8")
     sql = re.sub(
         r"\{\{\s*source\('([^']+)',\s*'([^']+)'\)\s*\}\}",

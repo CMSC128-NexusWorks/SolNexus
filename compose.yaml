@@ -79,8 +79,9 @@ services:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./api:/app
-      # Read-only contract/model sources used by backend integration tests in the dev container.
-      - ./data-platform/dbt:/dbt:ro
+      # Read-only contract/model sources used by backend integration tests in the dev container, mounted at their
+      # repo-relative paths so the tests find them the same way here as on a CI runner (tests/test_leads.py).
+      - ./data-platform/dbt:/data-platform/dbt:ro
       - ./docs/contracts/fixtures:/docs/contracts/fixtures:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
