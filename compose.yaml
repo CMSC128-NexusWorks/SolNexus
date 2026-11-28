@@ -34,7 +34,7 @@ x-airflow-common: &airflow-common
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/include:/opt/airflow/include:ro
     # Transitional (SNX-67): removed once ingest_email calls the master over HTTP.
-    - ./google-workspace/google-workspace-master-service:/opt/airflow/google-workspace-master:ro
+    - ./data-ingestion/google-workspace/google-workspace-master-service:/opt/airflow/google-workspace-master:ro
     - ./dbt:/opt/airflow/dbt
     - airflow_logs:/opt/airflow/logs
     # OAuth files stay on the host and are mounted read-only; the image never contains them.
@@ -138,7 +138,7 @@ services:
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
       PIP_ROOT_USER_ACTION: ignore
     volumes:
-      - ./google-workspace/google-workspace-master-service:/app:ro
+      - ./data-ingestion/google-workspace/google-workspace-master-service:/app:ro
     # Read-only mount, so pytest's cache is disabled. Arguments after the service name reach pytest.
     entrypoint:
       - bash

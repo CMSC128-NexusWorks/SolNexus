@@ -211,7 +211,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             api/requirements.txt
-            google-workspace/google-workspace-master-service/requirements*.txt
+            data-ingestion/google-workspace/google-workspace-master-service/requirements*.txt
 
       # The tables the master writes are owned by the backend's Alembic migrations (docs/database.md).
       - name: Migrate the test database to head
@@ -225,7 +225,7 @@ jobs:
       # Plain Python on the runner: the master has no Airflow dependency. Mirrors
       # `docker compose --profile test run --rm google-workspace-master-tests`.
       - name: Run Google Workspace master tests
-        working-directory: google-workspace/google-workspace-master-service
+        working-directory: data-ingestion/google-workspace/google-workspace-master-service
         env:
           SOLNEXUS_TEST_DATABASE_URL: ${{ env.INGEST_TEST_DATABASE_URL }}
         run: |

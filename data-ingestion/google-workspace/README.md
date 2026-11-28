@@ -32,7 +32,7 @@ shared Google API layer (auth, retries, error classes) under every Google produc
 - *The core / coordinator service.* SolNexus has one client and no scan coordinator. Airflow plays that role.
 - *Kafka and Flink.* At SolTech's volume the master writes bronze directly, in one transaction per page.
 - *A separate database for the master.* SolNexus keeps one Postgres. Every table, including the master's,
-  is created by the backend's Alembic migrations ([docs/database.md](../docs/database.md)).
+  is created by the backend's Alembic migrations ([docs/database.md](../../docs/database.md)).
 - *PII masking.* SolTech staff are the data owners and read the real conversations. Logs still never carry
   addresses or content.
 
@@ -49,4 +49,4 @@ docker compose --profile test run --rm google-workspace-master-tests
 ```
 
 The Postgres-backed tests use the same throwaway `solnexus_ingest_test` database as the Airflow tests; see
-[airflow/README.md](../airflow/README.md#tests) for creating it, and set `SOLNEXUS_TEST_DATABASE_URL`.
+[airflow/README.md](../../airflow/README.md#tests) for creating it, and set `SOLNEXUS_TEST_DATABASE_URL`.
