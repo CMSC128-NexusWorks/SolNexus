@@ -175,12 +175,14 @@ See the [frontend README](web/README.md) for scripts and conventions.
 
 ```
 .
-├── data-platform/    Airflow image, DAGs and the Gmail connector (see data-platform/README.md)
-├── api/    FastAPI app, Alembic migrations and dev seed
-├── data-platform/dbt/        dbt project (silver models; reads bronze and app as sources)
-├── docker/     container init scripts (Postgres)
-├── docs/       proposal, requirements, architecture, contracts, roadmap, wireframes
-├── web/   React dashboard
+├── web/              React dashboard for SolTech staff (see web/README.md)
+├── api/              FastAPI backend the dashboard calls; Alembic migrations own every bronze/app table
+├── data-ingestion/   Source connectors that write bronze (see data-ingestion/README.md)
+│   └── google-workspace/   Gmail + Google Calendar: master service, mock server, contracts
+├── data-platform/    Airflow DAGs and image (see data-platform/README.md)
+│   └── dbt/          dbt project: silver models built from bronze and app
+├── docker/           container init scripts (Postgres)
+├── docs/             proposal, requirements, architecture, contracts, roadmap, wireframes
 └── compose.yaml
 ```
 
@@ -190,23 +192,24 @@ See the [frontend README](web/README.md) for scripts and conventions.
 - Keep commits atomic: one logical change per commit, so each can be reviewed and reverted on its own.
 - Write commits as [Conventional Commits](https://www.conventionalcommits.org/) with the ticket as scope, e.g. `feat(snx-54): add app shell`.
 - Run the checks for the area you changed before opening a PR; see [Automated checks](#automated-checks) for the commands. CI runs the same ones.
-- Open a PR into `main`. It needs one approval from someone other than the last pusher, and the **Frontend**, **Backend** and **Airflow** CI checks must pass.
+- Open a PR into `main`. It needs one approval from someone other than the last pusher, and the **Frontend**, **Backend**, **Airflow** and **Google Workspace** CI checks must pass.
 - Use synthetic data only in fixtures, mocks, tests and screenshots. Real client data stays in the git-ignored `leads-data/` folder.
 
 AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project context.
 
 ### Automated checks
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs three parallel jobs on every pull request into `main` (and on every push to `main`). They are required status checks, so a failing job blocks the merge. CI needs no secrets and uses the same runtime versions as the Dockerfiles (Node 22, Python 3.12, Airflow 2.10.5, PostgreSQL 16).
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs four parallel jobs on every pull request into `main` (and on every push to `main`). They are required status checks, so a failing job blocks the merge. CI needs no secrets and uses the same runtime versions as the Dockerfiles (Node 22, Python 3.12, Airflow 2.10.5, PostgreSQL 16).
 
 | CI job | What it runs | Run the same checks locally |
 |---|---|---|
 | **Frontend** | `npm ci`, then `typecheck`, `lint`, `format:check`, `test` (vitest) and `build` (production Vite bundle) in `web/` | `cd web && npm ci && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build` |
 | **Backend** | `pytest` in `api/`, against a PostgreSQL service container (it creates its own `solnexus_test` database) | `docker compose run --rm api pytest` |
-| **Airflow** | `pytest` in `data-platform/`, inside the project's Airflow image: DAG import test, the Gmail connector tests (Gmail faked in memory) and the Postgres-backed tests, against a throwaway `solnexus_ingest_test` database migrated to head | `docker compose --profile test run --rm airflow-tests` (add the database steps in [data-platform/README.md](data-platform/README.md#tests) to include the Postgres-backed tests) |
+| **Airflow** | `pytest` in `data-platform/`, inside the project's Airflow image: DAG import test, run status and silver publication, including Postgres-backed tests against a throwaway `solnexus_ingest_test` database migrated to head | `docker compose --profile test run --rm airflow-tests` (add the database steps in [data-platform/README.md](data-platform/README.md#tests) to include the Postgres-backed tests) |
+| **Google Workspace** | `pytest` in `data-ingestion/google-workspace/google-workspace-master-service/`, plain Python: the Google API layer and Gmail connector (Google faked in memory) and the Postgres-backed bronze store tests, against the same kind of throwaway database | `docker compose --profile test run --rm google-workspace-master-tests` (set `SOLNEXUS_TEST_DATABASE_URL` as for the Airflow tests) |
 
 - `npm run format:check` fails on unformatted files; fix them with `npm run format` in `web/`.
-- Locally, the Airflow tests that need Postgres skip unless `SOLNEXUS_TEST_DATABASE_URL` is set. CI sets it; to run them yourself, follow [data-platform/README.md](data-platform/README.md#tests).
+- Locally, the Airflow and Google Workspace tests that need Postgres skip unless `SOLNEXUS_TEST_DATABASE_URL` is set. CI sets it; to run them yourself, follow [data-platform/README.md](data-platform/README.md#tests).
 - dbt models and tests are not run in CI yet.
 
 ## Documentation

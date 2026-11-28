@@ -1,4 +1,8 @@
-# Airflow: Gmail ingestion and silver publication
+# Data platform: Airflow and dbt
+
+The batch side of SolNexus, laid out like the Glynac Airflow platform: DAGs and their helper package at the
+root, the dbt project in [dbt/](dbt), both run by the project's Airflow image. Source connectors are not
+here: they live in [data-ingestion/](../data-ingestion/README.md), and the platform only orchestrates them.
 
 Two DAGs run the Phase 1 pipeline (SNX-33):
 
@@ -7,18 +11,23 @@ Two DAGs run the Phase 1 pipeline (SNX-33):
 | `ingest_email` | Hourly at :00 (`GMAIL_SYNC_SCHEDULE`) | Copies the connected Gmail mailbox into `bronze.raw_messages` (SNX-32). It opens an unknown-name inquiry for each inbound first contact, and it never links a message to a clinic without a staff-confirmed source identity |
 | `transform_bronze_to_silver` | After every successful `ingest_email` run, plus hourly at :30 (`SILVER_REFRESH_SCHEDULE`) | `build_silver` runs `dbt build` into `silver_build`. `publish_silver` swaps it in as `silver` and records the publication |
 
-Each DAG allows one active run at a time. The hourly silver run keeps spreadsheet imports and staff edits flowing into silver while Gmail is down. Both schedules are the contract's proposed defaults and still need team approval. The connector code is in [include/solnexus_ingest](include/solnexus_ingest). The DAGs only wire it to Airflow.
+Each DAG allows one active run at a time. The hourly silver run keeps spreadsheet imports and staff edits flowing into silver while Gmail is down. Both schedules are the contract's proposed defaults and still need team approval. The DAGs only wire code to Airflow. The Gmail connector lives in the Google Workspace master ([data-ingestion/google-workspace](../data-ingestion/google-workspace/README.md)); until the master has its scan API, `ingest_email` imports the master's `services` package through a read-only mount (SNX-67).
 
-| Module | Job |
+| Module (`include/solnexus_ingest/`) | Job |
 |---|---|
-| `gmail/client.py` | Read-only Gmail REST calls with bounded backoff and error classification |
-| `gmail/parsing.py` | Gmail `format=raw` message → `MessageEnvelope` (direction, participant, times) |
-| `gmail/sync.py` | Full or incremental listing, page by page, with the checkpoint saved after the last page |
-| `store.py` | Bronze insert with replay protection, initial resolution, inquiry, checkpoint, all in one transaction per page |
-| `resolution.py` | Identity-contract rules for `linked` / `needs_review` and when to open an inquiry |
-| `runs.py` | Run status in `app.pipeline_runs`: `running` at task start, `retrying` / `failed` from task callbacks, `succeeded` with the work |
+| `core/runs.py` | Run status in `app.pipeline_runs`: `running` at task start, `retrying` / `failed` from task callbacks, `succeeded` with the work |
+| `core/orchestration.py` | Names the DAGs share: warehouse connection, the `GMAIL_BRONZE` dataset, the schedule timezone |
 | `silver.py` | `dbt build` into `silver_build`, then the atomic schema swap and publication record |
-| `orchestration.py` | Names the DAGs share: warehouse connection, the `GMAIL_BRONZE` dataset, the schedule timezone |
+
+| Connector module (`google-workspace-master-service/services/`) | Job |
+|---|---|
+| `google_api.py` | OAuth session, bounded backoff and error classification shared by every Google client |
+| `gmail_client.py` | Read-only Gmail REST calls |
+| `gmail_parsing.py` | Gmail `format=raw` message → `MessageEnvelope` (direction, participant, times) |
+| `gmail_sync.py` | Full or incremental listing, page by page, with the checkpoint saved after the last page |
+| `message_store.py` | Bronze insert with replay protection, initial resolution, inquiry, checkpoint, all in one transaction per page |
+| `message_resolution.py` | Identity-contract rules for `linked` / `needs_review` and when to open an inquiry |
+| `checkpoints.py` | The cursor each source resumes from, in `app.ingestion_checkpoints` |
 
 ## How a run works
 
@@ -107,4 +116,4 @@ SOLNEXUS_TEST_DATABASE_URL="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postg
   docker compose --profile test run --rm airflow-tests
 ```
 
-If `SOLNEXUS_TEST_DATABASE_URL` is not set, only the database tests are skipped. Arguments after the service name go to pytest, for example `docker compose --profile test run --rm airflow-tests -k sync`. All test data is synthetic (`example.test` addresses). Gmail is faked in memory, so the tests never call Google.
+If `SOLNEXUS_TEST_DATABASE_URL` is not set, only the database tests are skipped. Arguments after the service name go to pytest, for example `docker compose --profile test run --rm airflow-tests -k silver`. All test data is synthetic. The Gmail connector's tests moved with it to the Google Workspace master: run them with `docker compose --profile test run --rm google-workspace-master-tests`, against the same database.
