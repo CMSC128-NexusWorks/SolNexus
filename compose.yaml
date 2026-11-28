@@ -147,6 +147,44 @@ services:
       - "--"
     command: []
 
+  # Mock Google (SNX-69): fake Gmail and Calendar APIs with synthetic data, so the pipeline runs with no Google
+  # account. Opt-in profile, so `docker compose up` behaves as before:
+  #   docker compose --profile mock up -d google-workspace-mock   ->  http://127.0.0.1:18090/_mock/health
+  google-workspace-mock:
+    profiles: ["mock"]
+    build:
+      context: ./data-ingestion/google-workspace/google-workspace-mock-server
+    environment:
+      # Validated at startup; anything but local/ci/dev stops the container (it must never pose as Google
+      # where real data flows).
+      MOCK_ENVIRONMENT: local
+      MOCK_LOG_LEVEL: ${MOCK_LOG_LEVEL:-INFO}
+    # Bound to localhost only: the mock has no authentication of its own.
+    ports:
+      - "127.0.0.1:18090:8090"
+
+  # Mock tests and lint: docker compose --profile test run --rm google-workspace-mock-tests
+  # Unit tests only (in-process, no database, no network). The project mount is read-only, so caches are off.
+  google-workspace-mock-tests:
+    profiles: ["test"]
+    image: python:3.12-slim
+    working_dir: /app
+    environment:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_ROOT_USER_ACTION: ignore
+    volumes:
+      - ./data-ingestion/google-workspace/google-workspace-mock-server:/app:ro
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        pip install --quiet -r requirements-dev.txt
+        && ruff check --no-cache .
+        && ruff format --no-cache --check .
+        && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
+
   web:
     build:
       context: ./web
