@@ -42,6 +42,14 @@ Until the master has its scan API, Airflow's `ingest_email` DAG imports the mast
 directly (mounted read-only and put on `PYTHONPATH` in `compose.yaml`). When the scan API lands, the DAG
 switches to calling it over HTTP and that mount is removed.
 
+## Run the mock Google server
+
+```bash
+docker compose --profile mock up -d google-workspace-mock    # fake Gmail + Calendar on http://127.0.0.1:18090
+```
+
+How to point a client at it, its controls and fault recipes: [the mock's README](google-workspace-mock-server/README.md).
+
 ## Tests
 
 Three tiers, from fastest to most complete:
