@@ -8,8 +8,9 @@ import re
 
 import pytest
 
-from mock_dataset import read_dataset_or_problems
+from mock_dataset import MockDataset, read_dataset_or_problems
 from mock_settings import DATASETS_DIR
+from mock_state import find_unplayable_dataset_parts
 
 SHIPPED_DATASET = DATASETS_DIR / "synthetic_soltech.json"
 
@@ -24,10 +25,11 @@ def write_dataset(tmp_path, data: dict):
     return path
 
 
-def test_shipped_dataset_is_valid():
-    _, problems = read_dataset_or_problems(SHIPPED_DATASET)
+def test_shipped_dataset_is_valid_and_every_scripted_change_applies():
+    dataset, problems = read_dataset_or_problems(SHIPPED_DATASET)
 
     assert problems == []
+    assert find_unplayable_dataset_parts(dataset, SHIPPED_DATASET.name) == []
 
 
 def test_shipped_dataset_uses_synthetic_addresses_only():
@@ -94,3 +96,16 @@ def test_report_stays_ascii_for_non_ascii_dataset_text(tmp_path):
     _, problems = read_dataset_or_problems(write_dataset(tmp_path, data))
 
     assert problems and all(p.problem.isascii() for p in problems)
+
+
+def test_scripted_change_that_references_a_missing_id_is_reported_with_its_position():
+    data = shipped_dataset_dict()
+    data["scripted_changes"].append({"kind": "cancel_event", "event_id": "evt-does-not-exist"})
+    dataset = MockDataset.model_validate(data)
+
+    problems = find_unplayable_dataset_parts(dataset, "synthetic_soltech.json")
+
+    position = len(data["scripted_changes"]) - 1
+    assert [p.problem for p in problems] == [
+        f"scripted_changes.{position} (cancel_event): event evt-does-not-exist is not in the calendar"
+    ]
