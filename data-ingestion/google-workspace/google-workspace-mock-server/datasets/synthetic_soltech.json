@@ -1,0 +1,253 @@
+{
+  "description": "Synthetic SolTech sales mailbox and calendar. SolTech sells a PhilHealth-certified YAKAP EMR to Philippine clinics; product facts (YAKAP e-filing, Tranche 1/2, eKonsulta import, yearly plans by patient count, free 30-minute demo, Viber/Messenger support) are paraphrased from soltech.ph as of November 2026. Every person, clinic, address and link is invented (example.test). Covers: an inquiry -> reply -> booking thread, a multi-branch prospect, a Taglish inquiry with a non-ASCII name, an owner writing from California, mail the master must skip (draft, spam, newsletter, internal), Calendly bookings, an all-day onboarding visit, a weekly go-live series in Manila, a weekly series in Los Angeles that crosses the US daylight-saving change, internal and personal events the master must not ingest; scripted new mail, a deletion, a reschedule, two cancellations and a new booking from the new lead.",
+  "seeded_at": "2026-11-20T00:00:00Z",
+  "mailbox": {
+    "address": "sales@soltech.example.test",
+    "first_history_id": 104000,
+    "messages": [
+      {
+        "id": "msg-001",
+        "thread_id": "thr-001",
+        "labels": ["INBOX"],
+        "sent_at": "2026-11-17T09:15:00+08:00",
+        "sender": "Dr. Ana Reyes <ana.reyes@reyesfamilyclinic.example.test>",
+        "to": ["SolTech <sales@soltech.example.test>"],
+        "subject": "Inquiry: YAKAP EMR for our clinic in Imus",
+        "body": "Good morning SolTech,\n\nI run Reyes Family Clinic in Imus, Cavite. We are a YAKAP clinic with around 1,800 empaneled patients, and we still encode everything in eKonsulta after clinic hours. My staff and I are always rushing before the monthly cutoff.\n\nA few questions:\n1. How much is your EMR for a single clinic our size?\n2. Can we bring over our existing patients and empanelments from eKonsulta?\n3. Can my two staff have their own accounts?\n\nThank you,\nDr. Ana Reyes\nReyes Family Clinic"
+      },
+      {
+        "id": "msg-002",
+        "thread_id": "thr-001",
+        "labels": ["SENT"],
+        "sent_at": "2026-11-17T13:40:00+08:00",
+        "sender": "SolTech <sales@soltech.example.test>",
+        "to": ["Dr. Ana Reyes <ana.reyes@reyesfamilyclinic.example.test>"],
+        "subject": "Re: Inquiry: YAKAP EMR for our clinic in Imus",
+        "body": "Hi Dr. Reyes,\n\nThank you for reaching out! Answers to your questions:\n\n1. With about 1,800 patients and one clinic, you fit our Basic plan (1 to 2,500 patients, single clinic). It is one fixed yearly subscription, currently PHP 50,000/year at our launch price. No onboarding, installation or performance fees, and your PhilHealth payout stays fully yours.\n2. Yes. We can bulk-import your historical patients and active empanelments from eKonsulta, so you do not start from zero.\n3. Yes, every staff member gets a personalized account.\n\nThe fastest way to see it is a free 30-minute demo, where we walk through YAKAP e-filing, Tranche 1 and Tranche 2 forms and the cutoff reminders. You can pick a time here: https://calendly.example.test/soltech/free-demo\n\nSalamat po,\nSolTech Sales Team",
+        "in_reply_to": "msg-001"
+      },
+      {
+        "id": "msg-003",
+        "thread_id": "thr-002",
+        "labels": ["INBOX", "UNREAD"],
+        "sent_at": "2026-11-18T08:05:00+08:00",
+        "sender": "Northpoint Medical Clinic <admin@northpointmedical.example.test>",
+        "to": ["sales@soltech.example.test"],
+        "subject": "Multi-branch setup and pricing (3 clinics, Cebu)",
+        "body": "Hello,\n\nWe are Northpoint Medical Clinic with three branches in Cebu (Mandaue, Lapu-Lapu and Talisay), about 6,000 YAKAP patients combined. We are looking for one EMR for all branches.\n\nCan the owners see reports for all three clinics in one account, while each branch's staff only sees their own branch? And what would the pricing be for our size?\n\nWe prefer to coordinate on Viber if possible.\n\nRegards,\nClinic Administrator\nNorthpoint Medical Clinic"
+      },
+      {
+        "id": "msg-004",
+        "thread_id": "thr-003",
+        "labels": ["INBOX", "CATEGORY_PROMOTIONS"],
+        "sent_at": "2026-11-18T10:00:00+08:00",
+        "sender": "ClinicOps PH Weekly <newsletter@clinicops-ph.example.test>",
+        "to": ["sales@soltech.example.test"],
+        "subject": "This week: year-end clinic deadlines, supply deals and more",
+        "body": "Your weekly roundup for clinic owners: year-end checklists, supply discounts and upcoming webinars.\n\nYou are receiving this because you subscribed. Unsubscribe any time."
+      },
+      {
+        "id": "msg-005",
+        "thread_id": "thr-002",
+        "labels": ["DRAFT"],
+        "sent_at": "2026-11-18T11:30:00+08:00",
+        "sender": "SolTech <sales@soltech.example.test>",
+        "to": ["admin@northpointmedical.example.test"],
+        "subject": "Re: Multi-branch setup and pricing (3 clinics, Cebu)",
+        "body": "Hi Northpoint team,\n\nDRAFT - check numbers before sending. With 6,000 patients across 3 clinics you are on Enterprise (5,001+ patients, 3+ clinics): PHP 5 per patient per year at launch price, plus Multi-clinic Management for centralized reporting and per-clinic staff access..."
+      },
+      {
+        "id": "msg-006",
+        "thread_id": "thr-004",
+        "labels": ["SPAM"],
+        "sent_at": "2026-11-18T12:00:00+08:00",
+        "sender": "Accreditation Desk <noreply@accreditation-alerts.example.test>",
+        "to": ["sales@soltech.example.test"],
+        "subject": "URGENT: Your clinic accreditation will be suspended today",
+        "body": "Your accreditation will be suspended within 24 hours. Click the link and enter your login details to keep it active."
+      },
+      {
+        "id": "msg-007",
+        "thread_id": "thr-005",
+        "labels": ["INBOX"],
+        "sent_at": "2026-11-18T15:20:00+08:00",
+        "sender": "SolTech Onboarding <onboarding@soltech.example.test>",
+        "to": ["sales@soltech.example.test"],
+        "subject": "Internal: demo account ready for Reyes Family Clinic",
+        "body": "Hi team,\n\nThe demo clinic account is ready with a sample masterlist of 50 fake patients, so we can show empanelment checking and a Tranche 1 encounter live. Login is in the shared vault, not in email.\n\nOnboarding"
+      },
+      {
+        "id": "msg-008",
+        "thread_id": "thr-006",
+        "labels": ["INBOX"],
+        "sent_at": "2026-11-19T07:45:00+08:00",
+        "sender": "Dr. Jose Peña <jose.pena@penapediatrics.example.test>",
+        "to": ["sales@soltech.example.test"],
+        "subject": "Pagtatanong tungkol sa YAKAP EMR — Peña Pediatrics",
+        "body": "Magandang araw po!\n\nPediatric clinic po kami sa Quezon City, YAKAP-accredited. Gabi-gabi po kami nag-e-encode ng consultations para humabol sa cutoff, kaya naghahanap po kami ng mas mabilis na system.\n\nTanong lang po:\n- Gagana po ba kahit mahina minsan ang internet sa clinic?\n- Kasama na po ba ang training para sa secretary ko?\n\nSalamat po,\nDr. Jose Peña\nPeña Pediatrics"
+      },
+      {
+        "id": "msg-009",
+        "thread_id": "thr-001",
+        "labels": ["INBOX"],
+        "sent_at": "2026-11-19T10:10:00+08:00",
+        "sender": "Dr. Ana Reyes <ana.reyes@reyesfamilyclinic.example.test>",
+        "to": ["SolTech <sales@soltech.example.test>"],
+        "subject": "Re: Inquiry: YAKAP EMR for our clinic in Imus",
+        "body": "Thank you! I booked the demo for December 2, 10 AM. My clinic secretary will join too.\n\nDr. Reyes",
+        "in_reply_to": "msg-002"
+      },
+      {
+        "id": "msg-010",
+        "thread_id": "thr-007",
+        "labels": ["INBOX"],
+        "sent_at": "2026-11-19T17:30:00-08:00",
+        "sender": "Carlo Villanueva <carlo.villanueva@villanuevamedical.example.test>",
+        "to": ["sales@soltech.example.test"],
+        "subject": "EMR for my family's clinic in Iloilo (I'm based in California)",
+        "body": "Hi SolTech,\n\nMy mother runs Villanueva Medical Clinic in Iloilo City, a YAKAP clinic with about 2,000 patients. I help manage it from California, so I need something cloud-based that I can check from here, and that her staff can learn quickly.\n\nI booked a demo slot for December 3 in my time zone. Is that OK even though it is the next morning in Manila?\n\nThanks,\nCarlo Villanueva"
+      }
+    ]
+  },
+  "calendar": {
+    "calendar_id": "sales@soltech.example.test",
+    "owner": "sales@soltech.example.test",
+    "time_zone": "Asia/Manila",
+    "events": [
+      {
+        "id": "evt-calendly-reyes-demo",
+        "summary": "SolTech Free 30-Minute Demo between SolTech Sales and Ana Reyes",
+        "description": "Event Name: SolTech Free 30-Minute Demo\n\nLocation: This is a Google Meet web conference.\nhttps://meet.example.test/sol-reyes-demo\n\nClinic name: Reyes Family Clinic\nNumber of YAKAP patients: around 1,800\nCurrent system: eKonsulta\nAnything we should prepare?: Gusto po namin makita yung YAKAP e-filing at import from eKonsulta.\n\nNeed to make changes to this event?\nCancel: https://calendly.example.test/cancellations/reyes-demo\nReschedule: https://calendly.example.test/reschedulings/reyes-demo\n\nPowered by Calendly.com",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "ana.reyes@reyesfamilyclinic.example.test", "response_status": "accepted"}
+        ],
+        "start": {"date_time": "2026-12-02T10:00:00", "time_zone": "Asia/Manila"},
+        "end": {"date_time": "2026-12-02T10:30:00", "time_zone": "Asia/Manila"}
+      },
+      {
+        "id": "evt-calendly-villanueva-demo",
+        "summary": "SolTech Free 30-Minute Demo between SolTech Sales and Carlo Villanueva",
+        "description": "Event Name: SolTech Free 30-Minute Demo\n\nLocation: This is a Google Meet web conference.\nhttps://meet.example.test/sol-villanueva-demo\n\nClinic name: Villanueva Medical Clinic (Iloilo City)\nNumber of YAKAP patients: about 2,000\nInvitee time zone: Pacific Time - US & Canada\n\nNeed to make changes to this event?\nCancel: https://calendly.example.test/cancellations/villanueva-demo\nReschedule: https://calendly.example.test/reschedulings/villanueva-demo\n\nPowered by Calendly.com",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "carlo.villanueva@villanuevamedical.example.test", "response_status": "accepted"}
+        ],
+        "start": {"date_time": "2026-12-03T17:00:00", "time_zone": "America/Los_Angeles"},
+        "end": {"date_time": "2026-12-03T17:30:00", "time_zone": "America/Los_Angeles"}
+      },
+      {
+        "id": "evt-calendly-pena-demo",
+        "summary": "SolTech Free 30-Minute Demo between SolTech Sales and Jose Peña",
+        "description": "Event Name: SolTech Free 30-Minute Demo\n\nLocation: This is a Google Meet web conference.\nhttps://meet.example.test/sol-pena-demo\n\nClinic name: Peña Pediatrics\nAnything we should prepare?: Paki-explain po yung offline mode at training.\n\nNeed to make changes to this event?\nCancel: https://calendly.example.test/cancellations/pena-demo\nReschedule: https://calendly.example.test/reschedulings/pena-demo\n\nPowered by Calendly.com",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "jose.pena@penapediatrics.example.test", "response_status": "accepted"}
+        ],
+        "start": {"date_time": "2026-12-03T14:00:00", "time_zone": "Asia/Manila"},
+        "end": {"date_time": "2026-12-03T14:30:00", "time_zone": "Asia/Manila"}
+      },
+      {
+        "id": "evt-northpoint-onboarding-day",
+        "summary": "Onboarding and staff training: Northpoint Medical Clinic (Mandaue)",
+        "description": "Free onboarding day: account setup for all three branches, eKonsulta import, and training for front desk and doctors. Talisay and Lapu-Lapu staff join online.",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "onboarding@soltech.example.test", "response_status": "accepted"},
+          {"email": "admin@northpointmedical.example.test", "response_status": "needsAction"}
+        ],
+        "start": {"date": "2026-12-07"},
+        "end": {"date": "2026-12-08"}
+      },
+      {
+        "id": "evt-northpoint-golive-weekly",
+        "summary": "Northpoint Medical Clinic: weekly go-live check-in",
+        "description": "Weekly check-in for the first month after go-live: Tranche 1/2 progress per branch, backlog submissions, questions from staff.",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "admin@northpointmedical.example.test", "response_status": "accepted"}
+        ],
+        "start": {"date_time": "2026-12-02T14:00:00", "time_zone": "Asia/Manila"},
+        "end": {"date_time": "2026-12-02T14:30:00", "time_zone": "Asia/Manila"},
+        "recurrence": "RRULE:FREQ=WEEKLY;COUNT=4"
+      },
+      {
+        "id": "evt-villanueva-weekly-dst",
+        "summary": "Villanueva Medical Clinic: weekly onboarding sync (owner joins from California)",
+        "description": "Weekly at 5:00 PM Pacific, which is the next morning in Iloilo. The US switches to daylight time on 2027-03-14, so the Manila-side time moves from 9:00 AM to 8:00 AM while the Pacific time stays the same.",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "carlo.villanueva@villanuevamedical.example.test", "response_status": "tentative"}
+        ],
+        "start": {"date_time": "2027-03-04T17:00:00", "time_zone": "America/Los_Angeles"},
+        "end": {"date_time": "2027-03-04T17:30:00", "time_zone": "America/Los_Angeles"},
+        "recurrence": "RRULE:FREQ=WEEKLY;COUNT=3"
+      },
+      {
+        "id": "evt-internal-standup",
+        "summary": "Sales and onboarding standup",
+        "description": "Internal only: pipeline review and demo prep. No external attendee, so the master must not ingest it.",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "onboarding@soltech.example.test", "response_status": "accepted"}
+        ],
+        "start": {"date_time": "2026-12-01T09:00:00", "time_zone": "Asia/Manila"},
+        "end": {"date_time": "2026-12-01T09:15:00", "time_zone": "Asia/Manila"}
+      },
+      {
+        "id": "evt-personal-block",
+        "summary": "Prepare Northpoint Enterprise quote",
+        "description": "No attendees: a personal work block the master must not ingest.",
+        "organizer": "sales@soltech.example.test",
+        "start": {"date_time": "2026-12-01T13:00:00", "time_zone": "Asia/Manila"},
+        "end": {"date_time": "2026-12-01T15:00:00", "time_zone": "Asia/Manila"}
+      }
+    ]
+  },
+  "scripted_changes": [
+    {
+      "kind": "add_message",
+      "message": {
+        "id": "msg-011",
+        "thread_id": "thr-008",
+        "labels": ["INBOX", "UNREAD"],
+        "sent_at": "2026-11-21T09:00:00+08:00",
+        "sender": "Dr. Grace Tan <grace.tan@sunrisefamilyhealth.example.test>",
+        "to": ["sales@soltech.example.test"],
+        "subject": "Saw your page on Facebook, interested in a demo",
+        "body": "Hi SolTech,\n\nWe are Sunrise Family Health Center in Davao City, newly YAKAP-accredited, around 900 patients so far. I saw your page on Facebook. I will book a free demo slot on your Calendly.\n\nDr. Grace Tan"
+      }
+    },
+    {"kind": "delete_message", "message_id": "msg-004"},
+    {
+      "kind": "reschedule_event",
+      "event_id": "evt-calendly-reyes-demo",
+      "start": {"date_time": "2026-12-04T15:00:00", "time_zone": "Asia/Manila"},
+      "end": {"date_time": "2026-12-04T15:30:00", "time_zone": "Asia/Manila"}
+    },
+    {"kind": "cancel_event", "event_id": "evt-calendly-pena-demo"},
+    {"kind": "cancel_event", "event_id": "evt-northpoint-golive-weekly_20261216T060000Z"},
+    {
+      "kind": "add_event",
+      "event": {
+        "id": "evt-calendly-tan-demo",
+        "summary": "SolTech Free 30-Minute Demo between SolTech Sales and Grace Tan",
+        "description": "Event Name: SolTech Free 30-Minute Demo\n\nLocation: This is a Google Meet web conference.\nhttps://meet.example.test/sol-tan-demo\n\nClinic name: Sunrise Family Health Center\nNumber of YAKAP patients: around 900\nHow did you hear about us?: Facebook\n\nNeed to make changes to this event?\nCancel: https://calendly.example.test/cancellations/tan-demo\nReschedule: https://calendly.example.test/reschedulings/tan-demo\n\nPowered by Calendly.com",
+        "organizer": "sales@soltech.example.test",
+        "attendees": [
+          {"email": "sales@soltech.example.test", "response_status": "accepted"},
+          {"email": "grace.tan@sunrisefamilyhealth.example.test", "response_status": "accepted"}
+        ],
+        "start": {"date_time": "2026-12-09T11:00:00", "time_zone": "Asia/Manila"},
+        "end": {"date_time": "2026-12-09T11:30:00", "time_zone": "Asia/Manila"}
+      }
+    }
+  ]
+}

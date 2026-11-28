@@ -6,7 +6,7 @@ import io
 
 import pytest
 
-from mock_settings import collect_settings_or_errors, format_settings_report, load_mock_server_settings_or_exit
+from mock_settings import collect_settings_or_errors, format_startup_report, load_mock_server_settings_or_exit
 
 
 def test_defaults_are_a_valid_local_mock():
@@ -14,7 +14,7 @@ def test_defaults_are_a_valid_local_mock():
 
     assert problems == []
     assert settings is not None
-    assert (settings.environment, settings.log_level) == ("local", "INFO")
+    assert (settings.environment, settings.log_level, settings.dataset_name) == ("local", "INFO", "synthetic_soltech")
 
 
 @pytest.mark.parametrize("environment", ["local", "ci", "dev", " Dev "])
@@ -44,7 +44,7 @@ def test_report_is_ascii_only_grouped_by_variable_with_a_fix_each():
     # A non-ASCII value must not make the report non-ASCII (it is escaped, not printed raw).
     _, problems = collect_settings_or_errors({"MOCK_ENVIRONMENT": "pröd", "MOCK_LOG_LEVEL": "LOUD"})
 
-    report = format_settings_report(problems)
+    report = format_startup_report(problems)
 
     assert report.isascii()
     assert "2 problem(s)" in report
@@ -60,3 +60,12 @@ def test_invalid_settings_print_the_report_and_exit_with_status_1():
 
     assert exit_info.value.code == 1
     assert "Nothing was started" in stderr.getvalue()
+
+
+@pytest.mark.parametrize("dataset", ["no_such_dataset", "../synthetic_soltech", "datasets/synthetic_soltech"])
+def test_dataset_must_be_a_bare_name_of_an_existing_file(dataset):
+    # Path-like values are refused, so MOCK_DATASET can never read a file outside datasets/.
+    _, problems = collect_settings_or_errors({"MOCK_DATASET": dataset})
+
+    assert [p.variable for p in problems] == ["MOCK_DATASET"]
+    assert "synthetic_soltech" in problems[0].problem  # the report lists what is available

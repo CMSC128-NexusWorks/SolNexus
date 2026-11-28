@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from mock_app import build_mock_google_app
 from mock_settings import MockServerSettings
 
-CI_SETTINGS = MockServerSettings(environment="ci", log_level="INFO")
+CI_SETTINGS = MockServerSettings(environment="ci", log_level="INFO", dataset_name="synthetic_soltech")
 
 
 def test_health_reports_ok_and_which_environment_this_mock_is():
