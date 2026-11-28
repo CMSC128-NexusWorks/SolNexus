@@ -1,4 +1,4 @@
-"""Errors in Google's own JSON format, for the mock's Google-shaped routes.
+"""Errors in Google's own JSON formats, for the mock's Google-shaped routes and its OAuth token endpoint.
 
 The master classifies failures by Google's status code and `errors[0].reason` (e.g. 403 rateLimitExceeded is a
 retry, 403 domainPolicy needs a person). For the mock to test that logic, its Gmail and Calendar routes must fail
@@ -7,6 +7,10 @@ exactly the way Google does, body included. The mock's own `/_mock/*` routes kee
 Shape (Gmail v1 / Calendar v3 error responses):
     {"error": {"code": 404, "message": "...", "errors": [{"message": "...", "domain": "global", "reason": "notFound"}],
                "status": "NOT_FOUND"}}
+
+The OAuth token endpoint speaks a different dialect (RFC 6749), which google-auth parses to decide whether a failed
+refresh is worth retrying:
+    {"error": "invalid_grant", "error_description": "Token has been expired or revoked."}
 """
 
 from __future__ import annotations
@@ -37,6 +41,16 @@ class GoogleApiError(Exception):
         self.message = message
 
 
+class OAuthTokenError(Exception):
+    """Raised by the token endpoint to answer in OAuth's error format. Handled in mock_app."""
+
+    def __init__(self, code: int, error: str, description: str) -> None:
+        super().__init__(description)
+        self.code = code
+        self.error = error
+        self.description = description
+
+
 def google_error_body(code: int, reason: str, message: str) -> dict[str, Any]:
     """The JSON body Google returns for an error with this code and reason."""
     error: dict[str, Any] = {
@@ -51,3 +65,7 @@ def google_error_body(code: int, reason: str, message: str) -> dict[str, Any]:
 
 def google_error_response(code: int, reason: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=code, content=google_error_body(code, reason, message))
+
+
+def oauth_error_response(error: OAuthTokenError) -> JSONResponse:
+    return JSONResponse(status_code=error.code, content={"error": error.error, "error_description": error.description})

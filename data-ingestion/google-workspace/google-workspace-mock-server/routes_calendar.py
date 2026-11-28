@@ -33,11 +33,17 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Query, Request
 
 from google_errors import GoogleApiError
-from mock_auth import require_bearer_token
+from mock_oauth import require_access_token_for
 from mock_paging import decode_opaque_token, encode_opaque_token
 from mock_state import MockGoogleCalendar, MockGoogleState, StoredCalendarEvent, format_google_timestamp
 
-router = APIRouter(prefix="/calendar/v3/calendars/{calendar_id}", dependencies=[Depends(require_bearer_token)])
+router = APIRouter(
+    prefix="/calendar/v3/calendars/{calendar_id}",
+    dependencies=[
+        # The access token must be one the mock issued, unexpired, with a Calendar scope.
+        Depends(require_access_token_for("calendar")),
+    ],
+)
 
 SYNC_TOKEN_KIND = "calendar-sync"
 PAGE_TOKEN_KIND = "calendar-page"

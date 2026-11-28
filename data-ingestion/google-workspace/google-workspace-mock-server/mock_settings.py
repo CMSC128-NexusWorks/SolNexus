@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
+from mock_oauth import DEFAULT_GRANTED_SCOPES, KNOWN_SCOPES
+
 # Where a fake Google is acceptable. Anything else, including "stage" and "prod", is refused.
 ALLOWED_MOCK_ENVIRONMENTS = ("local", "ci", "dev")
 ALLOWED_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
@@ -39,6 +41,11 @@ class MockServerSettings:
     log_level: str
     # Name of the dataset file (datasets/<name>.json) the mock is seeded from.
     dataset_name: str
+    # Lifetime of access tokens issued by the fake token endpoint. Short values exercise token refresh.
+    access_token_ttl_seconds: int = 3600
+    # What the fake refresh token was consented for. Leaving out the Calendar scope simulates a mailbox that
+    # was authorized for Gmail only and never re-consented for Calendar.
+    granted_scopes: tuple[str, ...] = DEFAULT_GRANTED_SCOPES
 
     @property
     def dataset_path(self) -> Path:
@@ -100,9 +107,66 @@ def collect_settings_or_errors(
             )
         )
 
+    access_token_ttl_seconds = read_int_in_range(
+        environ,
+        "MOCK_ACCESS_TOKEN_TTL_SECONDS",
+        default=3600,
+        lowest=1,
+        highest=86_400,
+        problems=problems,
+        fix="set MOCK_ACCESS_TOKEN_TTL_SECONDS to 1-86400 (Google uses 3600), or leave it unset.",
+    )
+
+    raw_scopes = environ.get("MOCK_OAUTH_GRANTED_SCOPES", " ".join(DEFAULT_GRANTED_SCOPES))
+    granted_scopes = tuple(dict.fromkeys(raw_scopes.replace(",", " ").split()))  # de-duplicated, order kept
+    unknown_scopes = [scope for scope in granted_scopes if scope not in KNOWN_SCOPES]
+    if unknown_scopes or not granted_scopes:
+        problems.append(
+            StartupProblem(
+                variable="MOCK_OAUTH_GRANTED_SCOPES",
+                problem="unknown or missing scope(s): "
+                + (ascii(" ".join(unknown_scopes)) if unknown_scopes else "(none)"),
+                fix=f"use space- or comma-separated values from: {' '.join(sorted(KNOWN_SCOPES))}",
+            )
+        )
+
     if problems:
         return None, problems
-    return MockServerSettings(environment=environment, log_level=log_level, dataset_name=dataset_name), []
+    return (
+        MockServerSettings(
+            environment=environment,
+            log_level=log_level,
+            dataset_name=dataset_name,
+            access_token_ttl_seconds=access_token_ttl_seconds,
+            granted_scopes=granted_scopes,
+        ),
+        [],
+    )
+
+
+def read_int_in_range(
+    environ: Mapping[str, str],
+    variable: str,
+    *,
+    default: int,
+    lowest: int,
+    highest: int,
+    problems: list[StartupProblem],
+    fix: str,
+) -> int:
+    """An integer setting within bounds. A bad value is recorded as a problem (not raised), so validation can go
+    on and report every other problem too; the default is returned as a placeholder in that case."""
+    raw = environ.get(variable, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = None
+    if value is None or not lowest <= value <= highest:
+        problems.append(
+            StartupProblem(variable, f"got {ascii(raw)}; must be a whole number from {lowest} to {highest}", fix)
+        )
+        return default
+    return value
 
 
 def format_startup_report(problems: list[StartupProblem]) -> str:

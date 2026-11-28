@@ -17,7 +17,6 @@ from mock_state import MockGoogleState
 
 SETTINGS = MockServerSettings(environment="ci", log_level="INFO", dataset_name="synthetic_soltech")
 GMAIL = "/gmail/v1/users/me"
-AUTH = {"Authorization": "Bearer test-access-token"}
 
 
 @pytest.fixture
@@ -29,7 +28,9 @@ def state() -> MockGoogleState:
 
 @pytest.fixture
 def client(state) -> TestClient:
-    return TestClient(build_mock_google_app(SETTINGS, state), headers=AUTH)
+    # A real access token from the mock's OAuth server: the routes accept nothing else.
+    token = state.oauth.issue_access_token(state.oauth.granted_scopes, state.clock()).token
+    return TestClient(build_mock_google_app(SETTINGS, state), headers={"Authorization": f"Bearer {token}"})
 
 
 def list_all_message_ids(client: TestClient, **params) -> list[str]:

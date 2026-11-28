@@ -2,8 +2,9 @@
 
 The master service talks to it exactly as it talks to Google, so the whole pipeline can run locally and
 in CI with no Google account and no secrets. So far it has validated settings, a validated dataset loaded
-into in-memory state (mock_state), the health route, the error formats, the Gmail API (routes_gmail) and
-Calendar events.list with sync tokens (routes_calendar). The OAuth token endpoint arrives in a later step.
+into in-memory state (mock_state), the health route, the error formats, the OAuth token endpoint and access
+checks (mock_oauth), the Gmail API (routes_gmail) and Calendar
+events.list with sync tokens (routes_calendar).
 
 Route namespaces:
 - `/_mock/*` holds the mock's own routes (health now; data control and fault injection later). The
@@ -24,9 +25,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+import mock_oauth
 import routes_calendar
 import routes_gmail
-from google_errors import GoogleApiError, google_error_response
+from google_errors import GoogleApiError, OAuthTokenError, google_error_response, oauth_error_response
 from mock_dataset import read_dataset_or_problems
 from mock_settings import MockServerSettings, format_startup_report, load_mock_server_settings_or_exit
 from mock_state import MockGoogleState, find_unplayable_dataset_parts
@@ -71,6 +73,11 @@ def register_error_handlers(app: FastAPI) -> None:
     async def google_api_error(_: Request, exc: GoogleApiError) -> JSONResponse:
         return google_error_response(exc.code, exc.reason, exc.message)
 
+    @app.exception_handler(OAuthTokenError)
+    async def oauth_token_error(_: Request, exc: OAuthTokenError) -> JSONResponse:
+        # The token endpoint's own dialect, which google-auth reads to decide whether a refresh is retryable.
+        return oauth_error_response(exc)
+
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         # Unknown paths (404) and wrong methods (405), plus errors raised by route code.
@@ -108,7 +115,11 @@ def load_mock_google_state_or_exit(settings: MockServerSettings, stderr: TextIO 
         stderr.write(format_startup_report(problems))
         sys.exit(1)
     assert dataset is not None
-    return MockGoogleState(dataset)
+    return MockGoogleState(
+        dataset,
+        granted_scopes=settings.granted_scopes,
+        access_token_ttl_seconds=settings.access_token_ttl_seconds,
+    )
 
 
 def build_mock_google_app(settings: MockServerSettings, state: MockGoogleState) -> FastAPI:
@@ -124,6 +135,7 @@ def build_mock_google_app(settings: MockServerSettings, state: MockGoogleState) 
     register_error_handlers(app)
     # Routes reach the state through app.state, so tests can build an app around any state they like.
     app.state.mock_google_state = state
+    app.include_router(mock_oauth.router)
     app.include_router(routes_gmail.router)
     app.include_router(routes_calendar.router)
 

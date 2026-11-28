@@ -69,3 +69,35 @@ def test_dataset_must_be_a_bare_name_of_an_existing_file(dataset):
 
     assert [p.variable for p in problems] == ["MOCK_DATASET"]
     assert "synthetic_soltech" in problems[0].problem  # the report lists what is available
+
+
+def test_token_lifetime_and_scopes_have_safe_defaults():
+    settings, _ = collect_settings_or_errors({})
+
+    assert settings.access_token_ttl_seconds == 3600
+    assert settings.granted_scopes == (
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/calendar.events.readonly",
+    )
+
+
+def test_gmail_only_consent_can_be_configured_with_commas_or_spaces():
+    settings, problems = collect_settings_or_errors(
+        {"MOCK_OAUTH_GRANTED_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,"}
+    )
+
+    assert problems == [] and settings.granted_scopes == ("https://www.googleapis.com/auth/gmail.readonly",)
+
+
+def test_bad_token_lifetime_and_unknown_scopes_are_reported_together():
+    _, problems = collect_settings_or_errors(
+        {
+            "MOCK_ACCESS_TOKEN_TTL_SECONDS": "0",
+            "MOCK_OAUTH_GRANTED_SCOPES": "https://www.googleapis.com/auth/drive",
+        }
+    )
+
+    assert {p.variable for p in problems} == {
+        "MOCK_ACCESS_TOKEN_TTL_SECONDS",
+        "MOCK_OAUTH_GRANTED_SCOPES",
+    }

@@ -7,7 +7,8 @@
 
 Point the master's Gmail client at `http://<mock>/gmail/v1/users/me` instead of
 `https://gmail.googleapis.com/gmail/v1/users/me` and nothing else changes. Like Gmail, history IDs and internalDate
-are JSON strings, messages are listed newest first, and every call needs a bearer token.
+are JSON strings, messages are listed newest first, and every call needs an access token issued by the mock's token
+endpoint (mock_oauth).
 
 Deliberate limits, each failing loudly (400) rather than silently returning wrong data:
 - `q` supports only `newer_than:` and `older_than:` (with d, m or y), the operators the master's backfill query uses.
@@ -24,11 +25,17 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, Request
 
 from google_errors import GoogleApiError
-from mock_auth import require_bearer_token
+from mock_oauth import require_access_token_for
 from mock_paging import slice_page
 from mock_state import GmailHistoryRecord, MockGmailMailbox, MockGoogleState, StoredGmailMessage
 
-router = APIRouter(prefix="/gmail/v1/users/{user_id}", dependencies=[Depends(require_bearer_token)])
+router = APIRouter(
+    prefix="/gmail/v1/users/{user_id}",
+    dependencies=[
+        # The access token must be one the mock issued, unexpired, with a Gmail scope.
+        Depends(require_access_token_for("gmail")),
+    ],
+)
 
 # Gmail leaves spam and trash out of messages.list unless includeSpamTrash=true.
 LABELS_HIDDEN_FROM_LIST_BY_DEFAULT = frozenset({"SPAM", "TRASH"})

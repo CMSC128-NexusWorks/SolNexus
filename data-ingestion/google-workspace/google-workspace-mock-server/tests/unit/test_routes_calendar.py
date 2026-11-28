@@ -17,7 +17,6 @@ from mock_state import MockGoogleState
 
 SETTINGS = MockServerSettings(environment="ci", log_level="INFO", dataset_name="synthetic_soltech")
 EVENTS = "/calendar/v3/calendars/primary/events"
-AUTH = {"Authorization": "Bearer test-access-token"}
 CANCELLED_OCCURRENCE = "evt-northpoint-golive-weekly_20261216T060000Z"
 
 
@@ -29,7 +28,9 @@ def state() -> MockGoogleState:
 
 @pytest.fixture
 def client(state) -> TestClient:
-    return TestClient(build_mock_google_app(SETTINGS, state), headers=AUTH)
+    # A real access token from the mock's OAuth server: the routes accept nothing else.
+    token = state.oauth.issue_access_token(state.oauth.granted_scopes, state.clock()).token
+    return TestClient(build_mock_google_app(SETTINGS, state), headers={"Authorization": f"Bearer {token}"})
 
 
 def sync_all_pages(client: TestClient, between_pages=None, **params) -> tuple[list[dict], str, int]:
