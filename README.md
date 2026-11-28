@@ -192,14 +192,14 @@ See the [frontend README](web/README.md) for scripts and conventions.
 - Keep commits atomic: one logical change per commit, so each can be reviewed and reverted on its own.
 - Write commits as [Conventional Commits](https://www.conventionalcommits.org/) with the ticket as scope, e.g. `feat(snx-54): add app shell`.
 - Run the checks for the area you changed before opening a PR; see [Automated checks](#automated-checks) for the commands. CI runs the same ones.
-- Open a PR into `main`. It needs one approval from someone other than the last pusher, and the **Frontend**, **Backend**, **Airflow** and **Google Workspace** CI checks must pass.
+- Open a PR into `main`. It needs one approval from someone other than the last pusher, and the **Frontend**, **Backend** and **Airflow** CI checks must pass. **Google Workspace** runs on every PR too and is meant to become required once branch protection is updated; until then a red Google Workspace job does not block the merge, so check it yourself.
 - Use synthetic data only in fixtures, mocks, tests and screenshots. Real client data stays in the git-ignored `leads-data/` folder.
 
 AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project context.
 
 ### Automated checks
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs four parallel jobs on every pull request into `main` (and on every push to `main`). They are required status checks, so a failing job blocks the merge. CI needs no secrets and uses the same runtime versions as the Dockerfiles (Node 22, Python 3.12, Airflow 2.10.5, PostgreSQL 16).
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs four parallel jobs on every pull request into `main` (and on every push to `main`). **Frontend**, **Backend** and **Airflow** are required status checks, so a failing one blocks the merge; **Google Workspace** is meant to join them once branch protection is updated. CI needs no secrets and uses the same runtime versions as the Dockerfiles (Node 22, Python 3.12, Airflow 2.10.5, PostgreSQL 16).
 
 | CI job | What it runs | Run the same checks locally |
 |---|---|---|
