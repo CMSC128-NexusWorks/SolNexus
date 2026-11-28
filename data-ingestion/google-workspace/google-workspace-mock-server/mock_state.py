@@ -47,7 +47,15 @@ MOCK_ID_DOMAIN = "mock.example.test"
 
 
 class MockStateError(Exception):
-    """A change that cannot be applied, e.g. deleting a message that does not exist."""
+    """A change that cannot be applied, e.g. deleting a message that does not exist.
+
+    `status` says which kind, so the control routes can answer 404 (the thing is not there) or 409 (it is there,
+    but in a state that forbids the change, like adding a duplicate or cancelling twice).
+    """
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 def format_google_timestamp(moment: datetime) -> str:
@@ -130,7 +138,7 @@ class MockGmailMailbox:
 
     def add_message(self, message: DatasetMessage) -> StoredGmailMessage:
         if message.id in self.messages:
-            raise MockStateError(f"message {message.id} is already in the mailbox")
+            raise MockStateError(f"message {message.id} is already in the mailbox", status=409)
         history_id = self._take_next_history_id()
         stored = StoredGmailMessage(
             message_id=message.id,
@@ -153,7 +161,7 @@ class MockGmailMailbox:
         """Permanently delete (not trash): the message disappears and a messageDeleted record is added."""
         stored = self.messages.pop(message_id, None)
         if stored is None:
-            raise MockStateError(f"message {message_id} is not in the mailbox")
+            raise MockStateError(f"message {message_id} is not in the mailbox", status=404)
         self.history.append(
             GmailHistoryRecord(
                 self._take_next_history_id(), "messageDeleted", message_id, stored.thread_id, stored.label_ids
@@ -286,7 +294,7 @@ class MockGoogleCalendar:
         resources = build_event_resources(event, self.owner, created_at=at)
         clashes = [r["id"] for r in resources if r["id"] in self.events]
         if clashes:
-            raise MockStateError(f"event id(s) already in the calendar: {', '.join(clashes)}")
+            raise MockStateError(f"event id(s) already in the calendar: {', '.join(clashes)}", status=409)
         for resource in resources:
             self._write_version(resource, at)
         return [r["id"] for r in resources]
@@ -294,9 +302,9 @@ class MockGoogleCalendar:
     def _latest_resource_copy(self, event_id: str) -> dict[str, Any]:
         stored = self.events.get(event_id)
         if stored is None:
-            raise MockStateError(f"event {event_id} is not in the calendar")
+            raise MockStateError(f"event {event_id} is not in the calendar", status=404)
         if stored.resource["status"] == "cancelled":
-            raise MockStateError(f"event {event_id} is already cancelled")
+            raise MockStateError(f"event {event_id} is already cancelled", status=409)
         # A deep copy: the stored version must never change in place, only be replaced by a new one.
         return copy.deepcopy(stored.resource)
 
