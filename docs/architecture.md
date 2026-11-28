@@ -168,7 +168,7 @@ flowchart TB
 
 ## 2. Data Pipeline Architecture
 
-This section zooms into the ingestion → storage → transformation flow — the medallion (bronze/silver/gold) pipeline referenced in Section 6 of the proposal — independent of the frontend/serving concerns covered above.
+This section zooms into the ingestion → storage → transformation flow — the medallion (bronze/silver/gold) pipeline referenced in Section 6 of the proposal — independent of the web/serving concerns covered above.
 
 ### 2.1 Description
 

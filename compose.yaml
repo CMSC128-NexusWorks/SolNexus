@@ -149,14 +149,14 @@ services:
 
   web:
     build:
-      context: ./frontend
+      context: ./web
     environment:
       VITE_API_URL: ${VITE_API_URL}
       VITE_USE_MOCKS: ${VITE_USE_MOCKS:-true}
     ports:
       - "${WEB_PORT:-5173}:5173"
     volumes:
-      - ./frontend:/app
+      - ./web:/app
       - web_node_modules:/app/node_modules
     depends_on:
       api:

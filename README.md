@@ -157,19 +157,19 @@ docker compose down        # keep data
 docker compose down -v     # also delete the Postgres volume
 ```
 
-After pulling changes to `frontend/package.json`, refresh the frontend's packages with `docker compose run --rm web npm install`.
+After pulling changes to `web/package.json`, refresh the frontend's packages with `docker compose run --rm web npm install`.
 
 ### Frontend only (no Docker)
 
-The frontend ships with a mock API, so you can build screens before the backend endpoints exist. Create `frontend/.env.local` containing `VITE_USE_MOCKS=true` (git-ignored), then:
+The frontend ships with a mock API, so you can build screens before the backend endpoints exist. Create `web/.env.local` containing `VITE_USE_MOCKS=true` (git-ignored), then:
 
 ```bash
-cd frontend
+cd web
 npm install
 npm run dev
 ```
 
-See the [frontend README](frontend/README.md) for scripts and conventions.
+See the [frontend README](web/README.md) for scripts and conventions.
 
 ## Project structure
 
@@ -180,7 +180,7 @@ See the [frontend README](frontend/README.md) for scripts and conventions.
 ├── dbt/        dbt project (silver models; reads bronze and app as sources)
 ├── docker/     container init scripts (Postgres)
 ├── docs/       proposal, requirements, architecture, contracts, roadmap, wireframes
-├── frontend/   React dashboard
+├── web/   React dashboard
 └── compose.yaml
 ```
 
@@ -201,11 +201,11 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 
 | CI job | What it runs | Run the same checks locally |
 |---|---|---|
-| **Frontend** | `npm ci`, then `typecheck`, `lint`, `format:check`, `test` (vitest) and `build` (production Vite bundle) in `frontend/` | `cd frontend && npm ci && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build` |
+| **Frontend** | `npm ci`, then `typecheck`, `lint`, `format:check`, `test` (vitest) and `build` (production Vite bundle) in `web/` | `cd web && npm ci && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build` |
 | **Backend** | `pytest` in `backend/`, against a PostgreSQL service container (it creates its own `solnexus_test` database) | `docker compose run --rm api pytest` |
 | **Airflow** | `pytest` in `airflow/`, inside the project's Airflow image: DAG import test, the Gmail connector tests (Gmail faked in memory) and the Postgres-backed tests, against a throwaway `solnexus_ingest_test` database migrated to head | `docker compose --profile test run --rm airflow-tests` (add the database steps in [airflow/README.md](airflow/README.md#tests) to include the Postgres-backed tests) |
 
-- `npm run format:check` fails on unformatted files; fix them with `npm run format` in `frontend/`.
+- `npm run format:check` fails on unformatted files; fix them with `npm run format` in `web/`.
 - Locally, the Airflow tests that need Postgres skip unless `SOLNEXUS_TEST_DATABASE_URL` is set. CI sets it; to run them yourself, follow [airflow/README.md](airflow/README.md#tests).
 - dbt models and tests are not run in CI yet.
 

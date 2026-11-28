@@ -53,7 +53,7 @@ Thumbs.db
 .docker/
 
 # Frontend tooling
-frontend/.vite/
+web/.vite/
 
 # Jira planning verification snapshot (regenerate from Jira when needed)
 docs/jira_backlog_verification.json

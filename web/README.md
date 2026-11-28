@@ -6,7 +6,7 @@ React 19 + TypeScript, built with Vite. UI components come from [shadcn/ui](http
 
 With Docker (from the repo root): `docker compose up web`, then open http://localhost:5173.
 
-Without Docker (from `frontend/`):
+Without Docker (from `web/`):
 
 ```bash
 npm install

@@ -4,13 +4,13 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 
 ## Where to look
 
-- **API shapes, data ownership, import rules:** `docs/contracts/phase1-data-api-v1.md`. Message-to-clinic linking is in `docs/contracts/phase1-identity-v1.md`. The contract is the single source of truth: when it changes, update `frontend/src/lib/api/types.ts` and `frontend/src/mocks/` in the same PR.
+- **API shapes, data ownership, import rules:** `docs/contracts/phase1-data-api-v1.md`. Message-to-clinic linking is in `docs/contracts/phase1-identity-v1.md`. The contract is the single source of truth: when it changes, update `web/src/lib/api/types.ts` and `web/src/mocks/` in the same PR.
 - **Scope and sprint targets:** `docs/implementation_roadmap.md`. Phase 1 is the semester deliverable; Phase 2 work starts only after Phase 1 is accepted.
 - **Requirement IDs (FR-xx, NFR-xx):** `docs/software_requirements.md`.
 - **Screens:** `docs/wireframes/`. They are low-fidelity: follow their structure and fields, not their visual styling.
 - **Schema changes, migrations, table ownership:** `docs/database.md`. Read it before touching `backend/migrations/` or writing to `bronze` or `app` tables.
 - **New API endpoints:** `docs/authentication.md`. Feature routers go on the `protected` router in `backend/app/main.py` so they require a signed-in staff member.
-- **Frontend work:** `frontend/README.md`.
+- **Frontend work:** `web/README.md`.
 - **Local setup and ports:** `README.md`.
 
 ## Data rules
@@ -35,5 +35,5 @@ Lead and client communication pipeline for SolTech EMR, our client. Conversation
 - Commits are atomic: one logical change per commit, so each can be reviewed and reverted on its own.
 - Commits follow Conventional Commits with the ticket as scope, e.g. `feat(snx-54): add app shell`.
 - PRs go into `main`, which is protected: one approval from someone other than the last pusher, no direct pushes.
-- Before opening a PR, run the checks for the area you changed; CI (`.github/workflows/ci.yml`) runs the same commands on every PR into `main`. Frontend: `npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build` in `frontend/`. Backend: `docker compose run --rm api pytest`. Airflow: `docker compose --profile test run --rm airflow-tests`. dbt has no automated checks yet.
+- Before opening a PR, run the checks for the area you changed; CI (`.github/workflows/ci.yml`) runs the same commands on every PR into `main`. Frontend: `npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build` in `web/`. Backend: `docker compose run --rm api pytest`. Airflow: `docker compose --profile test run --rm airflow-tests`. dbt has no automated checks yet.
 - CI jobs **Frontend**, **Backend** and **Airflow** are required status checks on `main`: a red check blocks the merge. CI uses no secrets, so tests must use synthetic data and mocks only. CI runs the Airflow Postgres-backed tests against its own throwaway database; locally they skip unless `SOLNEXUS_TEST_DATABASE_URL` is set (see `airflow/README.md`).
