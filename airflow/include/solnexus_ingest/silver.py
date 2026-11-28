@@ -38,7 +38,7 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import connection as Connection
 
-from solnexus_ingest.runs import SILVER_PUBLISH, mark_succeeded, succeeded_counts
+from solnexus_ingest.core.runs import SILVER_PUBLISH, mark_succeeded, succeeded_counts
 
 log = logging.getLogger(__name__)
 

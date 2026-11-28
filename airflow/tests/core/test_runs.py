@@ -7,7 +7,7 @@ import uuid
 import psycopg2
 import pytest
 
-from solnexus_ingest.runs import (
+from solnexus_ingest.core.runs import (
     ERROR_SUMMARY_MAX,
     GMAIL_INGEST,
     mark_running,

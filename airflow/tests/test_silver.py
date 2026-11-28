@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 import psycopg2
 import pytest
 
-from solnexus_ingest.runs import SILVER_PUBLISH, mark_running
+from solnexus_ingest.core.runs import SILVER_PUBLISH, mark_running
 from solnexus_ingest.silver import (
     BUILD_LOCK_KEY,
     BUILD_SCHEMA,

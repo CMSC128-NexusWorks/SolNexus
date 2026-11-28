@@ -154,7 +154,7 @@ def airflow_failure_callbacks(pipeline: str) -> dict[str, Callable[[dict], None]
 
     def record(context: dict, will_retry: bool) -> None:
         try:
-            from solnexus_ingest.orchestration import warehouse_conn
+            from solnexus_ingest.core.orchestration import warehouse_conn
 
             conn = warehouse_conn()
             try:

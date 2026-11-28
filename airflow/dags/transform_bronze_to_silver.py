@@ -21,8 +21,8 @@ from airflow.operators.python import get_current_context
 from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.trigger import CronTriggerTimetable
 
-from solnexus_ingest.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, warehouse_conn
-from solnexus_ingest.runs import SILVER_PUBLISH, airflow_failure_callbacks
+from solnexus_ingest.core.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, warehouse_conn
+from solnexus_ingest.core.runs import SILVER_PUBLISH, airflow_failure_callbacks
 
 DBT_PROJECT_DIR = os.environ.get("DBT_PROJECT_DIR") or "/opt/airflow/dbt"
 # Offset from ingest_email's :00, so the fallback does not start next to a dataset-triggered run.
@@ -56,7 +56,7 @@ def transform_bronze_to_silver():
     @task(execution_timeout=timedelta(minutes=30), **callbacks)
     def build_silver() -> dict[str, int]:
         """Run dbt build into silver_build; return dbt node counts by status."""
-        from solnexus_ingest.runs import mark_running, succeeded_counts
+        from solnexus_ingest.core.runs import mark_running, succeeded_counts
         from solnexus_ingest.silver import DbtBuildError, build, run_dbt_build
 
         context = get_current_context()

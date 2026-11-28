@@ -16,8 +16,8 @@ from airflow.exceptions import AirflowFailException
 from airflow.operators.python import get_current_context
 from airflow.timetables.trigger import CronTriggerTimetable
 
-from solnexus_ingest.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, warehouse_conn
-from solnexus_ingest.runs import GMAIL_INGEST, airflow_failure_callbacks
+from solnexus_ingest.core.orchestration import GMAIL_BRONZE, SCHEDULE_TIMEZONE, warehouse_conn
+from solnexus_ingest.core.runs import GMAIL_INGEST, airflow_failure_callbacks
 
 # Hourly is the data/API contract's proposed default, pending team approval and quota validation.
 SCHEDULE = os.environ.get("GMAIL_SYNC_SCHEDULE") or "0 * * * *"
@@ -58,7 +58,7 @@ def ingest_email():
         # not depend on Google/psycopg2 imports succeeding.
         from solnexus_ingest.gmail.client import GmailAuthError, GmailClient, GmailPolicyError
         from solnexus_ingest.gmail.sync import SyncSettings, sync_mailbox
-        from solnexus_ingest.runs import mark_running, mark_succeeded
+        from solnexus_ingest.core.runs import mark_running, mark_succeeded
 
         context = get_current_context()
 

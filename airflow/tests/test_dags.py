@@ -7,7 +7,7 @@ from airflow.models import DagBag
 from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.trigger import CronTriggerTimetable
 
-from solnexus_ingest.orchestration import GMAIL_BRONZE
+from solnexus_ingest.core.orchestration import GMAIL_BRONZE
 
 DAGS_DIR = Path(__file__).resolve().parents[1] / "dags"
 
