@@ -58,7 +58,8 @@ def ingest_email():
         """Sync the mailbox and return per-run counts (no addresses or content, so safe in XCom)."""
         # Imported inside the task so the scheduler's frequent DAG-file parsing stays fast and does
         # not depend on Google/psycopg2 imports succeeding, or on the master's package being mounted.
-        from services.gmail_client import GmailAuthError, GmailClient, GmailPolicyError
+        from services.gmail_client import GmailClient
+        from services.google_api import GoogleAuthError, GooglePolicyError
         from services.gmail_sync import SyncSettings, sync_mailbox
         from solnexus_ingest.core.runs import mark_running, mark_succeeded
 
@@ -85,7 +86,7 @@ def ingest_email():
             mark_succeeded(conn, GMAIL_INGEST, context["run_id"], counts, context["ti"].try_number)
             conn.commit()
             return counts
-        except (GmailAuthError, GmailPolicyError) as exc:
+        except (GoogleAuthError, GooglePolicyError) as exc:
             # Revoked/expired consent or an admin policy will not fix itself: fail now, visibly,
             # without burning retries. See airflow/README.md for the operator steps. Every other
             # error (exhausted backoff, used-up daily quota, retryable token-endpoint outage) is

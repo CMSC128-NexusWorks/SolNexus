@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from services.gmail_client import GmailRetriesExhausted, HistoryExpired
-from services.gmail_sync import SyncSettings, sync_mailbox
 from services.checkpoints import load_checkpoint
+from services.gmail_client import HistoryExpired
+from services.gmail_sync import SyncSettings, sync_mailbox
+from services.google_api import GoogleRetriesExhausted
 from tests.unit.gmail_messages import api_message, inbound, outbound, rfc822
 
 RUN = "test-run"
@@ -58,7 +59,7 @@ class FakeMailbox:
     def _page(self, ids, page_token):
         self.list_calls += 1
         if self.list_calls == self.fail_on_list_call:
-            raise GmailRetriesExhausted("injected failure")
+            raise GoogleRetriesExhausted("injected failure")
         start = int(page_token or 0)
         end = start + self.page_size
         return ids[start:end], (str(end) if end < len(ids) else None)
@@ -119,7 +120,7 @@ def test_rerun_with_nothing_new_changes_nothing(db, parties, mailbox):
 def test_failure_mid_run_keeps_committed_pages_and_old_checkpoint(db, parties, mailbox):
     mailbox.fail_on_list_call = 2  # first page stored, then listing page 2 fails
 
-    with pytest.raises(GmailRetriesExhausted):
+    with pytest.raises(GoogleRetriesExhausted):
         sync_mailbox(mailbox, db, SyncSettings(), RUN)
 
     assert stored_ids(db, parties.mailbox) == ["m1", "m2"]

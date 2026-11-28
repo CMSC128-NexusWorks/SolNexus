@@ -1,20 +1,14 @@
-"""Unit tests for the Gmail client's retry and error classification, using a fake HTTP session."""
+"""Unit tests for the Gmail client's endpoints, using a fake HTTP session.
+
+Retries and error classification are the shared layer's job (test_google_api.py)."""
 
 from __future__ import annotations
 
 import pytest
 import requests
-from google.auth.exceptions import RefreshError
 
-from services.gmail_client import (
-    GmailAuthError,
-    GmailClient,
-    GmailPolicyError,
-    GmailQuotaExhausted,
-    GmailRetriesExhausted,
-    HistoryExpired,
-    RetryPolicy,
-)
+from services.gmail_client import GmailClient, HistoryExpired
+from services.google_api import RetryPolicy
 
 
 def response(status: int, body: dict | None = None, headers: dict | None = None) -> requests.Response:
@@ -52,80 +46,6 @@ def client(*outcomes, max_retries: int = 5):
     return gmail, session, sleeps
 
 
-@pytest.mark.parametrize(
-    "failure",
-    [error(429, "rateLimitExceeded"), error(403, "userRateLimitExceeded"), error(503, "backendError"),
-     requests.ConnectionError("reset")],
-)
-def test_transient_failures_are_retried_then_succeed(failure):
-    gmail, session, sleeps = client(failure, response(200, {"emailAddress": "x", "historyId": "1"}))
-
-    assert gmail.get_profile()["historyId"] == "1"
-    assert len(session.paths) == 2
-    assert len(sleeps) == 1
-
-
-def test_retries_are_bounded():
-    gmail, session, sleeps = client(*[error(503, "backendError")] * 3, max_retries=2)
-
-    with pytest.raises(GmailRetriesExhausted):
-        gmail.get_profile()
-    assert len(session.paths) == 3  # first try + 2 retries
-    assert len(sleeps) == 2
-
-
-def test_server_retry_after_is_respected():
-    gmail, _, sleeps = client(error(429, "rateLimitExceeded", {"Retry-After": "40"}), response(200, {}))
-
-    gmail.get_profile()
-
-    assert sleeps[0] >= 40
-
-
-def test_backoff_grows_and_is_capped():
-    policy = RetryPolicy(base_delay=1, max_delay=32)
-
-    delays = [policy.delay(n) for n in range(8)]
-
-    assert 1 <= delays[0] < 2
-    assert 4 <= delays[2] < 5
-    assert all(d < 33 for d in delays)  # 32s cap + at most 1s jitter
-
-
-@pytest.mark.parametrize("failure", [error(403, "domainPolicy"), error(400, "invalidArgument")])
-def test_policy_and_request_errors_fail_fast(failure):
-    gmail, session, sleeps = client(failure)
-
-    with pytest.raises(GmailPolicyError, match="domainPolicy|invalidArgument"):
-        gmail.get_profile()
-    assert sleeps == []
-
-
-def test_temporary_token_endpoint_failure_is_retried():
-    gmail, _, sleeps = client(RefreshError("token endpoint 503", retryable=True), response(200, {"historyId": "1"}))
-
-    assert gmail.get_profile()["historyId"] == "1"
-    assert len(sleeps) == 1
-
-
-@pytest.mark.parametrize("reason", ["dailyLimitExceeded", "quotaExceeded"])
-def test_used_up_daily_quota_is_not_an_operator_problem_or_a_quick_retry(reason):
-    gmail, _, sleeps = client(error(403, reason))
-
-    with pytest.raises(GmailQuotaExhausted):
-        gmail.get_profile()
-    assert sleeps == []  # waiting seconds will not refill a daily quota
-
-
-@pytest.mark.parametrize("failure", [RefreshError("invalid_grant"), error(401, "authError")])
-def test_expired_or_revoked_consent_needs_reauthorization(failure):
-    gmail, _, sleeps = client(failure)
-
-    with pytest.raises(GmailAuthError):
-        gmail.get_profile()
-    assert sleeps == []
-
-
 def test_expired_history_cursor_is_reported_distinctly():
     gmail, _, _ = client(error(404, "notFound"))
 
@@ -152,12 +72,3 @@ def test_message_deleted_after_listing_returns_none():
     gmail, _, _ = client(error(404, "notFound"))
 
     assert gmail.get_raw_message("gone") is None
-
-
-def test_error_messages_do_not_echo_response_bodies():
-    leaked = response(400, {"error": {"errors": [{"reason": "badRequest"}], "message": "lead@clinic.example.test"}})
-    gmail, _, _ = client(leaked)
-
-    with pytest.raises(GmailPolicyError) as exc_info:
-        gmail.get_profile()
-    assert "example.test" not in str(exc_info.value)
