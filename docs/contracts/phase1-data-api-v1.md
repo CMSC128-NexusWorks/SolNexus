@@ -10,16 +10,18 @@ Status: **implementation proposal for SNX-20**. The staff-confirmed message iden
 | `app.lead_inquiries` | One unresolved first-contact source identity requiring staff follow-up | `inquiry_id`; unique complete source identity key while open | Ingestion/review workflow | No |
 | `app.import_batches` / `app.import_rows` | One upload / one attempted sheet row | `batch_id` / `(batch_id,sheet_name,row_number)` | Import service | No |
 | `bronze.raw_messages` | One source message, whether linked or not | `(source_channel,source_account_id,source_message_id)` | Connector | No; append-only |
+| `bronze.raw_calendar_events` | One version of one Google Calendar event (FR-22) | `(source_account_id,source_calendar_id,source_event_id,source_etag)` | Connector | No; append-only |
 | `app.clinic_source_identities` | One staff confirmation or revocation of a channel participant to a clinic | `mapping_id`; one active mapping per complete source key | Staff workflow | No |
 | `app.message_resolutions` | Current clinic association for one raw message | `raw_message_id` | Resolution workflow | No; audit changes |
 | `silver.interactions` | One normalized raw message | `raw_message_id` | dbt | Yes |
+| `silver.meetings` | One calendar event at its latest version | `meeting_id` | dbt | Yes |
 | `silver.leads` | One confirmed clinic or open inquiry, including records with zero linked messages | `(record_type, lead_id)` | dbt | Yes |
 
 The application tables hold operational decisions. dbt reads them and the bronze messages; it never writes back to them. The authenticated API may read `app.clinics` for a just-created or corrected row before silver refresh, using the same field precedence as silver. A failed dbt run keeps the previous published silver snapshot and exposes its last successful publication time; it must not present an empty dashboard as fresh data.
 
 ## Message envelope and replay
 
-An accepted connector record has `source_channel` (`gmail` in Phase 1; `facebook` and `viber` are Phase 2 extensions), `source_account_id`, `source_message_id`, nullable `source_thread_id`, `direction` (`inbound` or `outbound`), original sender/recipient identifiers, nullable `external_participant_id`, nullable `source_event_at`, `ingested_at`, and unmodified raw payload bytes. Times are UTC instants with offsets at the API boundary. `source_event_at` is what the provider reported; `ingested_at` is when SolNexus durably stored it. A missing or untrustworthy provider time stays null; it is never replaced with ingestion time without a distinct effective-time field. A connector must document stable source IDs. Records without a stable message ID are quarantined with a reason rather than assigned a positional ID.
+An accepted connector record has `source_channel` (`gmail` in Phase 1; `facebook` and `viber` are out of scope for this delivery), `source_account_id`, `source_message_id`, nullable `source_thread_id`, `direction` (`inbound` or `outbound`), original sender/recipient identifiers, nullable `external_participant_id`, nullable `source_event_at`, `ingested_at`, and unmodified raw payload bytes. Times are UTC instants with offsets at the API boundary. `source_event_at` is what the provider reported; `ingested_at` is when SolNexus durably stored it. A missing or untrustworthy provider time stays null; it is never replaced with ingestion time without a distinct effective-time field. Calendar events are not messages: they have their own versioned envelope in [the calendar contract](google-calendar-v1.md). A connector must document stable source IDs. Records without a stable message ID are quarantined with a reason rather than assigned a positional ID.
 
 The uniqueness key is scoped by channel **and connected account**. On retry, an identical message is acknowledged without a second bronze or silver row. If the same key arrives with different payload bytes, preserve the first evidence and record a discrepancy for review. Commit the connector cursor/checkpoint only after the complete page is durable. Thread IDs group messages; they are not message IDs or clinic IDs.
 
@@ -135,7 +137,7 @@ Implemented in SNX-33 (defaults still pending that approval): `ingest_email` run
 
 ## Phase 2 boundaries
 
-Only after Phase 1 acceptance, Facebook adds a Page adapter after access and review-path validation, and Viber adds a bot adapter after access and conversation coverage are proven. LLM output is versioned enrichment or a suggestion; it cannot overwrite staff state without a separate approval rule. S3 is optional raw retention, not a replacement for the Phase 1 database contract.
+This delivery's sources are Google Workspace only (Product Owner, November 28, 2026): Facebook and Viber adapters are out of scope, and Google Phase 2 work may proceed in parallel with Phase 1 acceptance, on live evidence. LLM output is versioned enrichment or a suggestion; it cannot overwrite staff state without a separate approval rule. S3 is optional raw retention, not a replacement for the Phase 1 database contract.
 
 Proposed gold metric grain is **one clinic in a defined cohort**, with append-only status-transition events as evidence. For each stage (`contacted`, `proposal_sent`, `awaiting_demo`, `closed`), a funnel count is the number of distinct cohort clinics whose first confirmed transition to that stage occurred by the report cutoff; a stage rate divides that count by the cohort size, with zero denominator reported as null. The cohort rule (creation period versus first contact period), whether stages may be skipped, and whether `closed` means won are **unapproved**. Do not infer a conversion rate from the current status snapshot alone.
 

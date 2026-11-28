@@ -2,7 +2,7 @@
 
 Status: agreed entity-resolution boundary for SNX-20. The historical re-evaluation lifecycle below is the reconciled technical decision for team review; remaining SNX-20 product approvals are pending.
 
-This contract covers Gmail messages in Phase 1. The same identity boundary applies to Facebook Page and supported Viber messages after Phase 1 acceptance in Phase 2. A clinic created through initial spreadsheet migration or by staff has its own internal `clinic_id`. Message ingestion never creates or merges clinics. It may create an unresolved **inquiry** row with no clinic name so staff can see and contact the lead; this does not confirm a clinic identity or link a message to a clinic.
+This contract covers Gmail messages and Google Calendar bookings in Phase 1. Facebook Page and Viber messages are out of scope for this delivery (November 28, 2026); if a later team adds them, the same identity boundary applies. A clinic created through initial spreadsheet migration or by staff has its own internal `clinic_id`. Message ingestion never creates or merges clinics. It may create an unresolved **inquiry** row with no clinic name so staff can see and contact the lead; this does not confirm a clinic identity or link a message to a clinic.
 
 ## Source identity and evidence
 
@@ -43,5 +43,14 @@ After staff confirms, corrects, or revokes a mapping, re-evaluate previously sto
 | `clinic_id` | Internal clinic ID only after a permitted link; otherwise null. |
 | `resolution_status`, `review_reason` | `linked` or `needs_review`, plus the reason for review. |
 | `confirmed_by`, `confirmed_at` | Staff user and time on the source-to-clinic mapping, not inferred from message text. |
+
+## Calendar events (FR-22)
+
+Decided by the Product Owner on November 28, 2026. A Google Calendar booking resolves through the **Gmail** identity key
+of the same connected Google account: `(gmail, <account address>, <external attendee email>)`. The calendar and the
+mailbox are one Google account and the identifier is the same email address, so one staff confirmation covers email and
+bookings from that person, and an email and a booking from an unknown person share one open inquiry. This is the only
+exception to channel-scoped confirmation; it does not let a Gmail confirmation verify any other channel. All other rules
+above apply unchanged, per calendar event instead of per message. Details: [google-calendar-v1.md](google-calendar-v1.md).
 
 The connector-specific format of source IDs, candidate matching and conflict detection, storage tables, review UI, and batch size/checkpoint implementation remain decisions for dependent tickets. Those choices must preserve the rules above. The synthetic cases in [identity-resolution-v1.json](fixtures/identity-resolution-v1.json) illustrate the required outcomes without client data. Its Facebook cases demonstrate the future Phase 2 use of the same identity rule; they are not Phase 1 connector or access evidence.
