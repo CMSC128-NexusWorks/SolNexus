@@ -14,6 +14,8 @@ import requests
 
 from services.google_api import GoogleApi, GoogleApiError, GoogleNotFound, RetryPolicy, authorized_session
 
+# Where Gmail lives: Google by default. It is an ordinary configurable address (api_root), like a database URL;
+# local runs and contract tests set the mock Google server's, e.g. "http://google-workspace-mock:8090/gmail/v1/users/me".
 API_ROOT = "https://gmail.googleapis.com/gmail/v1/users/me"
 # Least privilege that can read message bodies (SNX-21 findings).
 READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
@@ -29,8 +31,9 @@ class GmailClient:
         session: requests.Session,
         retry_policy: RetryPolicy = RetryPolicy(),
         sleep: Callable[[float], None] = time.sleep,
+        api_root: str = API_ROOT,
     ) -> None:
-        self._api = GoogleApi(session, API_ROOT, "Gmail", retry_policy, sleep)
+        self._api = GoogleApi(session, api_root.rstrip("/"), "Gmail", retry_policy, sleep)
 
     @classmethod
     def from_token_file(cls, token_path: str, **kwargs: Any) -> GmailClient:

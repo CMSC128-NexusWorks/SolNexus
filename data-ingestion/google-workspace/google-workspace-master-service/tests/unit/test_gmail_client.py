@@ -72,3 +72,18 @@ def test_message_deleted_after_listing_returns_none():
     gmail, _, _ = client(error(404, "notFound"))
 
     assert gmail.get_raw_message("gone") is None
+
+
+def test_api_root_is_configurable_so_the_client_can_target_the_mock():
+    calls = []
+
+    class RecordingSession:
+        def get(self, url, params=None, timeout=None):
+            calls.append(url)
+            return response(200, {"emailAddress": "x", "historyId": "1"})
+
+    gmail = GmailClient(RecordingSession(), api_root="http://google-workspace-mock:8090/gmail/v1/users/me/")
+
+    gmail.get_profile()
+
+    assert calls == ["http://google-workspace-mock:8090/gmail/v1/users/me/profile"]
