@@ -1,8 +1,8 @@
 # Automated checks for every pull request into main (SNX-64, hardened in SNX-65; NFR-06).
 #
-# Three independent jobs run in parallel. Their `name:` values ("Frontend", "Backend", "Airflow") are
+# Four independent jobs run in parallel. The `name:` values "Frontend", "Backend" and "Airflow" are
 # what the main branch protection lists as required status checks, so renaming a job here means
-# updating the protection rule too.
+# updating the protection rule too. "Google Workspace" (SNX-67) should be added to that rule as well.
 #
 # Ground rules:
 # - No repository secrets. Everything below uses synthetic data, mocks, or throwaway CI-only values
@@ -38,15 +38,15 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: frontend
+        working-directory: web
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
         with:
-          node-version: "22" # frontend/Dockerfile uses node:22-alpine
+          node-version: "22" # web/Dockerfile uses node:22-alpine
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       # `npm ci` installs exactly what package-lock.json says and fails if it is out of sync with
       # package.json, which is the reproducibility guarantee we want in CI.
@@ -65,8 +65,8 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: backend
-    # The API tests need a real PostgreSQL: backend/tests/conftest.py creates a "<db>_test" database
+        working-directory: api
+    # The API tests need a real PostgreSQL: api/tests/conftest.py creates a "<db>_test" database
     # on the server named by DATABASE_URL and migrates it to head with Alembic. Same major version
     # as the Compose postgres service.
     services:
@@ -91,12 +91,12 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12" # backend/Dockerfile uses python:3.12-slim
+          python-version: "3.12" # api/Dockerfile uses python:3.12-slim
           cache: pip
           # requirements-dev.txt pulls in requirements.txt, so both files key the cache.
           cache-dependency-path: |
-            backend/requirements.txt
-            backend/requirements-dev.txt
+            api/requirements.txt
+            api/requirements-dev.txt
 
       - run: python -m pip install -r requirements-dev.txt
       # `python -m pytest` (not bare `pytest`) puts the project root on sys.path, matching pytest.ini.
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     # The Postgres-backed tests (replay protection, quarantine savepoints, cursor-after-store, silver
-    # publish) need a throwaway database migrated to head. The fixture in airflow/tests/conftest.py only
+    # publish) need a throwaway database migrated to head. The fixture in data-platform/tests/conftest.py only
     # accepts names ending in "_ingest_test", because those tests leave append-only rows behind. A fresh
     # container per run makes that harmless here.
     services:
@@ -130,14 +130,14 @@ jobs:
       - uses: actions/checkout@v5
 
       # The schema these tests write to is owned by the backend's Alembic migrations, so apply them
-      # the same way airflow/README.md does locally (`api alembic upgrade head`), just without Docker.
+      # the same way data-platform/README.md does locally (`api alembic upgrade head`), just without Docker.
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: api/requirements.txt
       - name: Migrate the test database to head
-        working-directory: backend
+        working-directory: api
         env:
           DATABASE_URL: ${{ env.INGEST_TEST_DATABASE_URL }}
         run: |
@@ -152,7 +152,7 @@ jobs:
       - name: Build the project Airflow image
         uses: docker/build-push-action@v7 # v7+ runs on Node 24
         with:
-          context: ./airflow
+          context: ./data-platform
           load: true # make the image available to `docker run` below
           push: false
           tags: solnexus-airflow:ci
@@ -163,8 +163,7 @@ jobs:
           cache-to: type=gha,mode=min
 
       # Mirrors `docker compose --profile test run --rm airflow-tests`: the project is mounted
-      # read-only, so pytest's cache is disabled instead of being written into it. The Gmail connector
-      # tests use an in-memory fake and never call Google.
+      # read-only, so pytest's cache is disabled instead of being written into it.
       # This stays a plain `docker run` rather than calling the Compose service because the container
       # must share the runner's network (--network host) to reach the job's Postgres service on
       # localhost; `docker compose run` would put it on the Compose project network instead.
@@ -173,9 +172,105 @@ jobs:
           docker run --rm \
             --network host \
             --env SOLNEXUS_TEST_DATABASE_URL="$INGEST_TEST_DATABASE_URL" \
-            --volume "$GITHUB_WORKSPACE/airflow:/opt/airflow/project:ro" \
+            --volume "$GITHUB_WORKSPACE/data-platform:/opt/airflow/project:ro" \
             --workdir /opt/airflow/project \
             --env AIRFLOW__CORE__LOAD_EXAMPLES=false \
             --entrypoint bash \
             solnexus-airflow:ci \
             -c 'pip install --quiet --disable-pip-version-check -r requirements-dev.txt && python -m pytest -p no:cacheprovider'
+
+  google-workspace:
+    name: Google Workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Three test tiers for the Google Workspace connector, in one job so branch protection needs one check:
+    # 1. the master's unit tests (Google faked in memory), 2. the mock Google server's lint and unit tests,
+    # 3. contract tests: the master's real code against the mock running as a container, writing to this job's
+    # Postgres. The Postgres-backed tests write append-only bronze rows, so they get their own throwaway
+    # "*_ingest_test" database, like the Airflow job. Nothing here calls Google or needs a secret.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: solnexus
+          POSTGRES_PASSWORD: ci-only-password # lives only in this job's throwaway container
+          POSTGRES_DB: solnexus_ingest_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U solnexus -d solnexus_ingest_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      INGEST_TEST_DATABASE_URL: postgresql://solnexus:ci-only-password@localhost:5432/solnexus_ingest_test
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            api/requirements.txt
+            data-ingestion/google-workspace/google-workspace-master-service/requirements*.txt
+            data-ingestion/google-workspace/google-workspace-mock-server/requirements*.txt
+
+      # The tables the master writes are owned by the backend's Alembic migrations (docs/database.md).
+      - name: Migrate the test database to head
+        working-directory: api
+        env:
+          DATABASE_URL: ${{ env.INGEST_TEST_DATABASE_URL }}
+        run: |
+          python -m pip install -r requirements.txt
+          python -m alembic upgrade head
+
+      # Plain Python on the runner: the master has no Airflow dependency. Mirrors
+      # `docker compose --profile test run --rm google-workspace-master-tests`.
+      - name: Run Google Workspace master tests
+        working-directory: data-ingestion/google-workspace/google-workspace-master-service
+        env:
+          SOLNEXUS_TEST_DATABASE_URL: ${{ env.INGEST_TEST_DATABASE_URL }}
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pytest -p no:cacheprovider
+
+      # Mirrors `docker compose --profile test run --rm google-workspace-mock-tests`, plus the same pinned ruff
+      # over the contract tests (they have no ruff config of their own, so they use the mock's).
+      - name: Lint and unit-test the mock Google server
+        working-directory: data-ingestion/google-workspace/google-workspace-mock-server
+        run: |
+          python -m pip install -r requirements-dev.txt
+          ruff check --no-cache .
+          ruff format --no-cache --check .
+          ruff check --no-cache --config ruff.toml ../contract-tests
+          ruff format --no-cache --config ruff.toml --check ../contract-tests
+          python -m pytest -p no:cacheprovider
+
+      # The mock runs from its real image, so the Dockerfile, the startup validation and the health check are
+      # exercised too. MOCK_ENVIRONMENT=ci is one of the three environments the mock agrees to start in.
+      - name: Start the mock Google server
+        run: |
+          docker build --tag solnexus-google-workspace-mock:ci data-ingestion/google-workspace/google-workspace-mock-server
+          docker run --detach --name google-workspace-mock --publish 127.0.0.1:18090:8090 \
+            --env MOCK_ENVIRONMENT=ci solnexus-google-workspace-mock:ci
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18090/_mock/health; then echo; exit 0; fi
+            sleep 1
+          done
+          echo "The mock did not become healthy; its log:" && docker logs google-workspace-mock && exit 1
+
+      # Mirrors `docker compose --profile test run --rm google-workspace-contract-tests`. The master's code is
+      # imported from its folder (PYTHONPATH), exactly as it runs in production; only Google's two addresses
+      # (API and token endpoint) point at the mock.
+      - name: Run contract tests (master against the mock)
+        working-directory: data-ingestion/google-workspace/contract-tests
+        env:
+          GOOGLE_WORKSPACE_MOCK_URL: http://127.0.0.1:18090
+          SOLNEXUS_TEST_DATABASE_URL: ${{ env.INGEST_TEST_DATABASE_URL }}
+          PYTHONPATH: ${{ github.workspace }}/data-ingestion/google-workspace/google-workspace-master-service
+        run: python -m pytest -p no:cacheprovider -rs
+
+      - name: Show the mock's log if anything failed
+        if: failure()
+        run: docker logs google-workspace-mock || true

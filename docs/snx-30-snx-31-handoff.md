@@ -26,9 +26,9 @@ docker compose run --rm api pytest -q
 
 The API's test database is `<DATABASE_URL database>_test`. The dev API service mounts dbt models and contract fixtures read-only so its integration tests can check the source-of-truth examples. Tests do not overwrite development rows.
 
-For the application, publish silver through the SNX-33 `transform_bronze_to_silver` DAG as documented in `airflow/README.md`. A standalone local dbt build does not create a successful pipeline run or mark its tables as published. Start API/web after setup, with `VITE_USE_MOCKS=false` for real API verification. Missing migrations or programming defects return sanitized 500 errors; connection outages return 503; known uniqueness/reference conflicts return 409.
+For the application, publish silver through the SNX-33 `transform_bronze_to_silver` DAG as documented in `data-platform/README.md`. A standalone local dbt build does not create a successful pipeline run or mark its tables as published. Start API/web after setup, with `VITE_USE_MOCKS=false` for real API verification. Missing migrations or programming defects return sanitized 500 errors; connection outages return 503; known uniqueness/reference conflicts return 409.
 
-Frontend checks, from `frontend/`:
+Frontend checks, from `web/`:
 
 ```sh
 npm ci

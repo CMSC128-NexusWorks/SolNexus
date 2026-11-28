@@ -1,0 +1,9 @@
+# Runtime dependencies of the mock Google server, pinned exactly so every build serves the same behavior.
+# Versions match the SolNexus API image (api/requirements.txt resolves to these).
+fastapi==0.165.0
+starlette==1.10.0
+uvicorn==0.54.0
+# Used directly for dataset validation (mock_dataset); pinned so the dataset rules never shift under us.
+pydantic==2.14.4
+# IANA time zone data for zoneinfo, so event offsets do not depend on the host OS having tz files.
+tzdata==2026.6

@@ -4,13 +4,13 @@ The Phase 1 business schema lives in the `solnexus` PostgreSQL database. Airflow
 
 ## Running migrations
 
-Migrations live in [backend/migrations/versions](../backend/migrations/versions) and run through the `api` image. Run them explicitly; the API does not migrate on startup.
+Migrations live in [api/migrations/versions](../api/migrations/versions) and run through the `api` image. Run them explicitly; the API does not migrate on startup.
 
 **Fresh setup or after pulling new migrations:**
 
 ```bash
 docker compose up -d postgres
-docker compose build api                                   # only when backend/requirements.txt changed
+docker compose build api                                   # only when api/requirements.txt changed
 docker compose run --rm --no-deps api alembic upgrade head
 docker compose run --rm --no-deps api alembic current      # expect the newest revision with (head)
 ```
@@ -24,12 +24,12 @@ Postgres runs `docker/postgres/init.sql` only when its volume is empty, which is
 ```bash
 set -a; . ./.env; set +a
 docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 \
-  < backend/fixtures/dev_seed.sql
+  < api/fixtures/dev_seed.sql
 ```
 
 **Review the SQL of a migration without a database:** `docker compose run --rm --no-deps api alembic upgrade head --sql`.
 
-**Adding a migration:** create the next numbered file in `backend/migrations/versions` with `docker compose run --rm --no-deps api alembic revision --rev-id 0015 -m "create app.example"` (pass the next number; without `--rev-id` Alembic uses a random hash). Write the DDL by hand with `op.execute`, include a `downgrade`, and before opening a PR check `upgrade head`, `downgrade -1`, `upgrade head` and the `--sql` output against a throwaway database. A downgrade drops its tables with their rows, so never run one against a database whose data you need.
+**Adding a migration:** create the next numbered file in `api/migrations/versions` with `docker compose run --rm --no-deps api alembic revision --rev-id 0015 -m "create app.example"` (pass the next number; without `--rev-id` Alembic uses a random hash). Write the DDL by hand with `op.execute`, include a `downgrade`, and before opening a PR check `upgrade head`, `downgrade -1`, `upgrade head` and the `--sql` output against a throwaway database. A downgrade drops its tables with their rows, so never run one against a database whose data you need.
 
 ## Who owns what
 
@@ -37,14 +37,14 @@ Each schema has exactly one tool that changes its structure.
 
 | Schema | Structure owned by | Rows written by | Rebuilt? |
 |---|---|---|---|
-| `bronze` | Alembic (`backend/migrations`) | Ingestion connectors, insert only | Never |
-| `app` | Alembic (`backend/migrations`) | API, ingestion, import, resolution job | Never |
-| `silver` | dbt (`dbt/models/silver`) | dbt only | Yes, on any dbt run |
+| `bronze` | Alembic (`api/migrations`) | Ingestion connectors, insert only | Never |
+| `app` | Alembic (`api/migrations`) | API, ingestion, import, resolution job | Never |
+| `silver` | dbt (`data-platform/dbt/models/silver`) | dbt only | Yes, on any dbt run |
 | `public` | Alembic's `alembic_version` table and the `citext` extension | Alembic | No |
 
 Rules that follow from this:
 
-- dbt reads `bronze` and `app` through [dbt/models/sources.yml](../dbt/models/sources.yml) and never writes to them. A staff edit stored in `silver` would be lost on the next dbt run.
+- dbt reads `bronze` and `app` through [data-platform/dbt/models/sources.yml](../data-platform/dbt/models/sources.yml) and never writes to them. A staff edit stored in `silver` would be lost on the next dbt run.
 - The API never writes to `silver`. It reads silver, plus `app` rows for edits not yet projected (`pending_projection`).
 - A schema change to `bronze` or `app` is a new Alembic revision. Never edit a merged revision.
 

@@ -1,0 +1,6 @@
+# Only the service's runtime modules go into the image.
+tests/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+requirements-dev.txt

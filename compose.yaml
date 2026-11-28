@@ -1,6 +1,6 @@
 x-airflow-common: &airflow-common
   build:
-    context: ./airflow
+    context: ./data-platform
   environment: &airflow-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
@@ -16,12 +16,13 @@ x-airflow-common: &airflow-common
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     POSTGRES_DB: ${POSTGRES_DB}
     POSTGRES_PORT: "5432"
-    # Connector package used by the DAGs (airflow/include/solnexus_ingest).
-    PYTHONPATH: /opt/airflow/include
+    # Airflow-side helpers (data-platform/include/solnexus_ingest), plus the Google Workspace master's
+    # `services` package, which ingest_email imports until the master has its scan API (SNX-67).
+    PYTHONPATH: /opt/airflow/include:/opt/airflow/google-workspace-master
     # Warehouse connection for PostgresHook(postgres_conn_id="solnexus_db"). JSON instead of a URI so a
     # password containing @ : / # % needs no URL encoding (only " and \ would need JSON escaping).
     AIRFLOW_CONN_SOLNEXUS_DB: '{"conn_type": "postgres", "host": "postgres", "port": 5432, "login": "${POSTGRES_USER}", "password": "${POSTGRES_PASSWORD}", "schema": "${POSTGRES_DB}"}'
-    # Gmail ingestion (SNX-32). The token comes from the SNX-21 consent flow; see airflow/README.md.
+    # Gmail ingestion (SNX-32). The token comes from the SNX-21 consent flow; see data-platform/README.md.
     GMAIL_TOKEN_FILE: /opt/airflow/secrets/gmail-token.json
     GMAIL_LABEL_ID: ${GMAIL_LABEL_ID:-}
     GMAIL_BACKFILL_QUERY: ${GMAIL_BACKFILL_QUERY:-newer_than:30d}
@@ -30,9 +31,11 @@ x-airflow-common: &airflow-common
     SILVER_REFRESH_SCHEDULE: ${SILVER_REFRESH_SCHEDULE:-30 * * * *}
     DBT_PROJECT_DIR: /opt/airflow/dbt
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
-    - ./airflow/include:/opt/airflow/include:ro
-    - ./dbt:/opt/airflow/dbt
+    - ./data-platform/dags:/opt/airflow/dags
+    - ./data-platform/include:/opt/airflow/include:ro
+    # Transitional (SNX-67): removed once ingest_email calls the master over HTTP.
+    - ./data-ingestion/google-workspace/google-workspace-master-service:/opt/airflow/google-workspace-master:ro
+    - ./data-platform/dbt:/opt/airflow/dbt
     - airflow_logs:/opt/airflow/logs
     # OAuth files stay on the host and are mounted read-only; the image never contains them.
     - ./.secrets:/opt/airflow/secrets:ro
@@ -61,7 +64,7 @@ services:
 
   api:
     build:
-      context: ./backend
+      context: ./api
       args:
         # Local dev image includes test tools for `docker compose run --rm api pytest`.
         INSTALL_DEV: "true"
@@ -75,9 +78,10 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
-      - ./backend:/app
-      # Read-only contract/model sources used by backend integration tests in the dev container.
-      - ./dbt:/dbt:ro
+      - ./api:/app
+      # Read-only contract/model sources used by backend integration tests in the dev container, mounted at their
+      # repo-relative paths so the tests find them the same way here as on a CI runner (tests/test_leads.py).
+      - ./data-platform/dbt:/data-platform/dbt:ro
       - ./docs/contracts/fixtures:/docs/contracts/fixtures:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
@@ -93,7 +97,7 @@ services:
   gmail-spike:
     profiles: ["spike"]
     build:
-      context: ./backend/spikes
+      context: ./api/spikes
     user: "${SNX_LOCAL_UID:-1000}:${SNX_LOCAL_GID:-1000}"
     environment:
       SNX_21_SECRET_DIR: /run/snx-21-secrets
@@ -104,7 +108,7 @@ services:
       - "127.0.0.1:8765:8765"
 
   # Connector tests in the same image the DAGs run in: docker compose --profile test run --rm airflow-tests
-  # SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests (see airflow/README.md).
+  # SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests (see data-platform/README.md).
   airflow-tests:
     profiles: ["test"]
     <<: *airflow-common
@@ -113,7 +117,7 @@ services:
     environment:
       SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
     volumes:
-      - ./airflow:/opt/airflow/project:ro
+      - ./data-platform:/opt/airflow/project:ro
     # Arguments after the service name are appended and reach pytest as "$$@" (e.g. -k sync).
     # The project mount is read-only, so pytest's cache is disabled rather than written into it.
     entrypoint:
@@ -123,16 +127,104 @@ services:
       - "--"
     command: []
 
+  # Google Workspace master tests: docker compose --profile test run --rm google-workspace-master-tests
+  # Plain Python, no Airflow. SOLNEXUS_TEST_DATABASE_URL enables the Postgres-backed tests; they share the
+  # throwaway solnexus_ingest_test database with the Airflow tests (data-platform/README.md).
+  google-workspace-master-tests:
+    profiles: ["test"]
+    image: python:3.12-slim
+    working_dir: /app
+    environment:
+      SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_ROOT_USER_ACTION: ignore
+    volumes:
+      - ./data-ingestion/google-workspace/google-workspace-master-service:/app:ro
+    # Read-only mount, so pytest's cache is disabled. Arguments after the service name reach pytest.
+    entrypoint:
+      - bash
+      - -c
+      - pip install --quiet -r requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
+
+  # Mock Google (SNX-69): fake Gmail and Calendar APIs with synthetic data, so the pipeline runs with no Google
+  # account. Opt-in profile, so `docker compose up` behaves as before:
+  #   docker compose --profile mock up -d google-workspace-mock   ->  http://127.0.0.1:18090/_mock/health
+  google-workspace-mock:
+    # "test" too, so the contract tests below can start it as a dependency.
+    profiles: ["mock", "test"]
+    build:
+      context: ./data-ingestion/google-workspace/google-workspace-mock-server
+    environment:
+      # Validated at startup; anything but local/ci/dev stops the container (it must never pose as Google
+      # where real data flows).
+      MOCK_ENVIRONMENT: local
+      MOCK_LOG_LEVEL: ${MOCK_LOG_LEVEL:-INFO}
+    # Bound to localhost only: the mock has no authentication of its own.
+    ports:
+      - "127.0.0.1:18090:8090"
+
+  # Mock tests and lint: docker compose --profile test run --rm google-workspace-mock-tests
+  # Unit tests only (in-process, no database, no network). The project mount is read-only, so caches are off.
+  google-workspace-mock-tests:
+    profiles: ["test"]
+    image: python:3.12-slim
+    working_dir: /app
+    environment:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_ROOT_USER_ACTION: ignore
+    volumes:
+      - ./data-ingestion/google-workspace/google-workspace-mock-server:/app:ro
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        pip install --quiet -r requirements-dev.txt
+        && ruff check --no-cache .
+        && ruff format --no-cache --check .
+        && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
+
+  # Contract tests (SNX-69): the master's real Gmail client and sync against the running mock and a throwaway
+  # Postgres. docker compose --profile test run --rm google-workspace-contract-tests
+  # Needs SOLNEXUS_TEST_DATABASE_URL (the *_ingest_test database, data-platform/README.md#tests); the database
+  # tests skip without it. Starts the mock first and waits until its health check passes.
+  google-workspace-contract-tests:
+    profiles: ["test"]
+    image: python:3.12-slim
+    working_dir: /contract-tests
+    depends_on:
+      google-workspace-mock:
+        condition: service_healthy
+    environment:
+      GOOGLE_WORKSPACE_MOCK_URL: http://google-workspace-mock:8090
+      SOLNEXUS_TEST_DATABASE_URL: ${SOLNEXUS_TEST_DATABASE_URL:-}
+      # The master's code, imported exactly as it runs in production.
+      PYTHONPATH: /master
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PIP_ROOT_USER_ACTION: ignore
+    volumes:
+      - ./data-ingestion/google-workspace/contract-tests:/contract-tests:ro
+      - ./data-ingestion/google-workspace/google-workspace-master-service:/master:ro
+    entrypoint:
+      - bash
+      - -c
+      - pip install --quiet -r /master/requirements-dev.txt && python -m pytest -p no:cacheprovider "$$@"
+      - "--"
+    command: []
+
   web:
     build:
-      context: ./frontend
+      context: ./web
     environment:
       VITE_API_URL: ${VITE_API_URL}
       VITE_USE_MOCKS: ${VITE_USE_MOCKS:-true}
     ports:
       - "${WEB_PORT:-5173}:5173"
     volumes:
-      - ./frontend:/app
+      - ./web:/app
       - web_node_modules:/app/node_modules
     depends_on:
       api:

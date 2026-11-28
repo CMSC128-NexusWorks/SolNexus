@@ -72,6 +72,8 @@ flowchart TB
 
 ### 1.3 Diagram — Phase 2 (Semester 2 / SWE 2)
 
+> **Scope update (November 28, 2026):** this delivery's data sources are Google Workspace only: Gmail and Google Calendar bookings (FR-22, [calendar contract](contracts/google-calendar-v1.md)). The Facebook and Viber connectors drawn below are out of scope and kept only as the design's extension points. Source connectors now run as the Google Workspace master service in `data-ingestion/`, orchestrated by Airflow in `data-platform/`.
+
 Phase 2 adds Facebook Page and supported Viber bot ingestion to Phase 1's Gmail connector, introduces LLM extraction, adds S3 raw retention and gold analytics, and adds failure alerting. The existing lead spreadsheet cannot supply missing Viber conversation history. The daily digest is optional.
 
 ```mermaid
@@ -168,7 +170,7 @@ flowchart TB
 
 ## 2. Data Pipeline Architecture
 
-This section zooms into the ingestion → storage → transformation flow — the medallion (bronze/silver/gold) pipeline referenced in Section 6 of the proposal — independent of the frontend/serving concerns covered above.
+This section zooms into the ingestion → storage → transformation flow — the medallion (bronze/silver/gold) pipeline referenced in Section 6 of the proposal — independent of the web/serving concerns covered above.
 
 ### 2.1 Description
 

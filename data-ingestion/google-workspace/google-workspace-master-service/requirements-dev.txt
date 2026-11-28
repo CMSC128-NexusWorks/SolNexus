@@ -1,0 +1,4 @@
+-r requirements.txt
+# Pinned exactly, and to the same version as the mock Google server's, so results do not change from run to run
+# and CI can install the master, the mock and the contract tests into one environment without a conflict.
+pytest==9.2.0

@@ -1,0 +1,5 @@
+# Runtime dependencies of the Google Workspace master service.
+# Versions match the Airflow image the extraction code ran in before it moved here (SNX-67).
+google-auth>=2.30,<3
+requests>=2.32,<3
+psycopg2-binary>=2.9,<3

@@ -8,9 +8,9 @@ SNX-15 now records this revision. It remains In Review pending team capacity rev
 
 **Phase 1 is this semester’s minimum finished product.** Complete and verify it before starting Phase 2 implementation. Phase 2 is an aspiration for remaining time and provider access; incomplete Phase 2 work is reported separately. FR-16 finance and FR-17 digest remain stretch goals. Sprint labels are planning labels; the connected Jira tool does not expose native board sprint assignment.
 
-Phase 1 includes Gmail API conversation ingestion; import of clinic/lead rows from both equally authoritative sheets of the private `leads-data/Leads Spreadsheet.xlsx` format; download of the current lead list; manual Add clinic (wireframe 06); and FR-21 spreadsheet-like editing of operational rows in the Due today, Needs clinic name and All leads dashboard views (wireframe 02). Authorized staff can edit contact details, status, next-action date, notes, person spoken to and confirmed clinic fields with save/cancel, validation, audit and stale-edit protection. New inquiries display **Clinic name unknown** and an **Email to ask** action until staff review the lead's reply and confirm the clinic name. Raw-message bronze storage, dbt silver processing, Airflow retries and authenticated FastAPI support these workflows. The lead workbook contains operational lead data, **not** Facebook or Viber conversation exports. Do not place its real rows in fixtures, Jira descriptions, or logs.
+Phase 1 includes Gmail API conversation ingestion; Google Calendar booking ingestion (FR-22, added November 28, 2026: SolTech bookings go from its web booking app through Calendly into Google Calendar, specified in [the calendar contract](contracts/google-calendar-v1.md)); import of clinic/lead rows from both equally authoritative sheets of the private `leads-data/Leads Spreadsheet.xlsx` format; download of the current lead list; manual Add clinic (wireframe 06); and FR-21 spreadsheet-like editing of operational rows in the Due today, Needs clinic name and All leads dashboard views (wireframe 02). Authorized staff can edit contact details, status, next-action date, notes, person spoken to and confirmed clinic fields with save/cancel, validation, audit and stale-edit protection. New inquiries display **Clinic name unknown** and an **Email to ask** action until staff review the lead's reply and confirm the clinic name. Raw-message bronze storage, dbt silver processing, Airflow retries and authenticated FastAPI support these workflows. The lead workbook contains operational lead data, **not** Facebook or Viber conversation exports. Do not place its real rows in fixtures, Jira descriptions, or logs.
 
-Phase 2 adds Facebook Page conversations after an access and review-path decision and supported Viber bot conversations after an access and workflow-coverage decision, LLM enrichment, private S3 raw retention, gold conversion/response analytics and pipeline failure alerts. The [Viber REST API](https://developers.viber.com/docs/api/rest-bot-api/) documents commercial bot access and webhook callbacks; it does not establish access to the client’s existing personal conversation history. A GO decision requires evidence for the intended conversation workflow.
+Phase 2 adds LLM enrichment, private S3 raw retention, gold conversion/response analytics and pipeline failure alerts, all on Google Workspace data. **Scope decision (Product Owner, November 28, 2026):** this delivery's only data sources are Gmail and Google Calendar. Facebook Page and Viber ingestion are out of scope; their requirements and tickets are kept, labelled `out-of-scope`, for a later team. Google Phase 2 work may proceed in parallel with Phase 1 acceptance instead of waiting for it, still on live evidence, with one PR per ticket after SNX-67. The [Viber REST API](https://developers.viber.com/docs/api/rest-bot-api/) documents commercial bot access and webhook callbacks; it does not establish access to the client’s existing personal conversation history. A GO decision requires evidence for the intended conversation workflow.
 
 ## Acceptance sequence
 
@@ -47,6 +47,8 @@ Priority labels map to Jira native priorities: P0 Highest, P1 High, P2 Medium, P
 | [SNX-43](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-43) | Verify Phase 1 acceptance and report Phase 2 readiness | QA | P0 | Sprint 3 |
 | [SNX-48](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-48) | Add named clinic lead manually | FRONTEND | P0 | Sprint 3 |
 | [SNX-53](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-53) | Download current lead data as a spreadsheet | DATA | P0 | Sprint 3 |
+| [SNX-67](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-67) | Complete Google Workspace ingestion end to end (Gmail + Calendar, FR-22) | INTEGRATION | P0 | Sprint 4 |
+| [SNX-68](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-68)–[SNX-76](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-76) | SNX-67 subtasks: Calendar docs, mock Google server, master scan API, calendar bronze, calendar extraction, silver.meetings, meetings API, dashboard, end-to-end verification | mixed | P0 | Sprint 4 |
 
 ### Release stabilization
 
@@ -57,15 +59,15 @@ Priority labels map to Jira native priorities: P0 Highest, P1 High, P2 Medium, P
 | [SNX-46](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-46) | Verify access controls, recovery and performance of the frozen build | QA | P0 | Sprint 4 |
 | [SNX-47](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-47) | Verify deployment and finalize the release runbook and demo | DOCS | P0 | Sprint 4 |
 
-### Phase 2, conditional after Phase 1
+### Phase 2 (Google data; may run in parallel with Phase 1 acceptance)
 
 | Issue | Work | Category | Priority | Target |
 |---|---|---|---|---|
-| [SNX-22](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-22) | Spike: prove Facebook Page conversation access and review path | INTEGRATION | P1 | After Phase 1 |
-| [SNX-36](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-36) | Ingest synthetic Facebook Page conversations automatically | INTEGRATION | P1 | After Phase 1 |
-| [SNX-23](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-23) | Spike: validate Viber bot access against the client's conversation workflow | INTEGRATION | P1 | After Phase 1 |
+| [SNX-22](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-22) | *Out of scope (November 28, 2026).* Spike: prove Facebook Page conversation access and review path | INTEGRATION | P1 | After Phase 1 |
+| [SNX-36](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-36) | *Out of scope (November 28, 2026).* Ingest synthetic Facebook Page conversations automatically | INTEGRATION | P1 | After Phase 1 |
+| [SNX-23](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-23) | *Out of scope (November 28, 2026).* Spike: validate Viber bot access against the client's conversation workflow | INTEGRATION | P1 | After Phase 1 |
 | [SNX-24](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-24) | Spike: select and evaluate structured LLM extraction | INTEGRATION | P1 | After Phase 1 |
-| [SNX-37](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-37) | Ingest synthetic Viber bot messages through verified callbacks | INTEGRATION | P1 | After Phase 1 |
+| [SNX-37](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-37) | *Out of scope (November 28, 2026).* Ingest synthetic Viber bot messages through verified callbacks | INTEGRATION | P1 | After Phase 1 |
 | [SNX-38](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-38) | Integrate validated LLM enrichment into the silver pipeline | DATA | P1 | After Phase 1 |
 | [SNX-39](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-39) | Archive raw conversations to private S3 with replay and reconciliation | DATA | P1 | After Phase 1 |
 | [SNX-40](https://jemarcobriz123-1788442076746.atlassian.net/browse/SNX-40) | Build gold conversion and response metrics with authenticated APIs | DATA | P1 | After Phase 1 |
@@ -92,8 +94,8 @@ Priority labels map to Jira native priorities: P0 Highest, P1 High, P2 Medium, P
 
 ## Risks and limits
 
-- **Facebook access:** Page permissions or webhook access may block Phase 2 Facebook delivery. After Phase 1 acceptance, record a GO/NO-GO decision and report FR-11 separately if live synthetic ingestion cannot run.
-- **Viber coverage:** the documented bot API may not include existing personal chats. Phase 2 scope is conditional on a workflow test, not an assumption that all historical conversations are available.
+- **Facebook access** (*out of scope for this delivery*): Page permissions or webhook access may block Phase 2 Facebook delivery. After Phase 1 acceptance, record a GO/NO-GO decision and report FR-11 separately if live synthetic ingestion cannot run.
+- **Viber coverage** (*out of scope for this delivery*): the documented bot API may not include existing personal chats. Phase 2 scope is conditional on a workflow test, not an assumption that all historical conversations are available.
 - **Lead reconciliation:** imported and manually created clinics must survive dbt rebuilds and avoid false cross-channel merges. SNX-20 defines identity and data ownership before implementation.
 - **Capacity:** hours and velocity are unmeasured. Phase 2 has no fixed sprint or due-date commitment until Phase 1 is accepted and the team reforecasts.
 - **Jira dependencies:** five earlier obsolete Phase 2 Blocks links to SNX-43 were removed. The planned direct blockers are SNX-35, SNX-48 and SNX-53. Jira still has an obsolete SNX-36 Blocks SNX-43 link because the connected Jira tool cannot delete issue links; remove link ID 10040 before using Jira blockers as the acceptance gate.

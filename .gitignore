@@ -31,15 +31,15 @@ yarn-error.log*
 pnpm-debug.log*
 
 # dbt
-dbt/target/
-dbt/dbt_packages/
-dbt/logs/
-dbt/package-lock.yml
-dbt/.user.yml
+data-platform/dbt/target/
+data-platform/dbt/dbt_packages/
+data-platform/dbt/logs/
+data-platform/dbt/package-lock.yml
+data-platform/dbt/.user.yml
 
 # Airflow
-airflow/logs/
-airflow/airflow.db
+data-platform/logs/
+data-platform/airflow.db
 
 # IDE / OS
 .idea/
@@ -53,7 +53,7 @@ Thumbs.db
 .docker/
 
 # Frontend tooling
-frontend/.vite/
+web/.vite/
 
 # Jira planning verification snapshot (regenerate from Jira when needed)
 docs/jira_backlog_verification.json

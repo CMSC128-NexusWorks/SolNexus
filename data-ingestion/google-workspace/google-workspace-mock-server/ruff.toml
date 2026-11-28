@@ -1,0 +1,7 @@
+# Lint and format settings for the mock Google server (ruff is pinned in requirements-dev.txt).
+line-length = 120
+target-version = "py312"
+
+[lint]
+# E/F: pycodestyle and pyflakes basics; I: import order; B: likely bugs; UP: modern syntax.
+select = ["E", "F", "I", "B", "UP"]
