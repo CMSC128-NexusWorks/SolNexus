@@ -67,7 +67,7 @@ def test_deactivated_account_cannot_sign_in(client, staff, run_sql):
 
 
 def test_seeded_placeholder_hash_never_matches(client, run_sql):
-    # backend/fixtures/dev_seed.sql stores unusable hashes; they must fail cleanly, not crash.
+    # api/fixtures/dev_seed.sql stores unusable hashes; they must fail cleanly, not crash.
     run_sql(
         "INSERT INTO app.staff_users (email, password_hash) VALUES (:email, '$dev-seed$login-disabled')",
         email="seeded@example.test",

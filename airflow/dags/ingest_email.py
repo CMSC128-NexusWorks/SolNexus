@@ -68,7 +68,7 @@ def ingest_email():
         token_file = os.environ.get("GMAIL_TOKEN_FILE", "/opt/airflow/secrets/gmail-token.json")
         if not os.path.isfile(token_file):
             raise AirflowFailException(
-                "Gmail token file not found; authorize the mailbox (backend/spikes/README.md) and mount .secrets"
+                "Gmail token file not found; authorize the mailbox (api/spikes/README.md) and mount .secrets"
             )
         settings = SyncSettings(
             # Empty strings from Compose defaults mean "not set".

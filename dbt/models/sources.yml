@@ -1,6 +1,6 @@
 version: 2
 
-# dbt only reads these schemas. Alembic (backend/migrations) owns their DDL, and the API and
+# dbt only reads these schemas. Alembic (api/migrations) owns their DDL, and the API and
 # ingestion own their rows. dbt builds and may rebuild only the silver schema.
 sources:
   - name: bronze

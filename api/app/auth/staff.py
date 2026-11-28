@@ -27,7 +27,7 @@ def authenticate(conn: Connection, email: str, password: str) -> StaffUser | Non
     try:
         matches = _hasher.verify(row.password_hash if row else _UNKNOWN_USER_HASH, password)
     except (VerificationError, InvalidHashError):
-        # InvalidHashError covers the unusable placeholder hashes in backend/fixtures/dev_seed.sql.
+        # InvalidHashError covers the unusable placeholder hashes in api/fixtures/dev_seed.sql.
         matches = False
     if not matches or row is None or not row.is_active:
         return None

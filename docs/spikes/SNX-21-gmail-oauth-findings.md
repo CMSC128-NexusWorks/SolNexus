@@ -22,7 +22,7 @@ JM Briz confirmed on October 26 that he controls recovery for both test Gmail ac
 
 ## Reproduction and redacted evidence
 
-Follow the [Docker runbook](../../backend/spikes/README.md). The verified synthetic conversation uses this query:
+Follow the [Docker runbook](../../api/spikes/README.md). The verified synthetic conversation uses this query:
 
 ```bash
 docker compose --profile spike run --rm --service-ports gmail-spike \

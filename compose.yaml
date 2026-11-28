@@ -64,7 +64,7 @@ services:
 
   api:
     build:
-      context: ./backend
+      context: ./api
       args:
         # Local dev image includes test tools for `docker compose run --rm api pytest`.
         INSTALL_DEV: "true"
@@ -78,7 +78,7 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
-      - ./backend:/app
+      - ./api:/app
       # Read-only contract/model sources used by backend integration tests in the dev container.
       - ./dbt:/dbt:ro
       - ./docs/contracts/fixtures:/docs/contracts/fixtures:ro
@@ -96,7 +96,7 @@ services:
   gmail-spike:
     profiles: ["spike"]
     build:
-      context: ./backend/spikes
+      context: ./api/spikes
     user: "${SNX_LOCAL_UID:-1000}:${SNX_LOCAL_GID:-1000}"
     environment:
       SNX_21_SECRET_DIR: /run/snx-21-secrets

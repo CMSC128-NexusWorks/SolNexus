@@ -33,7 +33,7 @@ Each DAG allows one active run at a time. The hourly silver run keeps spreadshee
 
 **One-time setup (Linux):** set `AIRFLOW_UID` in `.env` to your user ID (`id -u`). The OAuth files in `.secrets/` are owner-only, and Airflow must run as that owner to read them. They're mounted read-only at `/opt/airflow/secrets`. If Airflow has already run under the old UID, remove its log volume once (`docker compose down` then `docker volume rm solnexus_airflow_logs`) so the new user can write logs.
 
-1. Authorize the test mailbox once with the SNX-21 probe ([backend/spikes/README.md](../backend/spikes/README.md)). That creates `.secrets/gmail-token.json`.
+1. Authorize the test mailbox once with the SNX-21 probe ([api/spikes/README.md](../api/spikes/README.md)). That creates `.secrets/gmail-token.json`.
 2. Apply migrations: `docker compose run --rm --no-deps api alembic upgrade head`.
 3. Start Airflow (`docker compose up -d`). New DAGs start **paused** (`DAGS_ARE_PAUSED_AT_CREATION`), so nothing runs until you choose to start it. Unpause both DAGs in the UI at `localhost:8080`, or:
 

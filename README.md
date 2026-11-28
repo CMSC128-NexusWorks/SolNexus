@@ -176,7 +176,7 @@ See the [frontend README](web/README.md) for scripts and conventions.
 ```
 .
 ├── airflow/    Airflow image, DAGs and the Gmail connector (see airflow/README.md)
-├── backend/    FastAPI app, Alembic migrations and dev seed
+├── api/    FastAPI app, Alembic migrations and dev seed
 ├── dbt/        dbt project (silver models; reads bronze and app as sources)
 ├── docker/     container init scripts (Postgres)
 ├── docs/       proposal, requirements, architecture, contracts, roadmap, wireframes
@@ -202,7 +202,7 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 | CI job | What it runs | Run the same checks locally |
 |---|---|---|
 | **Frontend** | `npm ci`, then `typecheck`, `lint`, `format:check`, `test` (vitest) and `build` (production Vite bundle) in `web/` | `cd web && npm ci && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build` |
-| **Backend** | `pytest` in `backend/`, against a PostgreSQL service container (it creates its own `solnexus_test` database) | `docker compose run --rm api pytest` |
+| **Backend** | `pytest` in `api/`, against a PostgreSQL service container (it creates its own `solnexus_test` database) | `docker compose run --rm api pytest` |
 | **Airflow** | `pytest` in `airflow/`, inside the project's Airflow image: DAG import test, the Gmail connector tests (Gmail faked in memory) and the Postgres-backed tests, against a throwaway `solnexus_ingest_test` database migrated to head | `docker compose --profile test run --rm airflow-tests` (add the database steps in [airflow/README.md](airflow/README.md#tests) to include the Postgres-backed tests) |
 
 - `npm run format:check` fails on unformatted files; fix them with `npm run format` in `web/`.
@@ -211,7 +211,7 @@ AI coding agents read [`AGENTS.md`](AGENTS.md) for the same rules plus project c
 
 ## Documentation
 
-- [SNX-21 Gmail OAuth findings and real synthetic API evidence](docs/spikes/SNX-21-gmail-oauth-findings.md) · [Docker probe runbook](backend/spikes/README.md)
+- [SNX-21 Gmail OAuth findings and real synthetic API evidence](docs/spikes/SNX-21-gmail-oauth-findings.md) · [Docker probe runbook](api/spikes/README.md)
 - [Project Proposal](docs/project_proposal.md)
 - [Software Requirements](docs/software_requirements.md)
 - [System Architecture](docs/architecture.md)
