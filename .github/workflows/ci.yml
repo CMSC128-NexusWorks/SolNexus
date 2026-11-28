@@ -182,10 +182,12 @@ jobs:
   google-workspace:
     name: Google Workspace
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    # The master's Postgres-backed tests (replay protection, quarantine savepoints, cursor-after-store)
-    # write append-only bronze rows, so they get their own throwaway "*_ingest_test" database, like the
-    # Airflow job. Google is faked in memory; nothing here calls Google or needs a secret.
+    timeout-minutes: 20
+    # Three test tiers for the Google Workspace connector, in one job so branch protection needs one check:
+    # 1. the master's unit tests (Google faked in memory), 2. the mock Google server's lint and unit tests,
+    # 3. contract tests: the master's real code against the mock running as a container, writing to this job's
+    # Postgres. The Postgres-backed tests write append-only bronze rows, so they get their own throwaway
+    # "*_ingest_test" database, like the Airflow job. Nothing here calls Google or needs a secret.
     services:
       postgres:
         image: postgres:16-alpine
@@ -212,6 +214,7 @@ jobs:
           cache-dependency-path: |
             api/requirements.txt
             data-ingestion/google-workspace/google-workspace-master-service/requirements*.txt
+            data-ingestion/google-workspace/google-workspace-mock-server/requirements*.txt
 
       # The tables the master writes are owned by the backend's Alembic migrations (docs/database.md).
       - name: Migrate the test database to head
@@ -231,3 +234,43 @@ jobs:
         run: |
           python -m pip install -r requirements-dev.txt
           python -m pytest -p no:cacheprovider
+
+      # Mirrors `docker compose --profile test run --rm google-workspace-mock-tests`, plus the same pinned ruff
+      # over the contract tests (they have no ruff config of their own, so they use the mock's).
+      - name: Lint and unit-test the mock Google server
+        working-directory: data-ingestion/google-workspace/google-workspace-mock-server
+        run: |
+          python -m pip install -r requirements-dev.txt
+          ruff check --no-cache .
+          ruff format --no-cache --check .
+          ruff check --no-cache --config ruff.toml ../contract-tests
+          ruff format --no-cache --config ruff.toml --check ../contract-tests
+          python -m pytest -p no:cacheprovider
+
+      # The mock runs from its real image, so the Dockerfile, the startup validation and the health check are
+      # exercised too. MOCK_ENVIRONMENT=ci is one of the three environments the mock agrees to start in.
+      - name: Start the mock Google server
+        run: |
+          docker build --tag solnexus-google-workspace-mock:ci data-ingestion/google-workspace/google-workspace-mock-server
+          docker run --detach --name google-workspace-mock --publish 127.0.0.1:18090:8090 \
+            --env MOCK_ENVIRONMENT=ci solnexus-google-workspace-mock:ci
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18090/_mock/health; then echo; exit 0; fi
+            sleep 1
+          done
+          echo "The mock did not become healthy; its log:" && docker logs google-workspace-mock && exit 1
+
+      # Mirrors `docker compose --profile test run --rm google-workspace-contract-tests`. The master's code is
+      # imported from its folder (PYTHONPATH), exactly as it runs in production; only Google's two addresses
+      # (API and token endpoint) point at the mock.
+      - name: Run contract tests (master against the mock)
+        working-directory: data-ingestion/google-workspace/contract-tests
+        env:
+          GOOGLE_WORKSPACE_MOCK_URL: http://127.0.0.1:18090
+          SOLNEXUS_TEST_DATABASE_URL: ${{ env.INGEST_TEST_DATABASE_URL }}
+          PYTHONPATH: ${{ github.workspace }}/data-ingestion/google-workspace/google-workspace-master-service
+        run: python -m pytest -p no:cacheprovider -rs
+
+      - name: Show the mock's log if anything failed
+        if: failure()
+        run: docker logs google-workspace-mock || true
