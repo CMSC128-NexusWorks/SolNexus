@@ -2,8 +2,8 @@
 
 The master service talks to it exactly as it talks to Google, so the whole pipeline can run locally and
 in CI with no Google account and no secrets. So far it has validated settings, a validated dataset loaded
-into in-memory state (mock_state), the health route and the error formats. Gmail, Calendar and the
-OAuth token endpoint arrive in later steps.
+into in-memory state (mock_state), the health route, the error formats and the Gmail API (routes_gmail).
+Calendar and the OAuth token endpoint arrive in later steps.
 
 Route namespaces:
 - `/_mock/*` holds the mock's own routes (health now; data control and fault injection later). The
@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+import routes_gmail
 from google_errors import GoogleApiError, google_error_response
 from mock_dataset import read_dataset_or_problems
 from mock_settings import MockServerSettings, format_startup_report, load_mock_server_settings_or_exit
@@ -122,6 +123,7 @@ def build_mock_google_app(settings: MockServerSettings, state: MockGoogleState) 
     register_error_handlers(app)
     # Routes reach the state through app.state, so tests can build an app around any state they like.
     app.state.mock_google_state = state
+    app.include_router(routes_gmail.router)
 
     @app.get("/_mock/health")
     def mock_health() -> dict[str, str]:
